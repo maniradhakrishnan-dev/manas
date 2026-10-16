@@ -73,9 +73,13 @@
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
         </button>
 
-        <!-- Smart Carryover Check Button -->
-        <button id="btn-carryover-check" class="tool-btn" title="Check Unfinished Tasks from Yesterday (Shortcut: R)">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"></polyline><path d="M20 20v-7a4 4 0 0 0-4-4H4"></path></svg>
+        <!-- Roll Over / Import Planner Button -->
+        <button id="btn-import-planner" class="header-action-pill btn-rollover" title="Roll Over Unfinished Tasks & Notes from Previous Date (Shortcut: R)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 14 4 9 9 4"></polyline>
+            <path d="M20 20v-7a4 4 0 0 0-4-4H4"></path>
+          </svg>
+          <span>Roll Over / Import</span>
         </button>
 
 
@@ -120,6 +124,13 @@
         <span class="phase-title">Creative Evening</span>
         <span class="phase-sub">Huro · Kana · Bana · Curio · Survivo · Random</span>
       </button>
+
+      <button type="button" class="phase-tab-btn" data-phase="health" title="Focus on Diet & Exercise (Shortcut: 4)">
+        <span class="phase-pill-key">4</span>
+        <span class="phase-time">5-6</span>
+        <span class="phase-title">Diet & Exercise</span>
+        <span class="phase-sub">Workout · Meals · Supplements · Recovery</span>
+      </button>
     </nav>
 
     <!-- Main Planner Workspace (Two Rows Layout) -->
@@ -137,8 +148,9 @@
           </div>
         </div>
         <div class="carryover-actions">
-          <button id="btn-carryover-apply" class="carryover-btn btn-primary" title="Roll all pending tasks into today">↳ Roll Over to Today</button>
-          <button id="btn-carryover-dismiss" class="carryover-btn btn-ghost" title="Dismiss for today">Dismiss</button>
+          <button id="btn-carryover-apply" class="carryover-btn btn-primary" title="Roll all pending tasks and inherit notes into today">↳ Roll Over into Today</button>
+          <button id="btn-carryover-choose" class="carryover-btn btn-secondary" title="Pick another date to import from">Pick Date...</button>
+          <button id="btn-carryover-dismiss" class="carryover-btn btn-ghost" title="Start blank today">Dismiss</button>
         </div>
       </div>
 
@@ -484,6 +496,100 @@
         </div>
       </section>
 
+      <!-- ======================================================================
+           PHASE 4: DIET & EXERCISE (Dedicated Health Workspace)
+           4 Cards: Workout (5-6 AM) | Diet & Meals | Hydration & Supplements | Body & Recovery
+           ====================================================================== -->
+      <section class="planner-row row-health phase-section-health" id="phase-section-health" style="display: none;">
+        
+        <!-- Master Header: Diet & Exercise -->
+        <div class="col-master-banner banner-health-master" id="banner-health-master">
+          <div class="master-banner-left">
+            <span class="column-time-pill pill-rose">05:00 — 06:00</span>
+            <span class="column-name">Diet & Exercise Headquarters</span>
+          </div>
+          <div class="master-banner-right">
+            <span class="split-indicator">4 Health Tracks · Deep Physical Vitality</span>
+          </div>
+        </div>
+
+        <div class="health-grid">
+          
+          <!-- Track 1: Workout (5-6 AM) -->
+          <div class="cool-card health-col-card" data-block="health_workout">
+            <div class="card-bar">
+              <div class="card-bar-left">
+                <span class="track-indicator dot-rose"></span>
+                <input type="text" class="card-title-input" value="Workout (5-6 AM)" placeholder="Workout Title" spellcheck="false" />
+              </div>
+              <div class="card-bar-right">
+                <span class="card-checklist-stat"></span>
+                <button class="btn-check-insert" title="Insert Checkbox">☐</button>
+                <button class="btn-bullet-insert" title="Insert Bullet">•</button>
+              </div>
+            </div>
+            <div class="card-editor-area">
+              <textarea class="card-text-editor" placeholder="Warmup, routine split, sets, reps, weight, cardio, stretching..."></textarea>
+            </div>
+          </div>
+
+          <!-- Track 2: Diet & Meals -->
+          <div class="cool-card health-col-card" data-block="health_diet">
+            <div class="card-bar">
+              <div class="card-bar-left">
+                <span class="track-indicator dot-amber"></span>
+                <input type="text" class="card-title-input" value="Diet & Meals" placeholder="Diet Title" spellcheck="false" />
+              </div>
+              <div class="card-bar-right">
+                <span class="card-checklist-stat"></span>
+                <button class="btn-check-insert" title="Insert Checkbox">☐</button>
+                <button class="btn-bullet-insert" title="Insert Bullet">•</button>
+              </div>
+            </div>
+            <div class="card-editor-area">
+              <textarea class="card-text-editor" placeholder="Breakfast, lunch, dinner, snacks, protein & macro targets, clean eating log..."></textarea>
+            </div>
+          </div>
+
+          <!-- Track 3: Hydration & Supplements -->
+          <div class="cool-card health-col-card" data-block="health_habits">
+            <div class="card-bar">
+              <div class="card-bar-left">
+                <span class="track-indicator dot-cyan"></span>
+                <input type="text" class="card-title-input" value="Hydration & Supplements" placeholder="Supplements Title" spellcheck="false" />
+              </div>
+              <div class="card-bar-right">
+                <span class="card-checklist-stat"></span>
+                <button class="btn-check-insert" title="Insert Checkbox">☐</button>
+                <button class="btn-bullet-insert" title="Insert Bullet">•</button>
+              </div>
+            </div>
+            <div class="card-editor-area">
+              <textarea class="card-text-editor" placeholder="Water intake (3-4L), whey protein, creatine, multivitamins, daily health habits..."></textarea>
+            </div>
+          </div>
+
+          <!-- Track 4: Body & Recovery -->
+          <div class="cool-card health-col-card" data-block="health_recovery">
+            <div class="card-bar">
+              <div class="card-bar-left">
+                <span class="track-indicator dot-violet"></span>
+                <input type="text" class="card-title-input" value="Body & Recovery" placeholder="Recovery Title" spellcheck="false" />
+              </div>
+              <div class="card-bar-right">
+                <span class="card-checklist-stat"></span>
+                <button class="btn-check-insert" title="Insert Checkbox">☐</button>
+                <button class="btn-bullet-insert" title="Insert Bullet">•</button>
+              </div>
+            </div>
+            <div class="card-editor-area">
+              <textarea class="card-text-editor" placeholder="Sleep quality, body weight, physical energy score, recovery notes, reflections..."></textarea>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
     </main>
 
     <!-- Bottom Status Bar -->
@@ -513,6 +619,78 @@
           <div id="calendar-months-grid" class="months-grid">
             <!-- Dynamically populated 12 months -->
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================================
+         Roll Over & Import Day Modal (Travel & Multi-Day Gap Friendly)
+         ====================================================================== -->
+    <div id="import-planner-modal" class="modal-backdrop">
+      <div class="modal-card import-modal-card">
+        <div class="modal-header">
+          <div class="modal-header-left">
+            <h2>📥 Roll Over & Import Day</h2>
+            <p class="modal-sub">Bring forward unfinished tasks and inherit your notes without re-typing them.</p>
+          </div>
+          <button id="btn-close-import-modal" class="modal-close-btn" title="Close (Esc)">&times;</button>
+        </div>
+
+        <div class="modal-body import-modal-body">
+          <!-- Step 1: Select Source Date -->
+          <div class="import-section">
+            <label class="import-section-label">Select Date to Import From:</label>
+            <div class="import-quick-chips" id="import-quick-chips">
+              <!-- Dynamically populated chips -->
+            </div>
+            <div class="import-custom-picker-row">
+              <span class="import-sub-hint">Or choose any specific date (after trips / gaps):</span>
+              <input type="date" id="import-source-date-input" class="import-date-picker" />
+            </div>
+          </div>
+
+          <!-- Step 2: Live Content Preview -->
+          <div class="import-preview-box" id="import-preview-box">
+            <div class="preview-header">
+              <span class="preview-badge" id="preview-date-badge">Loading...</span>
+              <span class="preview-stat" id="preview-stat-pill"></span>
+            </div>
+            <div class="preview-summary-list" id="preview-content-summary">
+              <!-- Dynamic preview items -->
+            </div>
+          </div>
+
+          <!-- Step 3: Options -->
+          <div class="import-options-container">
+            <label class="import-check-row">
+              <input type="checkbox" id="chk-import-tasks" checked />
+              <div class="check-text">
+                <span class="check-main">Roll Over Unfinished Tasks & Subtasks</span>
+                <span class="check-sub">Pending tasks and milestones are carried forward. Finished tasks stay in past history.</span>
+              </div>
+            </label>
+
+            <label class="import-check-row">
+              <input type="checkbox" id="chk-import-notes" checked />
+              <div class="check-text">
+                <span class="check-main">Carry Over Block Notes & Routines</span>
+                <span class="check-sub">Copies research notes, workout routines, diet logs, and references to today.</span>
+              </div>
+            </label>
+
+            <label class="import-check-row">
+              <input type="checkbox" id="chk-import-titles" checked />
+              <div class="check-text">
+                <span class="check-main">Preserve Custom Track Titles</span>
+                <span class="check-sub">Keeps custom track names renamed on the source date.</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="modal-footer import-modal-footer">
+          <button type="button" id="btn-import-cancel" class="btn-import-cancel">Cancel</button>
+          <button type="button" id="btn-import-execute" class="btn-import-execute">↳ Roll Over into Today</button>
         </div>
       </div>
     </div>

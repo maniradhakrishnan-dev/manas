@@ -55,6 +55,16 @@ if (!['paper', 'chalk', 'ceramic'].includes(savedTheme)) {
 }
 let currentTheme = savedTheme;
 let currentPendingCarryover = [];
+let currentPendingCarryoverSourceDate = null;
+let currentImportSourceDate = null;
+
+const ALL_BLOCK_KEYS = [
+  'health_workout', 'health_diet', 'health_habits', 'health_recovery',
+  'part1_quad1', 'part1_quad2', 'part1_quad3', 'part1_quad4',
+  'part2', 'productive', 'admin',
+  'evening_huro', 'evening_kana', 'evening_bana',
+  'evening_curio', 'evening_survivi', 'evening_random'
+];
 
 // DOM Elements
 const currentDateLabel = document.getElementById('current-date-label');
@@ -76,13 +86,29 @@ const progressText = document.getElementById('progress-text');
 const progressCircle = document.getElementById('progress-circle');
 const toastEl = document.getElementById('toast');
 
-// Smart Task Carryover DOM Elements
+// Smart Task Carryover & Banner DOM Elements
 const btnCarryoverCheck = document.getElementById('btn-carryover-check');
 const carryoverBanner = document.getElementById('carryover-banner');
 const carryoverTitle = document.getElementById('carryover-title');
 const carryoverPreview = document.getElementById('carryover-preview');
 const btnCarryoverApply = document.getElementById('btn-carryover-apply');
+const btnCarryoverChoose = document.getElementById('btn-carryover-choose');
 const btnCarryoverDismiss = document.getElementById('btn-carryover-dismiss');
+
+// Roll Over & Import Day Modal Elements
+const btnImportPlanner = document.getElementById('btn-import-planner');
+const importModal = document.getElementById('import-planner-modal');
+const btnCloseImportModal = document.getElementById('btn-close-import-modal');
+const btnImportCancel = document.getElementById('btn-import-cancel');
+const btnImportExecute = document.getElementById('btn-import-execute');
+const importQuickChips = document.getElementById('import-quick-chips');
+const importSourceDateInput = document.getElementById('import-source-date-input');
+const previewDateBadge = document.getElementById('preview-date-badge');
+const previewStatPill = document.getElementById('preview-stat-pill');
+const previewContentSummary = document.getElementById('preview-content-summary');
+const chkImportTasks = document.getElementById('chk-import-tasks');
+const chkImportNotes = document.getElementById('chk-import-notes');
+const chkImportTitles = document.getElementById('chk-import-titles');
 
 // Phase Isolation & Lock-In Deep Work DOM Elements
 let currentPhase = safeStorage.getItem('mrt_phase') || 'all';
@@ -157,7 +183,11 @@ function getDefaultTitle(blockKey) {
     evening_bana: "Bana",
     evening_curio: "Curio",
     evening_survivi: "Survivo",
-    evening_random: "Random"
+    evening_random: "Random",
+    health_workout: "Workout (5-6 AM)",
+    health_diet: "Diet & Meals",
+    health_habits: "Hydration & Supplements",
+    health_recovery: "Body & Recovery"
   };
   return titles[blockKey] || "";
 }
@@ -189,6 +219,10 @@ function getDefaultDayData(dateKey) {
     evening_curio: getDefaultBlockData("Curio"),
     evening_survivi: getDefaultBlockData("Survivo"),
     evening_random: getDefaultBlockData("Random"),
+    health_workout: getDefaultBlockData("Workout (5-6 AM)"),
+    health_diet: getDefaultBlockData("Diet & Meals"),
+    health_habits: getDefaultBlockData("Hydration & Supplements"),
+    health_recovery: getDefaultBlockData("Body & Recovery"),
     updatedAt: new Date().toISOString()
   };
 }
@@ -308,14 +342,7 @@ function normalizeDayData(raw, dateKey) {
     if (raw.evening.random) raw.evening_random = raw.evening.random;
   }
 
-  const blockKeys = [
-    'part1_quad1', 'part1_quad2', 'part1_quad3', 'part1_quad4',
-    'part2', 'productive', 'admin',
-    'evening_huro', 'evening_kana', 'evening_bana',
-    'evening_curio', 'evening_survivi', 'evening_random'
-  ];
-
-  for (const k of blockKeys) {
+  for (const k of ALL_BLOCK_KEYS) {
     normalized[k] = normalizeBlockData(raw[k], getDefaultTitle(k));
   }
 
@@ -1236,35 +1263,141 @@ function changeDate(newDate) {
 }
 
 // ==========================================================================
-// Smart Task Carryover Controller
+// Smart Task Carryover & Multi-Day Rollover Engine
 // ==========================================================================
 
-function extractUnfinishedTasks(dayData) {
-  if (!dayData || typeof dayData !== 'object') return [];
-  const blockKeys = [
-    'part1_quad1', 'part1_quad2', 'part1_quad3', 'part1_quad4',
-    'part2', 'productive', 'admin',
-    'evening_huro', 'evening_kana', 'evening_bana',
-    'evening_curio', 'evening_survivi', 'evening_random'
-  ];
-  const list = [];
-  for (const k of blockKeys) {
-    const block = dayData[k];
-    if (block && Array.isArray(block.tasks)) {
-      block.tasks.forEach(task => {
-        if (!task.done && task.text && task.text.trim().length > 0) {
-          list.push({
-            blockKey: k,
-            blockTitle: block.title || getDefaultTitle(k),
-            text: task.text.trim(),
-            notes: task.notes || '',
-            subtasks: Array.isArray(task.subtasks) ? JSON.parse(JSON.stringify(task.subtasks)) : []
-          });
-        }
+async function getAllStoredDates() {
+  const dates = new Set(activeDatesSet);
+
+  // 1. Fetch from Tauri filesystem if available
+  try {
+    const tauriDates = await callTauri('get_active_dates');
+    if (Array.isArray(tauriDates)) {
+      tauriDates.forEach(d => {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(d)) dates.add(d);
       });
     }
+  } catch (e) {}
+
+  // 2. Fetch from safeStorage cached active dates
+  try {
+    const cachedDates = safeStorage.getItem('mrt_active_dates');
+    if (cachedDates) {
+      const parsed = JSON.parse(cachedDates);
+      if (Array.isArray(parsed)) parsed.forEach(d => dates.add(d));
+    }
+  } catch (e) {}
+
+  // 3. Scan localStorage for any mrt_YYYY-MM-DD keys
+  try {
+    if (typeof localStorage !== 'undefined') {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('mrt_')) {
+          const possibleDate = key.replace('mrt_', '');
+          if (/^\d{4}-\d{2}-\d{2}$/.test(possibleDate)) {
+            dates.add(possibleDate);
+          }
+        }
+      }
+    }
+  } catch (e) {}
+
+  activeDatesSet = dates;
+  return Array.from(dates).sort().reverse();
+}
+
+async function findLatestActiveDayBefore(targetDateKey) {
+  const allDates = await getAllStoredDates();
+  
+  // Find dates strictly before targetDateKey
+  const pastDates = allDates.filter(d => d < targetDateKey);
+
+  for (const dKey of pastDates) {
+    const dData = await loadDay(dKey);
+    if (hasContent(dData)) {
+      return { dateKey: dKey, dayData: dData };
+    }
   }
-  return list;
+
+  // Fallback: Check yesterday directly even if not listed in active dates yet
+  const [y, m, d] = targetDateKey.split('-').map(Number);
+  const targetDateObj = new Date(y, m - 1, d);
+  const yestDateObj = new Date(targetDateObj);
+  yestDateObj.setDate(yestDateObj.getDate() - 1);
+  const yestKey = formatDateKey(yestDateObj);
+
+  if (!pastDates.includes(yestKey)) {
+    const yestData = await loadDay(yestKey);
+    if (hasContent(yestData)) {
+      return { dateKey: yestKey, dayData: yestData };
+    }
+  }
+
+  return null;
+}
+
+function analyzeSourceDay(dayData) {
+  if (!dayData || typeof dayData !== 'object') {
+    return {
+      unfinishedTasks: [],
+      completedTasksCount: 0,
+      totalTasks: 0,
+      notesCount: 0,
+      blockNotes: {},
+      blockTitles: {}
+    };
+  }
+
+  const unfinishedTasks = [];
+  let completedTasksCount = 0;
+  let totalTasks = 0;
+  let notesCount = 0;
+  const blockNotes = {};
+  const blockTitles = {};
+
+  for (const k of ALL_BLOCK_KEYS) {
+    const block = dayData[k];
+    if (block) {
+      if (block.title) {
+        blockTitles[k] = block.title;
+      }
+      if (block.notes && block.notes.trim().length > 0) {
+        notesCount++;
+        blockNotes[k] = block.notes.trim();
+      }
+      if (Array.isArray(block.tasks)) {
+        block.tasks.forEach(task => {
+          if (!task || !task.text || task.text.trim().length === 0) return;
+          totalTasks++;
+          if (task.done) {
+            completedTasksCount++;
+          } else {
+            unfinishedTasks.push({
+              blockKey: k,
+              blockTitle: block.title || getDefaultTitle(k),
+              text: task.text.trim(),
+              notes: task.notes || '',
+              subtasks: Array.isArray(task.subtasks) ? JSON.parse(JSON.stringify(task.subtasks)) : []
+            });
+          }
+        });
+      }
+    }
+  }
+
+  return {
+    unfinishedTasks,
+    completedTasksCount,
+    totalTasks,
+    notesCount,
+    blockNotes,
+    blockTitles
+  };
+}
+
+function extractUnfinishedTasks(dayData) {
+  return analyzeSourceDay(dayData).unfinishedTasks;
 }
 
 async function checkPendingCarryover(targetDateKey, forcePrompt = false) {
@@ -1274,121 +1407,95 @@ async function checkPendingCarryover(targetDateKey, forcePrompt = false) {
   if (!forcePrompt && safeStorage.getItem(`mrt_carryover_dismissed_${targetDateKey}`) === 'true') {
     carryoverBanner.style.display = 'none';
     currentPendingCarryover = [];
+    currentPendingCarryoverSourceDate = null;
     return;
   }
 
-  // Hide initially
   carryoverBanner.style.display = 'none';
   currentPendingCarryover = [];
+  currentPendingCarryoverSourceDate = null;
 
-  // 1. Identify yesterday's date
-  const [y, m, d] = targetDateKey.split('-').map(Number);
-  const targetDateObj = new Date(y, m - 1, d);
-  const yestDateObj = new Date(targetDateObj);
-  yestDateObj.setDate(yestDateObj.getDate() - 1);
-  const yestKey = formatDateKey(yestDateObj);
-
-  let sourceDateKey = yestKey;
-  let sourceData = await loadDay(sourceDateKey);
-  let candidateTasks = extractUnfinishedTasks(sourceData);
-
-  // 2. If yesterday had no tasks, check previous 7 days in activeDatesSet
-  if (candidateTasks.length === 0 && activeDatesSet && activeDatesSet.size > 0) {
-    for (let i = 2; i <= 7; i++) {
-      const pastObj = new Date(targetDateObj);
-      pastObj.setDate(pastObj.getDate() - i);
-      const pastKey = formatDateKey(pastObj);
-      if (activeDatesSet.has(pastKey)) {
-        const pastData = await loadDay(pastKey);
-        const pastTasks = extractUnfinishedTasks(pastData);
-        if (pastTasks.length > 0) {
-          sourceDateKey = pastKey;
-          candidateTasks = pastTasks;
-          break;
-        }
-      }
-    }
-  }
-
-  if (candidateTasks.length === 0) {
+  // Find the latest active day before targetDateKey
+  const activeDayResult = await findLatestActiveDayBefore(targetDateKey);
+  if (!activeDayResult) {
     if (forcePrompt) {
-      showToast("All clear! No unfinished tasks found from previous days 🎉");
+      showToast("No earlier records found to roll over.");
     }
     return;
   }
 
-  // 3. Deduplicate against current target day's existing block tasks
-  const pendingTasks = candidateTasks.filter(item => {
+  const { dateKey: sourceDateKey, dayData: sourceData } = activeDayResult;
+  const analysis = analyzeSourceDay(sourceData);
+
+  // Deduplicate against current target day's existing tasks
+  const pendingTasks = analysis.unfinishedTasks.filter(item => {
     const currentBlock = currentDayData[item.blockKey];
     if (!currentBlock || !Array.isArray(currentBlock.tasks)) return true;
-    return !currentBlock.tasks.some(t => t.text.trim().toLowerCase() === item.text.toLowerCase());
+    return !currentBlock.tasks.some(t => t.text && t.text.trim().toLowerCase() === item.text.toLowerCase());
   });
 
-  if (pendingTasks.length === 0) {
+  // Check if current day has any content
+  const targetHasContent = hasContent(currentDayData);
+
+  // If target day has no pending tasks AND already has content or source has no notes, nothing to prompt
+  if (pendingTasks.length === 0 && (targetHasContent || analysis.notesCount === 0)) {
     if (forcePrompt) {
       showToast("All pending tasks already exist in today's planner! 👍");
     }
     return;
   }
 
-  // 4. Update banner elements and display
+  // Store active carryover candidate
   currentPendingCarryover = pendingTasks;
+  currentPendingCarryoverSourceDate = sourceDateKey;
+
+  const [y, m, d] = targetDateKey.split('-').map(Number);
+  const targetDateObj = new Date(y, m - 1, d);
+  const yestDateObj = new Date(targetDateObj);
+  yestDateObj.setDate(yestDateObj.getDate() - 1);
+  const yestKey = formatDateKey(yestDateObj);
+
   const isYesterday = (sourceDateKey === yestKey);
   const sourceName = isYesterday ? "Yesterday" : sourceDateKey;
 
   if (carryoverTitle) {
-    carryoverTitle.textContent = `${pendingTasks.length} Unfinished Task${pendingTasks.length > 1 ? 's' : ''} from ${sourceName}`;
+    if (pendingTasks.length > 0) {
+      carryoverTitle.textContent = `${pendingTasks.length} Unfinished Task${pendingTasks.length > 1 ? 's' : ''} from ${sourceName}`;
+    } else {
+      carryoverTitle.textContent = `Inherit Notes & Setup from ${sourceName}`;
+    }
   }
+
   if (carryoverPreview) {
-    const previewSummary = `${pendingTasks[0].blockTitle}: "${pendingTasks[0].text}"${pendingTasks.length > 1 ? ` (+${pendingTasks.length - 1} more)` : ''}`;
-    carryoverPreview.textContent = previewSummary;
+    if (pendingTasks.length > 0) {
+      const previewSummary = `${pendingTasks[0].blockTitle}: "${pendingTasks[0].text}"${pendingTasks.length > 1 ? ` (+${pendingTasks.length - 1} more)` : ''}${analysis.notesCount > 0 ? ' · Notes included' : ''}`;
+      carryoverPreview.textContent = previewSummary;
+    } else {
+      carryoverPreview.textContent = `${analysis.notesCount} block notes ready to inherit without re-typing`;
+    }
+  }
+
+  if (btnCarryoverApply) {
+    btnCarryoverApply.textContent = "↳ Roll Over into Today";
   }
 
   carryoverBanner.style.display = 'flex';
   if (forcePrompt) {
-    showToast(`Found ${pendingTasks.length} pending task(s) to roll over`);
+    showToast(`Found records from ${sourceName} to roll over`);
   }
 }
 
 function applyPendingCarryover() {
-  if (!currentPendingCarryover || currentPendingCarryover.length === 0) return;
-
-  let addedCount = 0;
-  currentPendingCarryover.forEach(item => {
-    if (!currentDayData[item.blockKey]) {
-      currentDayData[item.blockKey] = getDefaultBlockData(getDefaultTitle(item.blockKey));
-    }
-    if (!Array.isArray(currentDayData[item.blockKey].tasks)) {
-      currentDayData[item.blockKey].tasks = [];
-    }
-
-    const exists = currentDayData[item.blockKey].tasks.some(
-      t => t.text.trim().toLowerCase() === item.text.toLowerCase()
-    );
-
-    if (!exists) {
-      currentDayData[item.blockKey].tasks.push({
-        text: item.text,
-        done: false,
-        notes: item.notes || '',
-        subtasks: Array.isArray(item.subtasks) ? JSON.parse(JSON.stringify(item.subtasks)) : []
-      });
-      syncBlockContent(item.blockKey);
-      addedCount++;
-    }
-  });
-
-  const targetDateKey = formatDateKey(currentDate);
-  safeStorage.setItem(`mrt_carryover_dismissed_${targetDateKey}`, 'true');
-
-  if (carryoverBanner) {
-    carryoverBanner.style.display = 'none';
+  const sourceDate = currentPendingCarryoverSourceDate;
+  if (!sourceDate) {
+    openImportModal();
+    return;
   }
-  currentPendingCarryover = [];
-
-  renderCurrentDay();
-  saveDay(targetDateKey, currentDayData);
-  showToast(`Rolled over ${addedCount} unfinished task${addedCount > 1 ? 's' : ''} into today! 🎯`);
+  executeImport(sourceDate, {
+    tasks: true,
+    notes: true,
+    titles: true
+  });
 }
 
 function dismissCarryover() {
@@ -1398,13 +1505,296 @@ function dismissCarryover() {
     carryoverBanner.style.display = 'none';
   }
   currentPendingCarryover = [];
-  showToast("Dismissed task carryover for today");
+  currentPendingCarryoverSourceDate = null;
+  showToast("Dismissed rollover for today");
 }
 
 function manualCheckCarryover() {
+  openImportModal();
+}
+
+async function openImportModal(preferredDate = null) {
+  if (!importModal) return;
+
   const targetDateKey = formatDateKey(currentDate);
-  safeStorage.removeItem(`mrt_carryover_dismissed_${targetDateKey}`);
-  checkPendingCarryover(targetDateKey, true);
+  const [y, m, d] = targetDateKey.split('-').map(Number);
+  const targetDateObj = new Date(y, m - 1, d);
+
+  // Determine smart source candidate
+  let initialDate = preferredDate;
+  if (!initialDate) {
+    const latestActive = await findLatestActiveDayBefore(targetDateKey);
+    if (latestActive) {
+      initialDate = latestActive.dateKey;
+    } else {
+      const yestObj = new Date(targetDateObj);
+      yestObj.setDate(yestObj.getDate() - 1);
+      initialDate = formatDateKey(yestObj);
+    }
+  }
+
+  currentImportSourceDate = initialDate;
+
+  // Set date picker constraints and value
+  if (importSourceDateInput) {
+    importSourceDateInput.value = initialDate;
+    importSourceDateInput.max = targetDateKey;
+  }
+
+  // Populate smart quick chips
+  if (importQuickChips) {
+    importQuickChips.innerHTML = '';
+    
+    const chipDates = [];
+    const allStored = await getAllStoredDates();
+    const pastStored = allStored.filter(k => k < targetDateKey);
+
+    const yestObj = new Date(targetDateObj);
+    yestObj.setDate(yestObj.getDate() - 1);
+    const yestKey = formatDateKey(yestObj);
+
+    if (pastStored.length > 0) {
+      const latestStored = pastStored[0];
+      const isYest = (latestStored === yestKey);
+      chipDates.push({
+        key: latestStored,
+        label: isYest ? `Yesterday (${latestStored})` : `Latest Active (${latestStored})`
+      });
+      if (!isYest) {
+        chipDates.push({ key: yestKey, label: `Yesterday (${yestKey})` });
+      }
+    } else {
+      chipDates.push({ key: yestKey, label: `Yesterday (${yestKey})` });
+    }
+
+    const twoDaysAgo = new Date(targetDateObj);
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+    const twoDaysKey = formatDateKey(twoDaysAgo);
+    if (!chipDates.some(c => c.key === twoDaysKey)) {
+      chipDates.push({ key: twoDaysKey, label: `2 Days Ago (${twoDaysKey})` });
+    }
+
+    const threeDaysAgo = new Date(targetDateObj);
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+    const threeDaysKey = formatDateKey(threeDaysAgo);
+    if (!chipDates.some(c => c.key === threeDaysKey)) {
+      chipDates.push({ key: threeDaysKey, label: `3 Days Ago (${threeDaysKey})` });
+    }
+
+    chipDates.forEach(item => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `import-chip-btn ${item.key === currentImportSourceDate ? 'active' : ''}`;
+      btn.textContent = item.label;
+      btn.setAttribute('data-date', item.key);
+      btn.addEventListener('click', () => {
+        selectImportSourceDate(item.key);
+      });
+      importQuickChips.appendChild(btn);
+    });
+  }
+
+  // Render preview
+  await updateImportPreview(currentImportSourceDate);
+
+  // Show modal
+  importModal.classList.add('open');
+}
+
+function selectImportSourceDate(dateKey) {
+  if (!dateKey) return;
+  currentImportSourceDate = dateKey;
+  if (importSourceDateInput) importSourceDateInput.value = dateKey;
+
+  if (importQuickChips) {
+    importQuickChips.querySelectorAll('.import-chip-btn').forEach(btn => {
+      if (btn.getAttribute('data-date') === dateKey) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+  }
+
+  updateImportPreview(dateKey);
+}
+
+function closeImportModal() {
+  if (importModal) importModal.classList.remove('open');
+}
+
+async function updateImportPreview(sourceDateKey) {
+  if (!previewDateBadge || !previewContentSummary) return;
+
+  const [y, m, d] = sourceDateKey.split('-').map(Number);
+  const srcObj = new Date(y, m - 1, d);
+  previewDateBadge.textContent = formatDateDisplay(srcObj);
+
+  if (previewStatPill) {
+    previewStatPill.textContent = "Scanning day...";
+  }
+  previewContentSummary.innerHTML = '<div class="preview-loading">Inspecting tasks & notes...</div>';
+
+  const sourceData = await loadDay(sourceDateKey);
+  const analysis = analyzeSourceDay(sourceData);
+
+  const pendingTasks = analysis.unfinishedTasks.filter(item => {
+    const curBlock = currentDayData[item.blockKey];
+    if (!curBlock || !Array.isArray(curBlock.tasks)) return true;
+    return !curBlock.tasks.some(t => t.text && t.text.trim().toLowerCase() === item.text.toLowerCase());
+  });
+
+  const notesList = Object.keys(analysis.blockNotes).map(k => {
+    return analysis.blockTitles[k] || getDefaultTitle(k);
+  });
+
+  if (previewStatPill) {
+    const statParts = [];
+    statParts.push(`${pendingTasks.length} pending task${pendingTasks.length !== 1 ? 's' : ''}`);
+    statParts.push(`${notesList.length} note block${notesList.length !== 1 ? 's' : ''}`);
+    previewStatPill.textContent = statParts.join(' · ');
+  }
+
+  if (pendingTasks.length === 0 && notesList.length === 0) {
+    previewContentSummary.innerHTML = `
+      <div class="preview-empty">
+        <p>No new tasks or notes found on <strong>${sourceDateKey}</strong>.</p>
+        <span class="preview-sub-hint">Pick another date from the chips above or using the date picker.</span>
+      </div>
+    `;
+    if (btnImportExecute) btnImportExecute.disabled = false;
+    return;
+  }
+
+  let html = '';
+
+  if (pendingTasks.length > 0) {
+    html += `<div class="preview-group-header">Tasks to Roll Over (${pendingTasks.length}):</div>`;
+    html += `<div class="preview-task-list">`;
+    pendingTasks.forEach(item => {
+      const subInfo = item.subtasks.length > 0 ? ` <span class="preview-sub-badge">${item.subtasks.length} subtask${item.subtasks.length > 1 ? 's' : ''}</span>` : '';
+      const notesInfo = item.notes ? ` <span class="preview-task-notes-badge" title="Has task notes">📝</span>` : '';
+      html += `
+        <div class="preview-task-row">
+          <span class="preview-block-tag">${escapeHtml(item.blockTitle)}</span>
+          <span class="preview-task-text">${escapeHtml(item.text)}${subInfo}${notesInfo}</span>
+        </div>
+      `;
+    });
+    html += `</div>`;
+  }
+
+  if (analysis.completedTasksCount > 0) {
+    html += `
+      <div class="preview-archived-hint">
+        ✓ ${analysis.completedTasksCount} completed task${analysis.completedTasksCount > 1 ? 's' : ''} on ${sourceDateKey} will remain safely recorded in past history.
+      </div>
+    `;
+  }
+
+  if (notesList.length > 0) {
+    html += `<div class="preview-group-header">Notes & Routines Inherited (${notesList.length} blocks):</div>`;
+    html += `<div class="preview-notes-pills">`;
+    notesList.forEach(title => {
+      html += `<span class="preview-note-pill">${escapeHtml(title)}</span>`;
+    });
+    html += `</div>`;
+  }
+
+  previewContentSummary.innerHTML = html;
+  if (btnImportExecute) btnImportExecute.disabled = false;
+}
+
+async function executeImport(sourceDateKey, options = { tasks: true, notes: true, titles: true }) {
+  if (!sourceDateKey) return;
+  const sourceData = await loadDay(sourceDateKey);
+  if (!sourceData) {
+    showToast(`Could not load data for ${sourceDateKey}`);
+    return;
+  }
+
+  let importedTasksCount = 0;
+  let inheritedNotesCount = 0;
+  let updatedTitlesCount = 0;
+
+  for (const blockKey of ALL_BLOCK_KEYS) {
+    if (!currentDayData[blockKey]) {
+      currentDayData[blockKey] = getDefaultBlockData(getDefaultTitle(blockKey));
+    }
+    const currentBlock = currentDayData[blockKey];
+    const sourceBlock = sourceData[blockKey];
+    if (!sourceBlock) continue;
+
+    // 1. Inherit Custom Block Titles
+    if (options.titles && sourceBlock.title) {
+      const defTitle = getDefaultTitle(blockKey);
+      if (sourceBlock.title !== defTitle && currentBlock.title === defTitle) {
+        currentBlock.title = sourceBlock.title;
+        updatedTitlesCount++;
+      }
+    }
+
+    // 2. Inherit Notes (Routines, Diet, Focus & Reference Notes)
+    if (options.notes && sourceBlock.notes && sourceBlock.notes.trim().length > 0) {
+      const srcNote = sourceBlock.notes.trim();
+      const curNote = (currentBlock.notes || '').trim();
+      if (!curNote) {
+        currentBlock.notes = srcNote;
+        inheritedNotesCount++;
+      } else if (!curNote.includes(srcNote)) {
+        currentBlock.notes = `${curNote}\n\n${srcNote}`;
+        inheritedNotesCount++;
+      }
+    }
+
+    // 3. Roll Over Unfinished Tasks & Subtasks
+    if (options.tasks && Array.isArray(sourceBlock.tasks)) {
+      if (!Array.isArray(currentBlock.tasks)) currentBlock.tasks = [];
+      sourceBlock.tasks.forEach(srcTask => {
+        if (!srcTask.done && srcTask.text && srcTask.text.trim().length > 0) {
+          const taskText = srcTask.text.trim();
+          const exists = currentBlock.tasks.some(
+            t => t.text && t.text.trim().toLowerCase() === taskText.toLowerCase()
+          );
+          if (!exists) {
+            currentBlock.tasks.push({
+              text: taskText,
+              done: false,
+              notes: srcTask.notes || '',
+              subtasks: Array.isArray(srcTask.subtasks) ? JSON.parse(JSON.stringify(srcTask.subtasks)) : []
+            });
+            importedTasksCount++;
+          }
+        }
+      });
+    }
+
+    syncBlockContent(blockKey);
+  }
+
+  // Save changes
+  isDirty = true;
+  const targetDateKey = formatDateKey(currentDate);
+  safeStorage.setItem(`mrt_carryover_dismissed_${targetDateKey}`, 'true');
+  saveDay(targetDateKey, currentDayData);
+  renderCurrentDay();
+
+  // Hide banner if visible
+  if (carryoverBanner) carryoverBanner.style.display = 'none';
+  currentPendingCarryover = [];
+  currentPendingCarryoverSourceDate = null;
+
+  closeImportModal();
+
+  // Feedback toast
+  const parts = [];
+  if (importedTasksCount > 0) parts.push(`${importedTasksCount} task${importedTasksCount > 1 ? 's' : ''}`);
+  if (inheritedNotesCount > 0) parts.push(`${inheritedNotesCount} note block${inheritedNotesCount > 1 ? 's' : ''}`);
+  if (parts.length === 0) {
+    showToast(`Planner is already up to date with ${sourceDateKey}`);
+  } else {
+    showToast(`Rolled over ${parts.join(' & ')} from ${sourceDateKey}! 🎯`);
+  }
 }
 
 // ==========================================================================
@@ -1427,7 +1817,8 @@ function setPhase(phase, notify = true) {
       all: 'All Phases: Full Day Overview (13 Tracks)',
       learning: 'Phase 4-9: Foundation & Learning (CS, AI, Apps, RSWE, Breadth)',
       productive: 'Phase 9-6: Productive & Admin (Deep Execution & Ops)',
-      evening: 'Phase 6-11: Creative Evening (Huro, Kana, Bana, Curio, Survivo, Random)'
+      evening: 'Phase 6-11: Creative Evening (Huro, Kana, Bana, Curio, Survivo, Random)',
+      health: 'Phase 5-6: Diet & Exercise (Workout, Meals, Supplements & Recovery)'
     };
     showToast(phaseLabels[phase] || phase);
   }
@@ -1502,6 +1893,9 @@ function getPhaseForBlock(blockKey) {
   }
   if (['productive', 'admin'].includes(blockKey)) {
     return 'Phase 9-6: Productive & Admin';
+  }
+  if (blockKey.startsWith('health_')) {
+    return 'Phase 5-6: Diet & Exercise';
   }
   return 'Phase 6-11: Creative Evening';
 }
@@ -1799,6 +2193,8 @@ function launchNextDeepWorkTask() {
     candidateKeys = ['productive', 'admin'];
   } else if (currentPhase === 'evening') {
     candidateKeys = ['evening_huro', 'evening_kana', 'evening_bana', 'evening_curio', 'evening_survivi', 'evening_random'];
+  } else if (currentPhase === 'health') {
+    candidateKeys = ['health_workout', 'health_diet', 'health_habits', 'health_recovery'];
   } else {
     candidateKeys = ['part1_quad1', 'part1_quad2', 'part1_quad3', 'part1_quad4', 'part2', 'productive', 'admin'];
   }
@@ -1877,6 +2273,12 @@ if (btnExport) {
     md += `### ${currentDayData.evening_curio?.title || 'Curio'}\n${currentDayData.evening_curio?.content || ''}\n\n`;
     md += `### ${currentDayData.evening_survivi?.title || 'Survivo'}\n${currentDayData.evening_survivi?.content || ''}\n\n`;
     md += `### ${currentDayData.evening_random?.title || 'Random'}\n${currentDayData.evening_random?.content || ''}\n\n`;
+
+    md += `## 🏋️ 05:00 — 06:00 Diet & Exercise Phase (4 Tracks)\n\n`;
+    md += `### ${currentDayData.health_workout?.title || 'Workout (5-6 AM)'}\n${currentDayData.health_workout?.content || ''}\n\n`;
+    md += `### ${currentDayData.health_diet?.title || 'Diet & Meals'}\n${currentDayData.health_diet?.content || ''}\n\n`;
+    md += `### ${currentDayData.health_habits?.title || 'Hydration & Supplements'}\n${currentDayData.health_habits?.content || ''}\n\n`;
+    md += `### ${currentDayData.health_recovery?.title || 'Body & Recovery'}\n${currentDayData.health_recovery?.content || ''}\n\n`;
 
     const blob = new Blob([md], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
@@ -2000,15 +2402,60 @@ function renderCalendarMonths(year) {
   });
 }
 
-// Smart Task Carryover Buttons
+// Smart Task Carryover & Rollover Buttons
 if (btnCarryoverApply) {
   btnCarryoverApply.addEventListener('click', applyPendingCarryover);
+}
+if (btnCarryoverChoose) {
+  btnCarryoverChoose.addEventListener('click', () => {
+    openImportModal(currentPendingCarryoverSourceDate);
+  });
 }
 if (btnCarryoverDismiss) {
   btnCarryoverDismiss.addEventListener('click', dismissCarryover);
 }
 if (btnCarryoverCheck) {
   btnCarryoverCheck.addEventListener('click', manualCheckCarryover);
+}
+
+// Roll Over & Import Day Modal Event Bindings
+if (btnImportPlanner) {
+  btnImportPlanner.addEventListener('click', () => {
+    openImportModal(currentPendingCarryoverSourceDate);
+  });
+}
+if (btnCloseImportModal) {
+  btnCloseImportModal.addEventListener('click', closeImportModal);
+}
+if (btnImportCancel) {
+  btnImportCancel.addEventListener('click', closeImportModal);
+}
+if (importModal) {
+  importModal.addEventListener('click', (e) => {
+    if (e.target === importModal) closeImportModal();
+  });
+}
+if (btnImportExecute) {
+  btnImportExecute.addEventListener('click', () => {
+    if (!currentImportSourceDate) return;
+    executeImport(currentImportSourceDate, {
+      tasks: chkImportTasks ? chkImportTasks.checked : true,
+      notes: chkImportNotes ? chkImportNotes.checked : true,
+      titles: chkImportTitles ? chkImportTitles.checked : true
+    });
+  });
+}
+if (importSourceDateInput) {
+  importSourceDateInput.addEventListener('change', (e) => {
+    if (e.target.value) {
+      selectImportSourceDate(e.target.value);
+    }
+  });
+  importSourceDateInput.addEventListener('input', (e) => {
+    if (e.target.value && e.target.value.length === 10) {
+      selectImportSourceDate(e.target.value);
+    }
+  });
 }
 
 // Phase Ribbon Interactive Buttons
@@ -2266,6 +2713,9 @@ window.addEventListener('keydown', (e) => {
   } else if (e.key === '3') {
     e.preventDefault();
     setPhase('evening');
+  } else if (e.key === '4') {
+    e.preventDefault();
+    setPhase('health');
   } else if (e.key === '0') {
     e.preventDefault();
     setPhase('all');
@@ -2277,7 +2727,11 @@ window.addEventListener('keydown', (e) => {
     cycleTheme();
   } else if (e.key === 'r' || e.key === 'R') {
     e.preventDefault();
-    manualCheckCarryover();
+    if (importModal?.classList.contains('open')) {
+      closeImportModal();
+    } else {
+      openImportModal();
+    }
   } else if (e.key === 'c' || e.key === 'C') {
     e.preventDefault();
     if (calendarModal?.classList.contains('open')) {
@@ -2286,6 +2740,10 @@ window.addEventListener('keydown', (e) => {
       openCalendarModal();
     }
   } else if (e.key === 'Escape') {
+    if (importModal?.classList.contains('open')) {
+      closeImportModal();
+      return;
+    }
     if (calendarModal) calendarModal.classList.remove('open');
     if (lockinActive) closeLockInFocus();
   }
@@ -2293,6 +2751,12 @@ window.addEventListener('keydown', (e) => {
 
 // Initialization (Instant Synchronous UI + Non-blocking Background Sync)
 function init() {
+  // 0. Pre-load cached active dates synchronously
+  const cachedDates = safeStorage.getItem('mrt_active_dates');
+  if (cachedDates) {
+    try { activeDatesSet = new Set(JSON.parse(cachedDates)); } catch (e) {}
+  }
+
   // 1. Immediately bind cards and inputs
   bindCardEvents();
 
@@ -2345,10 +2809,12 @@ function init() {
   callTauri('get_active_dates').then(activeDates => {
     if (Array.isArray(activeDates)) {
       activeDatesSet = new Set(activeDates);
+      safeStorage.setItem('mrt_active_dates', JSON.stringify(activeDates));
+      checkPendingCarryover(formatDateKey(currentDate));
     } else {
-      const cachedDates = safeStorage.getItem('mrt_active_dates');
-      if (cachedDates) {
-        try { activeDatesSet = new Set(JSON.parse(cachedDates)); } catch (e) {}
+      const cached = safeStorage.getItem('mrt_active_dates');
+      if (cached) {
+        try { activeDatesSet = new Set(JSON.parse(cached)); } catch (e) {}
       }
     }
   });
