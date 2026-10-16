@@ -411,13 +411,9 @@ function renderCardTasks(card, blockKey) {
   const block = currentDayData[blockKey] || { tasks: [], notes: "" };
   const tasks = Array.isArray(block.tasks) ? block.tasks : [];
   listEl.innerHTML = '';
+  listEl.onclick = null;
 
   if (tasks.length === 0) {
-    listEl.onclick = (e) => {
-      if (e.target === listEl) {
-        insertCheckboxTask(card, blockKey, '');
-      }
-    };
     updateCardTabBadges(card, blockKey);
     return;
   }
