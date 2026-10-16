@@ -49,7 +49,11 @@ let currentDayData = {};
 let activeDatesSet = new Set();
 let isDirty = false;
 let autoSaveTimer = null;
-let currentTheme = safeStorage.getItem('mrt_theme') || 'chalk';
+let savedTheme = safeStorage.getItem('mrt_theme');
+if (!['paper', 'chalk', 'ceramic'].includes(savedTheme)) {
+  savedTheme = 'paper';
+}
+let currentTheme = savedTheme;
 let currentPendingCarryover = [];
 
 // DOM Elements
@@ -80,10 +84,27 @@ const carryoverPreview = document.getElementById('carryover-preview');
 const btnCarryoverApply = document.getElementById('btn-carryover-apply');
 const btnCarryoverDismiss = document.getElementById('btn-carryover-dismiss');
 
+// Phase Isolation & Lock-In Deep Work DOM Elements
+let currentPhase = safeStorage.getItem('mrt_phase') || 'all';
+const btnDeepWorkFocus = document.getElementById('btn-deep-work-focus');
+const lockinModal = document.getElementById('lockin-focus-modal');
+const lockinPhaseLabel = document.getElementById('lockin-phase-label');
+const lockinBlockLabel = document.getElementById('lockin-block-label');
+const lockinTimerDisplay = document.getElementById('lockin-timer-display');
+const btnLockinTimerToggle = document.getElementById('btn-lockin-timer-toggle');
+const btnLockinTimerReset = document.getElementById('btn-lockin-timer-reset');
+const btnLockinExit = document.getElementById('btn-lockin-exit');
+const btnLockinCheck = document.getElementById('btn-lockin-check');
+const lockinTaskInput = document.getElementById('lockin-task-input');
+const lockinNotesArea = document.getElementById('lockin-notes-area');
+
 // Apply Initial Theme
 setTheme(currentTheme, false);
 
 function setTheme(theme, notify = true) {
+  if (!['paper', 'chalk', 'ceramic'].includes(theme)) {
+    theme = 'paper';
+  }
   currentTheme = theme;
   document.documentElement.setAttribute('data-theme', theme);
   document.body.setAttribute('data-theme', theme);
@@ -91,24 +112,21 @@ function setTheme(theme, notify = true) {
 
   if (notify) {
     const themeNames = {
-      chalk: 'Chalk & Blackboard (B&W Dark)',
-      paper: 'Pen & Paper (B&W Light)',
-      dark: 'Cyber Dark',
-      nordic: 'Nordic Slate'
+      paper: 'Pen & Paper',
+      chalk: 'Chalk & Blackboard',
+      ceramic: 'Satin Clay'
     };
     showToast(`Theme: ${themeNames[theme] || theme}`);
   }
 }
 
 function cycleTheme() {
-  if (currentTheme === 'chalk') {
-    setTheme('paper');
-  } else if (currentTheme === 'paper') {
-    setTheme('dark');
-  } else if (currentTheme === 'dark') {
-    setTheme('nordic');
-  } else {
+  if (currentTheme === 'paper') {
     setTheme('chalk');
+  } else if (currentTheme === 'chalk') {
+    setTheme('ceramic');
+  } else {
+    setTheme('paper');
   }
 }
 
@@ -194,10 +212,25 @@ function normalizeBlockData(rawBlock, defaultTitle) {
 
     for (const line of lines) {
       const trimmed = line.trimStart();
+      const isSubtask = (line.startsWith('  ') || line.startsWith('\t')) && extractedTasks.length > 0;
+      if (isSubtask) {
+        if (trimmed.startsWith('- [ ]') || trimmed.startsWith('* [ ]')) {
+          const parent = extractedTasks[extractedTasks.length - 1];
+          if (!Array.isArray(parent.subtasks)) parent.subtasks = [];
+          parent.subtasks.push({ text: trimmed.replace(/^[-*]\s\[\s\]\s?/, ''), done: false });
+          continue;
+        } else if (trimmed.startsWith('- [x]') || trimmed.startsWith('- [X]') || trimmed.startsWith('* [x]') || trimmed.startsWith('* [X]')) {
+          const parent = extractedTasks[extractedTasks.length - 1];
+          if (!Array.isArray(parent.subtasks)) parent.subtasks = [];
+          parent.subtasks.push({ text: trimmed.replace(/^[-*]\s\[[xX]\]\s?/, ''), done: true });
+          continue;
+        }
+      }
+
       if (trimmed.startsWith('- [ ]') || trimmed.startsWith('* [ ]')) {
-        extractedTasks.push({ text: trimmed.replace(/^[-*]\s\[\s\]\s?/, ''), done: false });
+        extractedTasks.push({ text: trimmed.replace(/^[-*]\s\[\s\]\s?/, ''), done: false, subtasks: [] });
       } else if (trimmed.startsWith('- [x]') || trimmed.startsWith('- [X]') || trimmed.startsWith('* [x]') || trimmed.startsWith('* [X]')) {
-        extractedTasks.push({ text: trimmed.replace(/^[-*]\s\[[xX]\]\s?/, ''), done: true });
+        extractedTasks.push({ text: trimmed.replace(/^[-*]\s\[[xX]\]\s?/, ''), done: true, subtasks: [] });
       } else if (trimmed.length > 0) {
         extractedNotes.push(line);
       }
@@ -207,10 +240,35 @@ function normalizeBlockData(rawBlock, defaultTitle) {
     if (notes === null) notes = extractedNotes.join('\n');
   }
 
+  if (Array.isArray(tasks)) {
+    tasks = tasks.map(t => ({
+      text: t.text || '',
+      done: !!t.done,
+      notes: typeof t.notes === 'string' ? t.notes : '',
+      subtasks: Array.isArray(t.subtasks)
+        ? t.subtasks.map(s => ({
+            text: typeof s === 'string' ? s : (s.text || ''),
+            done: !!s.done
+          }))
+        : []
+    }));
+  } else {
+    tasks = [];
+  }
+
   // Generate serialized content for markdown export compatibility
   const contentParts = [];
   if (tasks.length > 0) {
-    contentParts.push(tasks.map(t => `- [${t.done ? 'x' : ' '}] ${t.text}`).join('\n'));
+    const taskLines = [];
+    for (const t of tasks) {
+      taskLines.push(`- [${t.done ? 'x' : ' '}] ${t.text}`);
+      if (Array.isArray(t.subtasks) && t.subtasks.length > 0) {
+        for (const s of t.subtasks) {
+          taskLines.push(`  - [${s.done ? 'x' : ' '}] ${s.text}`);
+        }
+      }
+    }
+    contentParts.push(taskLines.join('\n'));
   }
   if (notes.trim().length > 0) {
     contentParts.push(notes.trim());
@@ -303,7 +361,16 @@ function syncBlockContent(blockKey) {
   if (!block) return;
   const parts = [];
   if (Array.isArray(block.tasks) && block.tasks.length > 0) {
-    parts.push(block.tasks.map(t => `- [${t.done ? 'x' : ' '}] ${t.text}`).join('\n'));
+    const taskLines = [];
+    for (const t of block.tasks) {
+      taskLines.push(`- [${t.done ? 'x' : ' '}] ${t.text}`);
+      if (Array.isArray(t.subtasks) && t.subtasks.length > 0) {
+        for (const s of t.subtasks) {
+          taskLines.push(`  - [${s.done ? 'x' : ' '}] ${s.text}`);
+        }
+      }
+    }
+    parts.push(taskLines.join('\n'));
   }
   if (block.notes && block.notes.trim().length > 0) {
     parts.push(block.notes.trim());
@@ -325,7 +392,16 @@ function saveDay(targetDateKey = null, targetData = null) {
       if (block) {
         const parts = [];
         if (Array.isArray(block.tasks) && block.tasks.length > 0) {
-          parts.push(block.tasks.map(t => `- [${t.done ? 'x' : ' '}] ${t.text}`).join('\n'));
+          const taskLines = [];
+          for (const t of block.tasks) {
+            taskLines.push(`- [${t.done ? 'x' : ' '}] ${t.text}`);
+            if (Array.isArray(t.subtasks) && t.subtasks.length > 0) {
+              for (const s of t.subtasks) {
+                taskLines.push(`  - [${s.done ? 'x' : ' '}] ${s.text}`);
+              }
+            }
+          }
+          parts.push(taskLines.join('\n'));
         }
         if (block.notes && block.notes.trim().length > 0) {
           parts.push(block.notes.trim());
@@ -423,6 +499,19 @@ function renderCardTasks(card, blockKey) {
     row.className = `task-row ${task.done ? 'is-completed' : ''}`;
     row.dataset.taskIdx = idx;
 
+    const hasNotes = typeof task.notes === 'string' && task.notes.trim().length > 0;
+    const lockinBtnLabel = hasNotes ? '⏱ Notes •' : '⏱ Lock-in';
+    const lockinBtnTitle = hasNotes ? 'Task-specific notes attached. Click to open focus & notes.' : 'Lock-in on this task (Time Block & Notes)';
+    
+    if (!Array.isArray(task.subtasks)) {
+      task.subtasks = [];
+    }
+    const subTotal = task.subtasks.length;
+    const subDone = task.subtasks.filter(s => s.done).length;
+    const subBadgeHtml = subTotal > 0
+      ? `<span class="task-subtasks-count ${subDone === subTotal ? 'completed' : ''}" title="${subDone}/${subTotal} subtasks done">${subDone}/${subTotal}</span>`
+      : '';
+
     row.innerHTML = `
       <button type="button" class="task-checkbox-btn ${task.done ? 'checked' : ''}" title="${task.done ? 'Mark active' : 'Mark completed'}">
         <svg class="task-check-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
@@ -430,17 +519,31 @@ function renderCardTasks(card, blockKey) {
         </svg>
       </button>
       <input type="text" class="task-row-input ${task.done ? 'task-done' : ''}" value="${escapeHtml(task.text)}" placeholder="Task..." spellcheck="false" />
+      ${subBadgeHtml}
+      <button type="button" class="task-row-add-sub" title="Add Subtask (or press Tab in task)">↳ Sub</button>
+      <button type="button" class="task-row-lockin ${hasNotes ? 'has-notes' : ''}" title="${lockinBtnTitle}">${lockinBtnLabel}</button>
       <button type="button" class="task-row-del" title="Delete task">×</button>
     `;
+
+    // Track active selection on focus and click
+    const input = row.querySelector('.task-row-input');
+    input.addEventListener('focus', () => {
+      setActiveTaskSelection(blockKey, idx);
+    });
+    row.addEventListener('click', (e) => {
+      if (!e.target.closest('.task-checkbox-btn') && !e.target.closest('.task-row-del') && !e.target.closest('.task-row-lockin') && !e.target.closest('.task-row-add-sub')) {
+        setActiveTaskSelection(blockKey, idx);
+      }
+    });
 
     // 1. Toggle Checkbox (Dedicated, no misclicks)
     const checkBtn = row.querySelector('.task-checkbox-btn');
     checkBtn.addEventListener('click', (e) => {
       e.stopPropagation();
+      setActiveTaskSelection(blockKey, idx);
       task.done = !task.done;
       row.classList.toggle('is-completed', task.done);
       checkBtn.classList.toggle('checked', task.done);
-      const input = row.querySelector('.task-row-input');
       if (input) input.classList.toggle('task-done', task.done);
       syncBlockContent(blockKey);
       updateCardTabBadges(card, blockKey);
@@ -449,26 +552,41 @@ function renderCardTasks(card, blockKey) {
     });
 
     // 2. Edit Task Text (NEVER toggles checkbox)
-    const input = row.querySelector('.task-row-input');
     input.addEventListener('input', () => {
       task.text = input.value;
       syncBlockContent(blockKey);
       triggerAutoSave();
     });
 
-    // Enter to insert new task below; Backspace on empty to delete
+    // Enter to insert new task below; Tab to add subtask; Backspace on empty to delete
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        tasks.splice(idx + 1, 0, { text: '', done: false });
+        tasks.splice(idx + 1, 0, { text: '', done: false, notes: '', subtasks: [] });
         syncBlockContent(blockKey);
         renderCardTasks(card, blockKey);
         updateCardTabBadges(card, blockKey);
         triggerAutoSave();
         setTimeout(() => {
           const nextRow = listEl.querySelector(`.task-row[data-task-idx="${idx + 1}"] .task-row-input`);
-          if (nextRow) nextRow.focus();
+          if (nextRow) {
+            nextRow.focus();
+            setActiveTaskSelection(blockKey, idx + 1);
+          }
         }, 20);
+      } else if (e.key === 'Tab' && !e.shiftKey) {
+        e.preventDefault();
+        setActiveTaskSelection(blockKey, idx);
+        if (!Array.isArray(task.subtasks)) task.subtasks = [];
+        task.subtasks.push({ text: '', done: false });
+        syncBlockContent(blockKey);
+        renderCardTasks(card, blockKey);
+        updateCardTabBadges(card, blockKey);
+        triggerAutoSave();
+        setTimeout(() => {
+          const newSubInput = listEl.querySelector(`.task-subtasks-tree[data-parent-task-idx="${idx}"] .subtask-row[data-sub-idx="${task.subtasks.length - 1}"] .subtask-row-input`);
+          if (newSubInput) newSubInput.focus();
+        }, 25);
       } else if (e.key === 'Backspace' && input.value === '') {
         e.preventDefault();
         tasks.splice(idx, 1);
@@ -479,12 +597,44 @@ function renderCardTasks(card, blockKey) {
         triggerAutoSave();
         setTimeout(() => {
           const prevRow = listEl.querySelector(`.task-row[data-task-idx="${Math.max(0, idx - 1)}"] .task-row-input`);
-          if (prevRow) prevRow.focus();
+          if (prevRow) {
+            prevRow.focus();
+            setActiveTaskSelection(blockKey, Math.max(0, idx - 1));
+          }
         }, 20);
       }
     });
 
-    // 3. Delete Task Button
+    // 3. Add Subtask Button
+    const addSubBtn = row.querySelector('.task-row-add-sub');
+    if (addSubBtn) {
+      addSubBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setActiveTaskSelection(blockKey, idx);
+        if (!Array.isArray(task.subtasks)) task.subtasks = [];
+        task.subtasks.push({ text: '', done: false });
+        syncBlockContent(blockKey);
+        renderCardTasks(card, blockKey);
+        updateCardTabBadges(card, blockKey);
+        triggerAutoSave();
+        setTimeout(() => {
+          const newSubInput = listEl.querySelector(`.task-subtasks-tree[data-parent-task-idx="${idx}"] .subtask-row[data-sub-idx="${task.subtasks.length - 1}"] .subtask-row-input`);
+          if (newSubInput) newSubInput.focus();
+        }, 25);
+      });
+    }
+
+    // 4. Task-Specific Lock-In Action
+    const lockinBtn = row.querySelector('.task-row-lockin');
+    if (lockinBtn) {
+      lockinBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setActiveTaskSelection(blockKey, idx);
+        openLockInFocus(blockKey, idx);
+      });
+    }
+
+    // 5. Delete Task Button
     const delBtn = row.querySelector('.task-row-del');
     delBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -497,6 +647,116 @@ function renderCardTasks(card, blockKey) {
     });
 
     listEl.appendChild(row);
+
+    // 6. Render Subtasks Tree branch if subtasks exist
+    if (Array.isArray(task.subtasks) && task.subtasks.length > 0) {
+      const subtasksTree = document.createElement('div');
+      subtasksTree.className = 'task-subtasks-tree';
+      subtasksTree.dataset.parentTaskIdx = idx;
+
+      task.subtasks.forEach((sub, sIdx) => {
+        const subRow = document.createElement('div');
+        subRow.className = `subtask-row ${sub.done ? 'is-completed' : ''}`;
+        subRow.dataset.subIdx = sIdx;
+        subRow.innerHTML = `
+          <span class="subtask-connector">↳</span>
+          <button type="button" class="subtask-checkbox-btn ${sub.done ? 'checked' : ''}" title="${sub.done ? 'Mark active' : 'Mark completed'}">
+            <svg class="subtask-check-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </button>
+          <input type="text" class="subtask-row-input ${sub.done ? 'task-done' : ''}" value="${escapeHtml(sub.text)}" placeholder="Subtask..." spellcheck="false" />
+          <button type="button" class="subtask-row-del" title="Delete subtask">×</button>
+        `;
+
+        const subInput = subRow.querySelector('.subtask-row-input');
+        const subCheck = subRow.querySelector('.subtask-checkbox-btn');
+        const subDel = subRow.querySelector('.subtask-row-del');
+
+        // Subtask checkbox
+        subCheck.addEventListener('click', (e) => {
+          e.stopPropagation();
+          sub.done = !sub.done;
+          subCheck.classList.toggle('checked', sub.done);
+          subInput.classList.toggle('task-done', sub.done);
+          subRow.classList.toggle('is-completed', sub.done);
+          syncBlockContent(blockKey);
+          updateCardTabBadges(card, blockKey);
+          updateTotalProgress();
+          renderCardTasks(card, blockKey);
+          triggerAutoSave();
+        });
+
+        // Subtask input typing
+        subInput.addEventListener('input', () => {
+          sub.text = subInput.value;
+          syncBlockContent(blockKey);
+          triggerAutoSave();
+        });
+
+        // Subtask keyboard navigation: Enter creates next subtask, Backspace on empty deletes, Shift+Tab outdents
+        subInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            task.subtasks.splice(sIdx + 1, 0, { text: '', done: false });
+            syncBlockContent(blockKey);
+            renderCardTasks(card, blockKey);
+            updateCardTabBadges(card, blockKey);
+            triggerAutoSave();
+            setTimeout(() => {
+              const nextSubInput = listEl.querySelector(`.task-subtasks-tree[data-parent-task-idx="${idx}"] .subtask-row[data-sub-idx="${sIdx + 1}"] .subtask-row-input`);
+              if (nextSubInput) nextSubInput.focus();
+            }, 20);
+          } else if (e.key === 'Backspace' && subInput.value === '') {
+            e.preventDefault();
+            task.subtasks.splice(sIdx, 1);
+            syncBlockContent(blockKey);
+            renderCardTasks(card, blockKey);
+            updateCardTabBadges(card, blockKey);
+            updateTotalProgress();
+            triggerAutoSave();
+            setTimeout(() => {
+              if (sIdx > 0) {
+                const prevSubInput = listEl.querySelector(`.task-subtasks-tree[data-parent-task-idx="${idx}"] .subtask-row[data-sub-idx="${sIdx - 1}"] .subtask-row-input`);
+                if (prevSubInput) prevSubInput.focus();
+              } else {
+                const parentInput = listEl.querySelector(`.task-row[data-task-idx="${idx}"] .task-row-input`);
+                if (parentInput) parentInput.focus();
+              }
+            }, 20);
+          } else if (e.key === 'Tab' && e.shiftKey) {
+            e.preventDefault();
+            const textToPromote = sub.text;
+            const doneToPromote = sub.done;
+            task.subtasks.splice(sIdx, 1);
+            tasks.splice(idx + 1, 0, { text: textToPromote, done: doneToPromote, notes: '', subtasks: [] });
+            syncBlockContent(blockKey);
+            renderCardTasks(card, blockKey);
+            updateCardTabBadges(card, blockKey);
+            triggerAutoSave();
+            setTimeout(() => {
+              const promotedInput = listEl.querySelector(`.task-row[data-task-idx="${idx + 1}"] .task-row-input`);
+              if (promotedInput) promotedInput.focus();
+            }, 20);
+          }
+        });
+
+        // Subtask delete button
+        subDel.addEventListener('click', (e) => {
+          e.stopPropagation();
+          task.subtasks.splice(sIdx, 1);
+          syncBlockContent(blockKey);
+          renderCardTasks(card, blockKey);
+          updateCardTabBadges(card, blockKey);
+          updateTotalProgress();
+          triggerAutoSave();
+        });
+
+        subtasksTree.appendChild(subRow);
+      });
+
+      listEl.appendChild(subtasksTree);
+    }
   });
 
   updateCardTabBadges(card, blockKey);
@@ -517,8 +777,19 @@ function renderCardNotes(card, blockKey) {
 function updateCardTabBadges(card, blockKey) {
   const block = currentDayData[blockKey] || { tasks: [], notes: "" };
   const tasks = Array.isArray(block.tasks) ? block.tasks : [];
-  const total = tasks.length;
-  const completed = tasks.filter(t => t.done).length;
+  let total = 0;
+  let completed = 0;
+
+  for (const t of tasks) {
+    total++;
+    if (t.done) completed++;
+    if (Array.isArray(t.subtasks)) {
+      for (const s of t.subtasks) {
+        total++;
+        if (s.done) completed++;
+      }
+    }
+  }
 
   const badge = card.querySelector('.tab-task-badge');
   if (badge) {
@@ -565,7 +836,7 @@ function insertCheckboxTask(card, blockKey, taskText = '') {
 
   const tasks = currentDayData[blockKey].tasks;
   const newIdx = tasks.length;
-  tasks.push({ text: taskText || '', done: false });
+  tasks.push({ text: taskText || '', done: false, notes: '', subtasks: [] });
 
   syncBlockContent(blockKey);
   setCardActiveTab(card, 'tasks');
@@ -591,6 +862,65 @@ function insertCheckboxTask(card, blockKey, taskText = '') {
 
 // Backward-compatible alias
 const addTaskToBlock = insertCheckboxTask;
+
+// Active Selection State for Task-Specific Lock-In
+let selectedBlockKey = 'part1_quad1';
+let selectedTaskIdx = null;
+
+function setActiveTaskSelection(blockKey, idx) {
+  selectedBlockKey = blockKey;
+  selectedTaskIdx = idx;
+
+  document.querySelectorAll('.task-row.is-active-task').forEach(el => el.classList.remove('is-active-task'));
+  document.querySelectorAll('.cool-card.is-active-card').forEach(el => el.classList.remove('is-active-card'));
+
+  const card = document.querySelector(`.cool-card[data-block="${blockKey}"]`);
+  if (card) {
+    card.classList.add('is-active-card');
+    const row = card.querySelector(`.task-row[data-task-idx="${idx}"]`);
+    if (row) row.classList.add('is-active-task');
+  }
+}
+
+function setActiveColumnSelection(blockKey) {
+  selectedBlockKey = blockKey;
+  document.querySelectorAll('.cool-card.is-active-card').forEach(el => el.classList.remove('is-active-card'));
+  const card = document.querySelector(`.cool-card[data-block="${blockKey}"]`);
+  if (card) {
+    card.classList.add('is-active-card');
+  }
+}
+
+// Insert a new bullet note properly at cursor position and continue writing
+function insertBulletNote(card, blockKey) {
+  setCardActiveTab(card, 'notes');
+  const notesPanel = card.querySelector('.card-notes-panel');
+  if (!notesPanel) return;
+  const editor = notesPanel.querySelector('.card-notes-editor');
+  if (!editor) return;
+
+  const text = editor.value || '';
+  const selStart = (editor.selectionStart !== undefined && editor.selectionStart !== null) ? editor.selectionStart : text.length;
+  const selEnd = (editor.selectionEnd !== undefined && editor.selectionEnd !== null) ? editor.selectionEnd : text.length;
+
+  let prefix = '';
+  if (selStart > 0 && text[selStart - 1] !== '\n') {
+    prefix = '\n';
+  }
+  const bulletStr = prefix + '• ';
+  const newText = text.slice(0, selStart) + bulletStr + text.slice(selEnd);
+  editor.value = newText;
+
+  const newPos = selStart + bulletStr.length;
+  editor.focus();
+  editor.setSelectionRange(newPos, newPos);
+
+  if (!currentDayData[blockKey]) currentDayData[blockKey] = getDefaultBlockData(getDefaultTitle(blockKey));
+  currentDayData[blockKey].notes = editor.value;
+  syncBlockContent(blockKey);
+  updateCardTabBadges(card, blockKey);
+  triggerAutoSave();
+}
 
 // Populate UI from State
 function renderCurrentDay() {
@@ -652,8 +982,16 @@ function updateTotalProgress() {
     if (key !== 'date' && key !== 'updatedAt') {
       const block = currentDayData[key];
       if (block && Array.isArray(block.tasks)) {
-        total += block.tasks.length;
-        completed += block.tasks.filter(t => t.done).length;
+        for (const t of block.tasks) {
+          total++;
+          if (t.done) completed++;
+          if (Array.isArray(t.subtasks)) {
+            for (const s of t.subtasks) {
+              total++;
+              if (s.done) completed++;
+            }
+          }
+        }
       }
     }
   }
@@ -728,6 +1066,16 @@ function bindCardEvents() {
       btnNotes.addEventListener('click', () => setCardActiveTab(card, 'notes'));
     }
 
+    // Card Selection Listener
+    card.addEventListener('click', (e) => {
+      if (!e.target.closest('.task-row')) {
+        setActiveColumnSelection(blockKey);
+      }
+    });
+    card.addEventListener('focusin', () => {
+      setActiveColumnSelection(blockKey);
+    });
+
     // 5. Notes Textarea Input Event (Independent notes editor)
     const notesEditor = card.querySelector('.card-notes-editor');
     if (notesEditor) {
@@ -737,6 +1085,59 @@ function bindCardEvents() {
         syncBlockContent(blockKey);
         updateCardTabBadges(card, blockKey);
         triggerAutoSave();
+      });
+
+      // Smart bullet list continuation and backspace cleanup
+      notesEditor.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          const val = notesEditor.value;
+          const start = notesEditor.selectionStart;
+          const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+          const lineEnd = val.indexOf('\n', start);
+          const currentLine = val.substring(lineStart, lineEnd === -1 ? val.length : lineEnd);
+
+          const bulletMatch = currentLine.match(/^(\s*)(•|-|\*)\s+/);
+          if (bulletMatch) {
+            e.preventDefault();
+            const prefix = bulletMatch[0];
+            const content = currentLine.substring(prefix.length).trim();
+
+            if (content.length === 0) {
+              const updated = val.substring(0, lineStart) + val.substring(start);
+              notesEditor.value = updated;
+              notesEditor.setSelectionRange(lineStart, lineStart);
+            } else {
+              const insertText = '\n' + prefix;
+              const updated = val.substring(0, start) + insertText + val.substring(start);
+              notesEditor.value = updated;
+              const nextPos = start + insertText.length;
+              notesEditor.setSelectionRange(nextPos, nextPos);
+            }
+
+            if (!currentDayData[blockKey]) currentDayData[blockKey] = getDefaultBlockData(getDefaultTitle(blockKey));
+            currentDayData[blockKey].notes = notesEditor.value;
+            syncBlockContent(blockKey);
+            triggerAutoSave();
+          }
+        } else if (e.key === 'Backspace') {
+          const val = notesEditor.value;
+          const start = notesEditor.selectionStart;
+          const end = notesEditor.selectionEnd;
+          if (start === end) {
+            const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+            const beforeCursor = val.substring(lineStart, start);
+            if (/^(\s*)(•|-|\*)\s$/.test(beforeCursor)) {
+              e.preventDefault();
+              const updated = val.substring(0, lineStart) + val.substring(start);
+              notesEditor.value = updated;
+              notesEditor.setSelectionRange(lineStart, lineStart);
+              if (!currentDayData[blockKey]) currentDayData[blockKey] = getDefaultBlockData(getDefaultTitle(blockKey));
+              currentDayData[blockKey].notes = notesEditor.value;
+              syncBlockContent(blockKey);
+              triggerAutoSave();
+            }
+          }
+        }
       });
     }
 
@@ -754,25 +1155,18 @@ function bindCardEvents() {
       btnCheck.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
+        setActiveColumnSelection(blockKey);
         insertCheckboxTask(card, blockKey, '');
       });
     }
 
-    // 8. Header Bullet Button (•) -> Immediately switch to Notes and append bullet!
+    // 8. Header Bullet Button (•) -> Immediately insert bullet note at cursor!
     if (btnBullet) {
-      btnBullet.addEventListener('click', () => {
-        setCardActiveTab(card, 'notes');
-        if (notesEditor) {
-          const val = notesEditor.value;
-          const prefix = val.length > 0 && !val.endsWith('\n') ? '\n' : '';
-          notesEditor.value = val + prefix + '• ';
-          notesEditor.focus();
-          if (!currentDayData[blockKey]) currentDayData[blockKey] = getDefaultBlockData(getDefaultTitle(blockKey));
-          currentDayData[blockKey].notes = notesEditor.value;
-          syncBlockContent(blockKey);
-          updateCardTabBadges(card, blockKey);
-          triggerAutoSave();
-        }
+      btnBullet.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setActiveColumnSelection(blockKey);
+        insertBulletNote(card, blockKey);
       });
     }
   });
@@ -862,7 +1256,9 @@ function extractUnfinishedTasks(dayData) {
           list.push({
             blockKey: k,
             blockTitle: block.title || getDefaultTitle(k),
-            text: task.text.trim()
+            text: task.text.trim(),
+            notes: task.notes || '',
+            subtasks: Array.isArray(task.subtasks) ? JSON.parse(JSON.stringify(task.subtasks)) : []
           });
         }
       });
@@ -973,7 +1369,9 @@ function applyPendingCarryover() {
     if (!exists) {
       currentDayData[item.blockKey].tasks.push({
         text: item.text,
-        done: false
+        done: false,
+        notes: item.notes || '',
+        subtasks: Array.isArray(item.subtasks) ? JSON.parse(JSON.stringify(item.subtasks)) : []
       });
       syncBlockContent(item.blockKey);
       addedCount++;
@@ -1007,6 +1405,417 @@ function manualCheckCarryover() {
   const targetDateKey = formatDateKey(currentDate);
   safeStorage.removeItem(`mrt_carryover_dismissed_${targetDateKey}`);
   checkPendingCarryover(targetDateKey, true);
+}
+
+// ==========================================================================
+// Phase Isolation Controller (Anti-Task-Switching View)
+// ==========================================================================
+
+function setPhase(phase, notify = true) {
+  currentPhase = phase;
+  document.body.setAttribute('data-phase', phase);
+  safeStorage.setItem('mrt_phase', phase);
+
+  // Update Ribbon buttons
+  const ribbonBtns = document.querySelectorAll('.phase-tab-btn');
+  ribbonBtns.forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-phase') === phase);
+  });
+
+  if (notify) {
+    const phaseLabels = {
+      all: 'All Phases: Full Day Overview (13 Tracks)',
+      learning: 'Phase 4-9: Foundation & Learning (CS, AI, Apps, RSWE, Breadth)',
+      productive: 'Phase 9-6: Productive & Admin (Deep Execution & Ops)',
+      evening: 'Phase 6-11: Creative Evening (Huro, Kana, Bana, Curio, Survivo, Random)'
+    };
+    showToast(phaseLabels[phase] || phase);
+  }
+}
+
+// ==========================================================================
+// Lock-In Deep Work Focus Controller (Single-Task Attention Shield)
+// ==========================================================================
+
+let lockinActive = false;
+let lockinBlockKey = null;
+let lockinTaskIdx = null;
+let currentLockinPresetMinutes = 25;
+let lockinSeconds = 25 * 60;
+let lockinTimerInterval = null;
+let lockinTimerRunning = false;
+
+function formatTimer(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function updateTimerDisplay() {
+  if (lockinTimerDisplay) {
+    lockinTimerDisplay.textContent = formatTimer(lockinSeconds);
+  }
+}
+
+function startLockinTimer() {
+  if (lockinTimerRunning) return;
+  lockinTimerRunning = true;
+  if (btnLockinTimerToggle) btnLockinTimerToggle.textContent = '⏸ Pause';
+  clearInterval(lockinTimerInterval);
+  lockinTimerInterval = setInterval(() => {
+    if (lockinSeconds > 0) {
+      lockinSeconds--;
+      updateTimerDisplay();
+    } else {
+      pauseLockinTimer();
+      showToast('⏱ Time Block Complete! Task progress saved.');
+    }
+  }, 1000);
+}
+
+function pauseLockinTimer() {
+  lockinTimerRunning = false;
+  if (btnLockinTimerToggle) btnLockinTimerToggle.textContent = '▶ Start';
+  clearInterval(lockinTimerInterval);
+}
+
+function resetLockinTimer(defaultMinutes = 25) {
+  pauseLockinTimer();
+  currentLockinPresetMinutes = defaultMinutes;
+  lockinSeconds = defaultMinutes * 60;
+  updateTimerDisplay();
+}
+
+function setLockinTimeBlock(minutes) {
+  currentLockinPresetMinutes = minutes;
+  document.querySelectorAll('.timeblock-preset-btn').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.mins, 10) === minutes);
+  });
+  resetLockinTimer(minutes);
+  startLockinTimer();
+  showToast(`⏱ Set ${minutes}-minute Time Block for this task`);
+}
+
+function getPhaseForBlock(blockKey) {
+  if (['part1_quad1', 'part1_quad2', 'part1_quad3', 'part1_quad4', 'part2'].includes(blockKey)) {
+    return 'Phase 4-9: Foundation & Learning';
+  }
+  if (['productive', 'admin'].includes(blockKey)) {
+    return 'Phase 9-6: Productive & Admin';
+  }
+  return 'Phase 6-11: Creative Evening';
+}
+
+function renderLockinSubtasks(task, blockKey, taskIdx) {
+  const container = document.getElementById('lockin-subtasks-container');
+  const listEl = document.getElementById('lockin-subtasks-list');
+  const titleEl = document.getElementById('lockin-subtasks-title');
+  if (!container || !listEl) return;
+
+  if (!task) {
+    listEl.innerHTML = '<div style="font-size:11.5px;color:var(--text-dim);font-style:italic;padding:4px;">Type a task name above to add subtasks</div>';
+    if (titleEl) titleEl.textContent = 'Subtasks & Milestones';
+    return;
+  }
+
+  if (!Array.isArray(task.subtasks)) {
+    task.subtasks = [];
+  }
+  const subtasks = task.subtasks;
+  const subTotal = subtasks.length;
+  const subDone = subtasks.filter(s => s.done).length;
+
+  if (titleEl) {
+    titleEl.textContent = subTotal > 0 ? `Subtasks & Milestones (${subDone}/${subTotal})` : 'Subtasks & Milestones';
+  }
+
+  listEl.innerHTML = '';
+
+  if (subtasks.length === 0) {
+    listEl.innerHTML = '<div style="font-size:11.5px;color:var(--text-dim);font-style:italic;padding:4px;">No subtasks yet. Click "+ Add Subtask" to break this task down.</div>';
+    return;
+  }
+
+  subtasks.forEach((sub, sIdx) => {
+    const item = document.createElement('div');
+    item.className = 'lockin-subtask-item';
+    item.innerHTML = `
+      <button type="button" class="subtask-checkbox-btn ${sub.done ? 'checked' : ''}" title="${sub.done ? 'Mark active' : 'Mark done'}">
+        <svg class="subtask-check-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </button>
+      <input type="text" class="${sub.done ? 'task-done' : ''}" value="${escapeHtml(sub.text)}" placeholder="Subtask milestone..." spellcheck="false" />
+      <button type="button" class="subtask-row-del" title="Delete subtask" style="opacity:0.65;">×</button>
+    `;
+
+    const checkBtn = item.querySelector('.subtask-checkbox-btn');
+    const input = item.querySelector('input');
+    const delBtn = item.querySelector('.subtask-row-del');
+
+    checkBtn.addEventListener('click', () => {
+      sub.done = !sub.done;
+      checkBtn.classList.toggle('checked', sub.done);
+      input.classList.toggle('task-done', sub.done);
+      syncBlockContent(blockKey);
+      updateTotalProgress();
+      renderLockinSubtasks(task, blockKey, taskIdx);
+      triggerAutoSave();
+    });
+
+    input.addEventListener('input', () => {
+      sub.text = input.value;
+      syncBlockContent(blockKey);
+      triggerAutoSave();
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        subtasks.splice(sIdx + 1, 0, { text: '', done: false });
+        syncBlockContent(blockKey);
+        renderLockinSubtasks(task, blockKey, taskIdx);
+        triggerAutoSave();
+        setTimeout(() => {
+          const nextInput = listEl.querySelectorAll('.lockin-subtask-item input')[sIdx + 1];
+          if (nextInput) nextInput.focus();
+        }, 20);
+      } else if (e.key === 'Backspace' && input.value === '') {
+        e.preventDefault();
+        subtasks.splice(sIdx, 1);
+        syncBlockContent(blockKey);
+        renderLockinSubtasks(task, blockKey, taskIdx);
+        updateTotalProgress();
+        triggerAutoSave();
+        setTimeout(() => {
+          const prevInput = listEl.querySelectorAll('.lockin-subtask-item input')[Math.max(0, sIdx - 1)];
+          if (prevInput) prevInput.focus();
+        }, 20);
+      }
+    });
+
+    delBtn.addEventListener('click', () => {
+      subtasks.splice(sIdx, 1);
+      syncBlockContent(blockKey);
+      renderLockinSubtasks(task, blockKey, taskIdx);
+      updateTotalProgress();
+      triggerAutoSave();
+    });
+
+    listEl.appendChild(item);
+  });
+}
+
+function openLockInFocus(blockKey, taskIdx = null) {
+  if (!lockinModal) return;
+  lockinActive = true;
+  lockinBlockKey = blockKey;
+  lockinTaskIdx = taskIdx;
+  selectedBlockKey = blockKey;
+  selectedTaskIdx = taskIdx;
+
+  const block = currentDayData[blockKey] || getDefaultBlockData(getDefaultTitle(blockKey));
+  const tasks = Array.isArray(block.tasks) ? block.tasks : [];
+  let task = (taskIdx !== null && tasks[taskIdx]) ? tasks[taskIdx] : null;
+
+  if (!task && tasks.length > 0) {
+    const uncompletedIdx = tasks.findIndex(t => !t.done && t.text.trim().length > 0);
+    if (uncompletedIdx !== -1) {
+      lockinTaskIdx = uncompletedIdx;
+      selectedTaskIdx = uncompletedIdx;
+      task = tasks[uncompletedIdx];
+    }
+  }
+
+  // Set Column & Phase Labels
+  if (lockinPhaseLabel) lockinPhaseLabel.textContent = getPhaseForBlock(blockKey);
+  if (lockinBlockLabel) lockinBlockLabel.textContent = block.title || getDefaultTitle(blockKey);
+
+  // Set Task Number Badge
+  const taskNumLabel = document.getElementById('lockin-task-num-label');
+  if (taskNumLabel) {
+    if (lockinTaskIdx !== null && tasks[lockinTaskIdx]) {
+      taskNumLabel.textContent = `Task ${lockinTaskIdx + 1} of ${tasks.length}`;
+      taskNumLabel.style.display = 'inline-block';
+    } else {
+      taskNumLabel.textContent = tasks.length > 0 ? `Task ${tasks.length + 1}` : `New Task`;
+      taskNumLabel.style.display = 'inline-block';
+    }
+  }
+
+  // Set Task Input
+  if (lockinTaskInput) {
+    lockinTaskInput.value = task ? task.text : '';
+  }
+
+  // Set Checkbox state
+  if (btnLockinCheck) {
+    btnLockinCheck.classList.toggle('completed', !!(task && task.done));
+  }
+
+  // Set Subtasks Breakdown for Deep Focus
+  renderLockinSubtasks(task, blockKey, lockinTaskIdx);
+
+  // Set Notes: Load notes specific to THIS task (never touch or overwrite column notes)
+  if (lockinNotesArea) {
+    lockinNotesArea.value = (task && typeof task.notes === 'string') ? task.notes : '';
+  }
+
+  // Update Time Block Presets
+  document.querySelectorAll('.timeblock-preset-btn').forEach(btn => {
+    btn.classList.toggle('active', parseInt(btn.dataset.mins, 10) === currentLockinPresetMinutes);
+  });
+
+  // Reset & Start Time Block for this task
+  resetLockinTimer(currentLockinPresetMinutes);
+  startLockinTimer();
+
+  lockinModal.style.display = 'flex';
+  setTimeout(() => {
+    if (lockinTaskInput) {
+      if (!task || !task.text) lockinTaskInput.focus();
+      else if (lockinNotesArea) lockinNotesArea.focus();
+    }
+  }, 40);
+}
+
+function closeLockInFocus() {
+  if (!lockinModal) return;
+  pauseLockinTimer();
+  lockinActive = false;
+  lockinModal.style.display = 'none';
+
+  // Sync edits back to card
+  if (lockinBlockKey) {
+    syncBlockContent(lockinBlockKey);
+    const card = document.querySelector(`.cool-card[data-block="${lockinBlockKey}"]`);
+    if (card) {
+      renderCardTasks(card, lockinBlockKey);
+      renderCardNotes(card, lockinBlockKey);
+      updateCardTabBadges(card, lockinBlockKey);
+      if (lockinTaskIdx !== null) {
+        setActiveTaskSelection(lockinBlockKey, lockinTaskIdx);
+      } else {
+        setActiveColumnSelection(lockinBlockKey);
+      }
+    }
+    updateTotalProgress();
+    saveDay(formatDateKey(currentDate), currentDayData);
+  }
+}
+
+function completeLockInTask() {
+  if (!lockinBlockKey) return;
+  const block = currentDayData[lockinBlockKey];
+  if (!block || !Array.isArray(block.tasks)) return;
+
+  if (lockinTaskIdx !== null && block.tasks[lockinTaskIdx]) {
+    const task = block.tasks[lockinTaskIdx];
+    if (task.done) {
+      task.done = false;
+      if (btnLockinCheck) btnLockinCheck.classList.remove('completed');
+      syncBlockContent(lockinBlockKey);
+      updateTotalProgress();
+      saveDay(formatDateKey(currentDate), currentDayData);
+      showToast('Task marked active');
+      return;
+    }
+    task.done = true;
+  } else {
+    const textVal = (lockinTaskInput ? lockinTaskInput.value : '').trim();
+    if (textVal.length > 0) {
+      block.tasks.push({
+        text: textVal,
+        done: true,
+        notes: (lockinNotesArea ? lockinNotesArea.value : ''),
+        subtasks: []
+      });
+      lockinTaskIdx = block.tasks.length - 1;
+      selectedTaskIdx = lockinTaskIdx;
+    }
+  }
+
+  if (btnLockinCheck) {
+    btnLockinCheck.classList.add('completed');
+  }
+
+  syncBlockContent(lockinBlockKey);
+  updateTotalProgress();
+  saveDay(formatDateKey(currentDate), currentDayData);
+  showToast('🎯 Task Crushed! Deep focus completed.');
+
+  setTimeout(() => {
+    const remainingIdx = block.tasks.findIndex(t => !t.done && t.text.trim().length > 0);
+    if (remainingIdx !== -1) {
+      lockinTaskIdx = remainingIdx;
+      selectedTaskIdx = remainingIdx;
+      if (lockinTaskInput) lockinTaskInput.value = block.tasks[remainingIdx].text;
+      if (lockinNotesArea) lockinNotesArea.value = block.tasks[remainingIdx].notes || '';
+      renderLockinSubtasks(block.tasks[remainingIdx], lockinBlockKey, remainingIdx);
+      if (btnLockinCheck) btnLockinCheck.classList.remove('completed');
+      const taskNumLabel = document.getElementById('lockin-task-num-label');
+      if (taskNumLabel) {
+        taskNumLabel.textContent = `Task ${remainingIdx + 1} of ${block.tasks.length}`;
+      }
+      resetLockinTimer(currentLockinPresetMinutes);
+      startLockinTimer();
+      showToast(`Next target loaded: "${block.tasks[remainingIdx].text}"`);
+    } else {
+      closeLockInFocus();
+    }
+  }, 350);
+}
+
+// Launch Task-Specific Lock-In based on User's Active Selection
+function launchNextDeepWorkTask() {
+  // 1. If user has actively selected a specific column and task:
+  if (selectedBlockKey && selectedTaskIdx !== null) {
+    const block = currentDayData[selectedBlockKey];
+    if (block && Array.isArray(block.tasks) && block.tasks[selectedTaskIdx]) {
+      openLockInFocus(selectedBlockKey, selectedTaskIdx);
+      return;
+    }
+  }
+
+  // 2. If user has selected a particular column:
+  if (selectedBlockKey) {
+    const block = currentDayData[selectedBlockKey];
+    if (block && Array.isArray(block.tasks)) {
+      const uncompletedIdx = block.tasks.findIndex(t => !t.done && t.text.trim().length > 0);
+      if (uncompletedIdx !== -1) {
+        openLockInFocus(selectedBlockKey, uncompletedIdx);
+        return;
+      }
+    }
+    openLockInFocus(selectedBlockKey, null);
+    return;
+  }
+
+  // 3. Fallback to active phase blocks
+  let candidateKeys = [];
+  if (currentPhase === 'learning') {
+    candidateKeys = ['part1_quad1', 'part1_quad2', 'part1_quad3', 'part1_quad4', 'part2'];
+  } else if (currentPhase === 'productive') {
+    candidateKeys = ['productive', 'admin'];
+  } else if (currentPhase === 'evening') {
+    candidateKeys = ['evening_huro', 'evening_kana', 'evening_bana', 'evening_curio', 'evening_survivi', 'evening_random'];
+  } else {
+    candidateKeys = ['part1_quad1', 'part1_quad2', 'part1_quad3', 'part1_quad4', 'part2', 'productive', 'admin'];
+  }
+
+  for (const k of candidateKeys) {
+    const block = currentDayData[k];
+    if (block && Array.isArray(block.tasks)) {
+      const idx = block.tasks.findIndex(t => !t.done && t.text.trim().length > 0);
+      if (idx !== -1) {
+        openLockInFocus(k, idx);
+        return;
+      }
+    }
+  }
+
+  const targetKey = candidateKeys[0] || 'part1_quad1';
+  openLockInFocus(targetKey, null);
 }
 
 // Button Bindings
@@ -1202,8 +2011,235 @@ if (btnCarryoverCheck) {
   btnCarryoverCheck.addEventListener('click', manualCheckCarryover);
 }
 
+// Phase Ribbon Interactive Buttons
+const ribbonBtns = document.querySelectorAll('.phase-tab-btn');
+ribbonBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const phase = btn.getAttribute('data-phase');
+    if (phase) setPhase(phase);
+  });
+});
+
+// Lock-In Deep Work Focus Controls
+if (btnDeepWorkFocus) {
+  btnDeepWorkFocus.addEventListener('click', launchNextDeepWorkTask);
+}
+if (btnLockinExit) {
+  btnLockinExit.addEventListener('click', closeLockInFocus);
+}
+const lockinBackdrop = document.querySelector('.lockin-backdrop');
+if (lockinBackdrop) {
+  lockinBackdrop.addEventListener('click', closeLockInFocus);
+}
+if (btnLockinCheck) {
+  btnLockinCheck.addEventListener('click', completeLockInTask);
+}
+if (btnLockinTimerToggle) {
+  btnLockinTimerToggle.addEventListener('click', () => {
+    if (lockinTimerRunning) pauseLockinTimer();
+    else startLockinTimer();
+  });
+}
+if (btnLockinTimerReset) {
+  btnLockinTimerReset.addEventListener('click', () => resetLockinTimer(currentLockinPresetMinutes));
+}
+
+// Time Block Preset Buttons
+document.querySelectorAll('.timeblock-preset-btn').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const mins = parseInt(btn.dataset.mins, 10);
+    if (!isNaN(mins)) {
+      setLockinTimeBlock(mins);
+    }
+  });
+});
+
+// Add Subtask in Lock-In Focus
+const btnLockinAddSubtask = document.getElementById('btn-lockin-add-subtask');
+if (btnLockinAddSubtask) {
+  btnLockinAddSubtask.addEventListener('click', () => {
+    if (!lockinBlockKey) return;
+    const block = currentDayData[lockinBlockKey];
+    if (!block || !Array.isArray(block.tasks)) return;
+
+    let task = (lockinTaskIdx !== null && block.tasks[lockinTaskIdx]) ? block.tasks[lockinTaskIdx] : null;
+    if (!task) {
+      const textVal = (lockinTaskInput ? lockinTaskInput.value : '').trim();
+      if (!textVal) {
+        if (lockinTaskInput) lockinTaskInput.focus();
+        showToast('Type a task name first');
+        return;
+      }
+      task = {
+        text: textVal,
+        done: false,
+        notes: (lockinNotesArea ? lockinNotesArea.value : ''),
+        subtasks: []
+      };
+      block.tasks.push(task);
+      lockinTaskIdx = block.tasks.length - 1;
+      selectedTaskIdx = lockinTaskIdx;
+      const taskNumLabel = document.getElementById('lockin-task-num-label');
+      if (taskNumLabel) taskNumLabel.textContent = `Task ${lockinTaskIdx + 1} of ${block.tasks.length}`;
+    }
+
+    if (!Array.isArray(task.subtasks)) task.subtasks = [];
+    task.subtasks.push({ text: '', done: false });
+    syncBlockContent(lockinBlockKey);
+    renderLockinSubtasks(task, lockinBlockKey, lockinTaskIdx);
+    triggerAutoSave();
+
+    setTimeout(() => {
+      const listEl = document.getElementById('lockin-subtasks-list');
+      if (listEl) {
+        const inputs = listEl.querySelectorAll('.lockin-subtask-item input');
+        if (inputs.length > 0) {
+          inputs[inputs.length - 1].focus();
+        }
+      }
+    }, 25);
+  });
+}
+
+// Live Sync for Lock-In Editors
+if (lockinTaskInput) {
+  lockinTaskInput.addEventListener('input', () => {
+    if (!lockinBlockKey) return;
+    const block = currentDayData[lockinBlockKey];
+    if (!block) return;
+    if (!Array.isArray(block.tasks)) block.tasks = [];
+    if (lockinTaskIdx !== null && block.tasks[lockinTaskIdx]) {
+      block.tasks[lockinTaskIdx].text = lockinTaskInput.value;
+    } else if (lockinTaskInput.value.trim().length > 0) {
+      block.tasks.push({
+        text: lockinTaskInput.value,
+        done: false,
+        notes: (lockinNotesArea ? lockinNotesArea.value : ''),
+        subtasks: []
+      });
+      lockinTaskIdx = block.tasks.length - 1;
+      selectedTaskIdx = lockinTaskIdx;
+      const taskNumLabel = document.getElementById('lockin-task-num-label');
+      if (taskNumLabel) taskNumLabel.textContent = `Task ${lockinTaskIdx + 1} of ${block.tasks.length}`;
+      renderLockinSubtasks(block.tasks[lockinTaskIdx], lockinBlockKey, lockinTaskIdx);
+    }
+    syncBlockContent(lockinBlockKey);
+    triggerAutoSave();
+  });
+
+  lockinTaskInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (lockinNotesArea) lockinNotesArea.focus();
+    }
+  });
+}
+
+if (lockinNotesArea) {
+  lockinNotesArea.addEventListener('input', () => {
+    if (!lockinBlockKey) return;
+    if (!currentDayData[lockinBlockKey]) {
+      currentDayData[lockinBlockKey] = getDefaultBlockData(getDefaultTitle(lockinBlockKey));
+    }
+    const block = currentDayData[lockinBlockKey];
+    if (!Array.isArray(block.tasks)) block.tasks = [];
+
+    // Save notes ONLY to the active task — NEVER to the column's block.notes!
+    if (lockinTaskIdx !== null && block.tasks[lockinTaskIdx]) {
+      block.tasks[lockinTaskIdx].notes = lockinNotesArea.value;
+    } else if (lockinTaskInput && lockinTaskInput.value.trim().length > 0) {
+      block.tasks.push({
+        text: lockinTaskInput.value,
+        done: false,
+        notes: lockinNotesArea.value,
+        subtasks: []
+      });
+      lockinTaskIdx = block.tasks.length - 1;
+      selectedTaskIdx = lockinTaskIdx;
+      const taskNumLabel = document.getElementById('lockin-task-num-label');
+      if (taskNumLabel) taskNumLabel.textContent = `Task ${lockinTaskIdx + 1} of ${block.tasks.length}`;
+      renderLockinSubtasks(block.tasks[lockinTaskIdx], lockinBlockKey, lockinTaskIdx);
+    }
+
+    syncBlockContent(lockinBlockKey);
+    triggerAutoSave();
+  });
+
+  // Smart bullet list continuation and backspace exit for task notes
+  lockinNotesArea.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const val = lockinNotesArea.value;
+      const start = lockinNotesArea.selectionStart;
+      const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+      const lineEnd = val.indexOf('\n', start);
+      const currentLine = val.substring(lineStart, lineEnd === -1 ? val.length : lineEnd);
+
+      const bulletMatch = currentLine.match(/^(\s*)(•|-|\*)\s+/);
+      if (bulletMatch) {
+        const fullPrefix = bulletMatch[0];
+        const indent = bulletMatch[1];
+        const symbol = bulletMatch[2];
+        const contentAfter = currentLine.substring(fullPrefix.length).trim();
+
+        if (contentAfter.length === 0) {
+          e.preventDefault();
+          const before = val.substring(0, lineStart);
+          const after = val.substring(start);
+          lockinNotesArea.value = before + after;
+          lockinNotesArea.setSelectionRange(lineStart, lineStart);
+          lockinNotesArea.dispatchEvent(new Event('input'));
+          return;
+        }
+
+        e.preventDefault();
+        const nextBullet = '\n' + indent + symbol + ' ';
+        const before = val.substring(0, start);
+        const after = val.substring(start);
+        lockinNotesArea.value = before + nextBullet + after;
+        const newPos = start + nextBullet.length;
+        lockinNotesArea.setSelectionRange(newPos, newPos);
+        lockinNotesArea.dispatchEvent(new Event('input'));
+      }
+    }
+  });
+}
+
 // Global Keyboard Shortcuts
 window.addEventListener('keydown', (e) => {
+  // 1. Shortcuts while inside Lock-In Focus Mode
+  if (lockinActive) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeLockInFocus();
+      return;
+    }
+    // Ctrl+Enter or Cmd+Enter completes the current task
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      completeLockInTask();
+      return;
+    }
+    // Space completes the task when not actively typing text or subtasks
+    const isTyping = document.activeElement === lockinNotesArea || 
+                     document.activeElement === lockinTaskInput || 
+                     (document.activeElement && document.activeElement.closest('#lockin-subtasks-list'));
+    if (e.key === ' ' && !isTyping) {
+      e.preventDefault();
+      completeLockInTask();
+      return;
+    }
+    // Shield against background phase switching or day jumping while locked in
+    if (!['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+      if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        closeLockInFocus();
+      }
+      return;
+    }
+  }
+
+  // 2. Ignore regular shortcuts if user is typing in any input/textarea
   if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
     if (e.key === 'Escape') {
       document.activeElement.blur();
@@ -1211,6 +2247,7 @@ window.addEventListener('keydown', (e) => {
     return;
   }
 
+  // 3. Navigation and Phase Shortcuts
   if (e.key === '[' || (e.altKey && e.key === 'ArrowLeft')) {
     e.preventDefault();
     if (btnPrevDay) btnPrevDay.click();
@@ -1220,6 +2257,21 @@ window.addEventListener('keydown', (e) => {
   } else if (e.key === 't' || e.key === 'T') {
     e.preventDefault();
     if (btnToday) btnToday.click();
+  } else if (e.key === '1') {
+    e.preventDefault();
+    setPhase('learning');
+  } else if (e.key === '2') {
+    e.preventDefault();
+    setPhase('productive');
+  } else if (e.key === '3') {
+    e.preventDefault();
+    setPhase('evening');
+  } else if (e.key === '0') {
+    e.preventDefault();
+    setPhase('all');
+  } else if (e.key === 'f' || e.key === 'F') {
+    e.preventDefault();
+    launchNextDeepWorkTask();
   } else if (e.key === 'm' || e.key === 'M') {
     e.preventDefault();
     cycleTheme();
@@ -1235,6 +2287,7 @@ window.addEventListener('keydown', (e) => {
     }
   } else if (e.key === 'Escape') {
     if (calendarModal) calendarModal.classList.remove('open');
+    if (lockinActive) closeLockInFocus();
   }
 });
 
@@ -1266,6 +2319,9 @@ function init() {
     currentDayData = getDefaultDayData(dateKey);
   }
   renderCurrentDay();
+
+  // Apply Phase Isolation
+  setPhase(currentPhase, false);
 
   // Check pending carryover for today
   checkPendingCarryover(dateKey);

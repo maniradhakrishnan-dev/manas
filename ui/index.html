@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="paper">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -78,8 +78,9 @@
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"></polyline><path d="M20 20v-7a4 4 0 0 0-4-4H4"></path></svg>
         </button>
 
+
         <!-- Theme Toggle -->
-        <button id="btn-theme" class="tool-btn" title="Toggle Theme (Chalk & Blackboard / Pen & Paper / Cyber Dark)">
+        <button id="btn-theme" class="tool-btn" title="Toggle Theme (Pen & Paper / Chalk / Satin Clay)">
           <svg class="theme-icon-dark" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
           <svg class="theme-icon-light" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
         </button>
@@ -91,29 +92,35 @@
       </div>
     </header>
 
-    <!-- Visual Day Timeline Ribbon -->
-    <div class="day-timeline-ribbon">
-      <div class="timeline-block time-learning">
-        <span class="timeline-dot"></span>
-        <span class="timeline-time">04:00 – 09:00</span>
-        <span class="timeline-desc">Morning Foundation & Learning</span>
-      </div>
-      <div class="timeline-block time-productive">
-        <span class="timeline-dot"></span>
-        <span class="timeline-time">09:00 – 14:00</span>
-        <span class="timeline-desc">Deep Execution & Shipping</span>
-      </div>
-      <div class="timeline-block time-admin">
-        <span class="timeline-dot"></span>
-        <span class="timeline-time">14:00 – 18:00</span>
-        <span class="timeline-desc">Admin & Operations</span>
-      </div>
-      <div class="timeline-block time-evening">
-        <span class="timeline-dot"></span>
-        <span class="timeline-time">18:00 – 23:00</span>
-        <span class="timeline-desc">Evening Exploration (6 Tracks)</span>
-      </div>
-    </div>
+    <!-- Interactive Phase Focus Ribbon -->
+    <nav class="day-timeline-ribbon" id="phase-ribbon" aria-label="Phase Isolation Focus">
+      <button type="button" class="phase-tab-btn active" data-phase="all" title="View Entire Day (Shortcut: 0)">
+        <span class="phase-pill-key">0</span>
+        <span class="phase-title">All Phases</span>
+        <span class="phase-sub">Full Day · 13 Tracks</span>
+      </button>
+
+      <button type="button" class="phase-tab-btn" data-phase="learning" title="Focus on 4-9 Foundation & Learning (Shortcut: 1)">
+        <span class="phase-pill-key">1</span>
+        <span class="phase-time">4-9</span>
+        <span class="phase-title">Foundation & Learning</span>
+        <span class="phase-sub">CS · SWE · AI · Apps · RSWE · Breadth</span>
+      </button>
+
+      <button type="button" class="phase-tab-btn" data-phase="productive" title="Focus on 9-6 Productive & Admin (Shortcut: 2)">
+        <span class="phase-pill-key">2</span>
+        <span class="phase-time">9-6</span>
+        <span class="phase-title">Productive & Admin</span>
+        <span class="phase-sub">High-Impact Work · Operations</span>
+      </button>
+
+      <button type="button" class="phase-tab-btn" data-phase="evening" title="Focus on 6-11 Creative Evening (Shortcut: 3)">
+        <span class="phase-pill-key">3</span>
+        <span class="phase-time">6-11</span>
+        <span class="phase-title">Creative Evening</span>
+        <span class="phase-sub">Huro · Kana · Bana · Curio · Survivo · Random</span>
+      </button>
+    </nav>
 
     <!-- Main Planner Workspace (Two Rows Layout) -->
     <main class="planner-workspace">
@@ -140,12 +147,12 @@
            Left: 4-9 (Part 1 4-Split + Part 2)
            Right: 9-6 (9-2 Productive + 2-6 Admin)
            ====================================================================== -->
-      <section class="planner-row row-top">
+      <section class="planner-row row-top" id="planner-row-top">
         
         <!-- ================================================================
              COLUMN 1 (LEFT): 04:00 — 09:00 FOUNDATION & LEARNING
              ================================================================ -->
-        <div class="planner-col col-left">
+        <div class="planner-col col-left phase-col-learning" id="phase-col-learning">
           
           <!-- Master Header: 4-9AM Foundation & Learning -->
           <div class="col-master-banner banner-learning-master">
@@ -271,7 +278,7 @@
         <!-- ================================================================
              COLUMN 2 (RIGHT): 09:00 — 18:00 WORK & EXECUTION
              ================================================================ -->
-        <div class="planner-col col-right">
+        <div class="planner-col col-right phase-col-productive" id="phase-col-productive">
           
           <!-- Master Header: 9-6 Work & Execution -->
           <div class="col-master-banner banner-work-master">
@@ -339,7 +346,7 @@
       <!-- ======================================================================
            NOTEBOOK FOLD SEPARATION (HORIZONTAL NEON SHEEN)
            ====================================================================== -->
-      <div class="phase-transition-fold">
+      <div class="phase-transition-fold phase-fold-divider" id="phase-fold-divider">
         <span class="neon-line"></span>
         <div class="phase-pill-glow">
           <span class="pill-sparkle">✦</span>
@@ -354,7 +361,16 @@
            Row 1: Huro | Kana | Bana
            Row 2: Curio | Survivi | Random
            ====================================================================== -->
-      <section class="planner-row row-bottom">
+      <section class="planner-row row-bottom phase-row-evening" id="phase-row-evening">
+        
+        <!-- Master Header: 6-11 Creative Evening (visible in isolated 6-11 mode) -->
+        <div class="col-master-banner banner-evening-master" id="banner-evening-master">
+          <div class="master-banner-left">
+            <span class="column-time-pill pill-emerald">18:00 — 23:00</span>
+            <span class="column-name">Creative Evening Exploration</span>
+          </div>
+        </div>
+
         <div class="evening-grid">
           
           <!-- Track 1: Huro (Row 1) -->
@@ -498,6 +514,83 @@
             <!-- Dynamically populated 12 months -->
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- ======================================================================
+         Lock-In Deep Work Focus Overlay (Single-Task Attention Shield)
+         ====================================================================== -->
+    <div id="lockin-focus-modal" class="lockin-modal" style="display: none;">
+      <div class="lockin-backdrop"></div>
+      <div class="lockin-card">
+        
+        <!-- Top Bar -->
+        <div class="lockin-header">
+          <div class="lockin-meta">
+            <span class="lockin-live-dot"></span>
+            <span id="lockin-phase-label" class="lockin-phase-tag">4-9 Foundation & Learning</span>
+            <span class="lockin-divider">/</span>
+            <span id="lockin-block-label" class="lockin-block-title">Core AI</span>
+            <span class="lockin-divider">/</span>
+            <span id="lockin-task-num-label" class="lockin-task-badge">Task 1</span>
+          </div>
+
+          <div class="lockin-timer-cluster">
+            <div class="lockin-timeblock-presets">
+              <span class="timeblock-label">Block:</span>
+              <button type="button" class="timeblock-preset-btn" data-mins="15" title="15-minute Time Block">15m</button>
+              <button type="button" class="timeblock-preset-btn active" data-mins="25" title="25-minute Time Block">25m</button>
+              <button type="button" class="timeblock-preset-btn" data-mins="45" title="45-minute Time Block">45m</button>
+              <button type="button" class="timeblock-preset-btn" data-mins="60" title="60-minute Time Block">60m</button>
+            </div>
+            <span class="timer-separator">|</span>
+            <span id="lockin-timer-display" class="lockin-timer-digits">25:00</span>
+            <button id="btn-lockin-timer-toggle" class="lockin-ctrl-btn" title="Start / Pause Timer">▶ Start</button>
+            <button id="btn-lockin-timer-reset" class="lockin-ctrl-btn" title="Reset Time Block">↺</button>
+          </div>
+
+          <button id="btn-lockin-exit" class="lockin-exit-btn" title="Exit Focus Mode (Esc)">
+            <span>Esc</span> ✕
+          </button>
+        </div>
+
+        <!-- Single Task Hero Row -->
+        <div class="lockin-task-hero">
+          <button type="button" id="btn-lockin-check" class="lockin-check-circle" title="Mark Done (Space)">
+            <svg class="lockin-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </button>
+          <div class="lockin-task-body">
+            <input type="text" id="lockin-task-input" class="lockin-task-input" placeholder="Type your single deep work target..." spellcheck="false" />
+            <div class="lockin-shortcuts-hint">
+              <span>Task-specific deep focus</span>
+              <span>•</span>
+              <span>Press <kbd>Space</kbd> or click circle to crush task</span>
+              <span>•</span>
+              <span><kbd>Esc</kbd> return to column</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Subtasks Breakdown for Deep Focus -->
+        <div class="lockin-subtasks-container" id="lockin-subtasks-container">
+          <div class="lockin-subtasks-bar">
+            <span class="lockin-subtasks-title" id="lockin-subtasks-title">Subtasks & Milestones</span>
+            <button type="button" id="btn-lockin-add-subtask" class="lockin-add-sub-btn">+ Add Subtask</button>
+          </div>
+          <div id="lockin-subtasks-list" class="lockin-subtasks-list"></div>
+        </div>
+
+        <!-- Task-Specific Notes / Scratchpad Area -->
+        <div class="lockin-notes-container">
+          <div class="lockin-notes-bar">
+            <span class="lockin-notes-title">Task-Specific Notes & Context</span>
+            <span class="lockin-notes-status" id="lockin-notes-sync-status">Saved directly to this task</span>
+          </div>
+          <textarea id="lockin-notes-area" class="lockin-notes-area" placeholder="Task-specific notes, sub-steps, debug logs, findings, or links..." spellcheck="false"></textarea>
+        </div>
+
       </div>
     </div>
 
