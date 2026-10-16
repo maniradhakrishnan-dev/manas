@@ -73,8 +73,13 @@
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
         </button>
 
+        <!-- Smart Carryover Check Button -->
+        <button id="btn-carryover-check" class="tool-btn" title="Check Unfinished Tasks from Yesterday (Shortcut: R)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"></polyline><path d="M20 20v-7a4 4 0 0 0-4-4H4"></path></svg>
+        </button>
+
         <!-- Theme Toggle -->
-        <button id="btn-theme" class="tool-btn" title="Toggle Theme (Cyber Dark / Warm Paper / Nordic)">
+        <button id="btn-theme" class="tool-btn" title="Toggle Theme (Chalk & Blackboard / Pen & Paper / Cyber Dark)">
           <svg class="theme-icon-dark" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
           <svg class="theme-icon-light" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
         </button>
@@ -113,6 +118,23 @@
     <!-- Main Planner Workspace (Two Rows Layout) -->
     <main class="planner-workspace">
       
+      <!-- Smart Task Carryover Banner -->
+      <div id="carryover-banner" class="carryover-banner" style="display: none;">
+        <div class="carryover-left">
+          <div class="carryover-icon-box">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"></polyline><path d="M20 20v-7a4 4 0 0 0-4-4H4"></path></svg>
+          </div>
+          <div class="carryover-info">
+            <span class="carryover-title" id="carryover-title">Pending Tasks from Yesterday</span>
+            <span class="carryover-subtitle" id="carryover-preview">Unfinished items ready to roll over</span>
+          </div>
+        </div>
+        <div class="carryover-actions">
+          <button id="btn-carryover-apply" class="carryover-btn btn-primary" title="Roll all pending tasks into today">↳ Roll Over to Today</button>
+          <button id="btn-carryover-dismiss" class="carryover-btn btn-ghost" title="Dismiss for today">Dismiss</button>
+        </div>
+      </div>
+
       <!-- ======================================================================
            ROW 1: (4-9 & 9-6) — TWO EQUAL COLUMNS
            Left: 4-9 (Part 1 4-Split + Part 2)

@@ -49,7 +49,8 @@ let currentDayData = {};
 let activeDatesSet = new Set();
 let isDirty = false;
 let autoSaveTimer = null;
-let currentTheme = safeStorage.getItem('mrt_theme') || 'dark';
+let currentTheme = safeStorage.getItem('mrt_theme') || 'chalk';
+let currentPendingCarryover = [];
 
 // DOM Elements
 const currentDateLabel = document.getElementById('current-date-label');
@@ -71,6 +72,14 @@ const progressText = document.getElementById('progress-text');
 const progressCircle = document.getElementById('progress-circle');
 const toastEl = document.getElementById('toast');
 
+// Smart Task Carryover DOM Elements
+const btnCarryoverCheck = document.getElementById('btn-carryover-check');
+const carryoverBanner = document.getElementById('carryover-banner');
+const carryoverTitle = document.getElementById('carryover-title');
+const carryoverPreview = document.getElementById('carryover-preview');
+const btnCarryoverApply = document.getElementById('btn-carryover-apply');
+const btnCarryoverDismiss = document.getElementById('btn-carryover-dismiss');
+
 // Apply Initial Theme
 setTheme(currentTheme, false);
 
@@ -82,8 +91,9 @@ function setTheme(theme, notify = true) {
 
   if (notify) {
     const themeNames = {
-      dark: 'Obsidian Cyber (Dark)',
-      paper: 'Warm Paper (Moleskine)',
+      chalk: 'Chalk & Blackboard (B&W Dark)',
+      paper: 'Pen & Paper (B&W Light)',
+      dark: 'Cyber Dark',
       nordic: 'Nordic Slate'
     };
     showToast(`Theme: ${themeNames[theme] || theme}`);
@@ -91,12 +101,14 @@ function setTheme(theme, notify = true) {
 }
 
 function cycleTheme() {
-  if (currentTheme === 'dark') {
+  if (currentTheme === 'chalk') {
     setTheme('paper');
   } else if (currentTheme === 'paper') {
+    setTheme('dark');
+  } else if (currentTheme === 'dark') {
     setTheme('nordic');
   } else {
-    setTheme('dark');
+    setTheme('chalk');
   }
 }
 
@@ -401,13 +413,11 @@ function renderCardTasks(card, blockKey) {
   listEl.innerHTML = '';
 
   if (tasks.length === 0) {
-    const hint = document.createElement('div');
-    hint.className = 'tasks-empty-hint';
-    hint.innerHTML = '<span>No tasks yet. Click here or press <b>☐</b> to insert task.</span>';
-    hint.style.cursor = 'pointer';
-    hint.title = 'Click to insert checkbox task';
-    hint.addEventListener('click', () => insertCheckboxTask(card, blockKey, ''));
-    listEl.appendChild(hint);
+    listEl.onclick = (e) => {
+      if (e.target === listEl) {
+        insertCheckboxTask(card, blockKey, '');
+      }
+    };
     updateCardTabBadges(card, blockKey);
     return;
   }
@@ -702,17 +712,12 @@ function bindCardEvents() {
       editorArea.innerHTML = `
         <!-- Independent Tasks Panel -->
         <div class="card-tasks-panel">
-          <div class="task-add-row">
-            <span class="task-add-icon">+</span>
-            <input type="text" class="task-add-input" placeholder="Add task (press Enter)..." spellcheck="false" />
-            <button type="button" class="btn-task-add-confirm">Add</button>
-          </div>
           <div class="tasks-scroll-list"></div>
         </div>
 
         <!-- Independent Notes Panel -->
         <div class="card-notes-panel" style="display: none;">
-          <textarea class="card-notes-editor" placeholder="Notes, thoughts, research notes..." spellcheck="false"></textarea>
+          <textarea class="card-notes-editor" placeholder="" spellcheck="false"></textarea>
         </div>
       `;
     }
@@ -725,38 +730,6 @@ function bindCardEvents() {
     }
     if (btnNotes) {
       btnNotes.addEventListener('click', () => setCardActiveTab(card, 'notes'));
-    }
-
-    // 4. Task Add Input & Button Events (Add tasks directly in task tab!)
-    const addInput = card.querySelector('.task-add-input');
-    const addConfirmBtn = card.querySelector('.btn-task-add-confirm');
-    const addIcon = card.querySelector('.task-add-icon');
-
-    const handleAddTask = () => {
-      const val = (addInput ? addInput.value : '').trim();
-      insertCheckboxTask(card, blockKey, val);
-      if (addInput) {
-        addInput.value = '';
-      }
-    };
-
-    if (addInput) {
-      addInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          handleAddTask();
-        }
-      });
-    }
-
-    if (addConfirmBtn) {
-      addConfirmBtn.addEventListener('click', handleAddTask);
-    }
-
-    if (addIcon) {
-      addIcon.style.cursor = 'pointer';
-      addIcon.title = 'Insert new checkbox task';
-      addIcon.addEventListener('click', handleAddTask);
     }
 
     // 5. Notes Textarea Input Event (Independent notes editor)
@@ -842,6 +815,10 @@ function changeDate(newDate) {
     }
   }
 
+  // Dismiss / hide any active carryover banner for previous date
+  if (carryoverBanner) carryoverBanner.style.display = 'none';
+  currentPendingCarryover = [];
+
   // 3. Instant cache render (0ms response)
   const localCached = safeStorage.getItem(`mrt_${targetDateKey}`);
   if (localCached) {
@@ -855,13 +832,185 @@ function changeDate(newDate) {
   }
   renderCurrentDay();
 
+  // Check carryover for target date
+  checkPendingCarryover(targetDateKey);
+
   // 4. Background fetch from native filesystem if available
   callTauri('get_day', { date: targetDateKey }).then(diskData => {
     if (formatDateKey(currentDate) === targetDateKey && diskData && typeof diskData === 'object') {
       currentDayData = normalizeDayData(diskData, targetDateKey);
       renderCurrentDay();
+      checkPendingCarryover(targetDateKey);
     }
   });
+}
+
+// ==========================================================================
+// Smart Task Carryover Controller
+// ==========================================================================
+
+function extractUnfinishedTasks(dayData) {
+  if (!dayData || typeof dayData !== 'object') return [];
+  const blockKeys = [
+    'part1_quad1', 'part1_quad2', 'part1_quad3', 'part1_quad4',
+    'part2', 'productive', 'admin',
+    'evening_huro', 'evening_kana', 'evening_bana',
+    'evening_curio', 'evening_survivi', 'evening_random'
+  ];
+  const list = [];
+  for (const k of blockKeys) {
+    const block = dayData[k];
+    if (block && Array.isArray(block.tasks)) {
+      block.tasks.forEach(task => {
+        if (!task.done && task.text && task.text.trim().length > 0) {
+          list.push({
+            blockKey: k,
+            blockTitle: block.title || getDefaultTitle(k),
+            text: task.text.trim()
+          });
+        }
+      });
+    }
+  }
+  return list;
+}
+
+async function checkPendingCarryover(targetDateKey, forcePrompt = false) {
+  if (!carryoverBanner) return;
+
+  // If already dismissed for this day and not explicitly forced by user
+  if (!forcePrompt && safeStorage.getItem(`mrt_carryover_dismissed_${targetDateKey}`) === 'true') {
+    carryoverBanner.style.display = 'none';
+    currentPendingCarryover = [];
+    return;
+  }
+
+  // Hide initially
+  carryoverBanner.style.display = 'none';
+  currentPendingCarryover = [];
+
+  // 1. Identify yesterday's date
+  const [y, m, d] = targetDateKey.split('-').map(Number);
+  const targetDateObj = new Date(y, m - 1, d);
+  const yestDateObj = new Date(targetDateObj);
+  yestDateObj.setDate(yestDateObj.getDate() - 1);
+  const yestKey = formatDateKey(yestDateObj);
+
+  let sourceDateKey = yestKey;
+  let sourceData = await loadDay(sourceDateKey);
+  let candidateTasks = extractUnfinishedTasks(sourceData);
+
+  // 2. If yesterday had no tasks, check previous 7 days in activeDatesSet
+  if (candidateTasks.length === 0 && activeDatesSet && activeDatesSet.size > 0) {
+    for (let i = 2; i <= 7; i++) {
+      const pastObj = new Date(targetDateObj);
+      pastObj.setDate(pastObj.getDate() - i);
+      const pastKey = formatDateKey(pastObj);
+      if (activeDatesSet.has(pastKey)) {
+        const pastData = await loadDay(pastKey);
+        const pastTasks = extractUnfinishedTasks(pastData);
+        if (pastTasks.length > 0) {
+          sourceDateKey = pastKey;
+          candidateTasks = pastTasks;
+          break;
+        }
+      }
+    }
+  }
+
+  if (candidateTasks.length === 0) {
+    if (forcePrompt) {
+      showToast("All clear! No unfinished tasks found from previous days 🎉");
+    }
+    return;
+  }
+
+  // 3. Deduplicate against current target day's existing block tasks
+  const pendingTasks = candidateTasks.filter(item => {
+    const currentBlock = currentDayData[item.blockKey];
+    if (!currentBlock || !Array.isArray(currentBlock.tasks)) return true;
+    return !currentBlock.tasks.some(t => t.text.trim().toLowerCase() === item.text.toLowerCase());
+  });
+
+  if (pendingTasks.length === 0) {
+    if (forcePrompt) {
+      showToast("All pending tasks already exist in today's planner! 👍");
+    }
+    return;
+  }
+
+  // 4. Update banner elements and display
+  currentPendingCarryover = pendingTasks;
+  const isYesterday = (sourceDateKey === yestKey);
+  const sourceName = isYesterday ? "Yesterday" : sourceDateKey;
+
+  if (carryoverTitle) {
+    carryoverTitle.textContent = `${pendingTasks.length} Unfinished Task${pendingTasks.length > 1 ? 's' : ''} from ${sourceName}`;
+  }
+  if (carryoverPreview) {
+    const previewSummary = `${pendingTasks[0].blockTitle}: "${pendingTasks[0].text}"${pendingTasks.length > 1 ? ` (+${pendingTasks.length - 1} more)` : ''}`;
+    carryoverPreview.textContent = previewSummary;
+  }
+
+  carryoverBanner.style.display = 'flex';
+  if (forcePrompt) {
+    showToast(`Found ${pendingTasks.length} pending task(s) to roll over`);
+  }
+}
+
+function applyPendingCarryover() {
+  if (!currentPendingCarryover || currentPendingCarryover.length === 0) return;
+
+  let addedCount = 0;
+  currentPendingCarryover.forEach(item => {
+    if (!currentDayData[item.blockKey]) {
+      currentDayData[item.blockKey] = getDefaultBlockData(getDefaultTitle(item.blockKey));
+    }
+    if (!Array.isArray(currentDayData[item.blockKey].tasks)) {
+      currentDayData[item.blockKey].tasks = [];
+    }
+
+    const exists = currentDayData[item.blockKey].tasks.some(
+      t => t.text.trim().toLowerCase() === item.text.toLowerCase()
+    );
+
+    if (!exists) {
+      currentDayData[item.blockKey].tasks.push({
+        text: item.text,
+        done: false
+      });
+      syncBlockContent(item.blockKey);
+      addedCount++;
+    }
+  });
+
+  const targetDateKey = formatDateKey(currentDate);
+  safeStorage.setItem(`mrt_carryover_dismissed_${targetDateKey}`, 'true');
+
+  if (carryoverBanner) {
+    carryoverBanner.style.display = 'none';
+  }
+  currentPendingCarryover = [];
+
+  renderCurrentDay();
+  saveDay(targetDateKey, currentDayData);
+  showToast(`Rolled over ${addedCount} unfinished task${addedCount > 1 ? 's' : ''} into today! 🎯`);
+}
+
+function dismissCarryover() {
+  const targetDateKey = formatDateKey(currentDate);
+  safeStorage.setItem(`mrt_carryover_dismissed_${targetDateKey}`, 'true');
+  if (carryoverBanner) {
+    carryoverBanner.style.display = 'none';
+  }
+  currentPendingCarryover = [];
+  showToast("Dismissed task carryover for today");
+}
+
+function manualCheckCarryover() {
+  const targetDateKey = formatDateKey(currentDate);
+  safeStorage.removeItem(`mrt_carryover_dismissed_${targetDateKey}`);
+  checkPendingCarryover(targetDateKey, true);
 }
 
 // Button Bindings
@@ -1046,6 +1195,17 @@ function renderCalendarMonths(year) {
   });
 }
 
+// Smart Task Carryover Buttons
+if (btnCarryoverApply) {
+  btnCarryoverApply.addEventListener('click', applyPendingCarryover);
+}
+if (btnCarryoverDismiss) {
+  btnCarryoverDismiss.addEventListener('click', dismissCarryover);
+}
+if (btnCarryoverCheck) {
+  btnCarryoverCheck.addEventListener('click', manualCheckCarryover);
+}
+
 // Global Keyboard Shortcuts
 window.addEventListener('keydown', (e) => {
   if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
@@ -1067,6 +1227,9 @@ window.addEventListener('keydown', (e) => {
   } else if (e.key === 'm' || e.key === 'M') {
     e.preventDefault();
     cycleTheme();
+  } else if (e.key === 'r' || e.key === 'R') {
+    e.preventDefault();
+    manualCheckCarryover();
   } else if (e.key === 'c' || e.key === 'C') {
     e.preventDefault();
     if (calendarModal?.classList.contains('open')) {
@@ -1108,11 +1271,15 @@ function init() {
   }
   renderCurrentDay();
 
+  // Check pending carryover for today
+  checkPendingCarryover(dateKey);
+
   // 4. Background non-blocking sync with native disk
   callTauri('get_day', { date: dateKey }).then(diskData => {
     if (formatDateKey(currentDate) === dateKey && diskData && typeof diskData === 'object') {
       currentDayData = normalizeDayData(diskData, dateKey);
       renderCurrentDay();
+      checkPendingCarryover(dateKey);
     }
   });
 
