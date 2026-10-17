@@ -66,6 +66,192 @@ let currentPendingCarryover = [];
 let currentPendingCarryoverSourceDate = null;
 let currentImportSourceDate = null;
 
+let defaultWorkspaceHTML = '';
+let currentEditingLayout = null;
+
+const PRESETS = {
+  default_polymath: {
+    id: "default_polymath",
+    name: "Polymath Golden Routine (Default)",
+    description: "4-9 Foundation (4 quads) + 9-6 + 6-11 + Health",
+    phases: [
+      {
+        id: "phase_learning",
+        title: "Foundation & Learning",
+        timeRange: "04:00 — 09:00",
+        colorClass: "amber",
+        tracks: [
+          { key: "part1_quad1", title: "CS & SWE", placeholder: "Data structures, algorithms, system design..." },
+          { key: "part1_quad2", title: "Core AI", placeholder: "Math, transformers, LLM architectures..." },
+          { key: "part1_quad3", title: "Applications", placeholder: "Web apps, backends, products..." },
+          { key: "part1_quad4", title: "RSWE", placeholder: "Reliability, observability, metrics..." },
+          { key: "part2", title: "Breadth", placeholder: "Adjacent disciplines, cross-domain knowledge..." }
+        ]
+      },
+      {
+        id: "phase_productive",
+        title: "Productive & Admin",
+        timeRange: "09:00 — 18:00",
+        colorClass: "violet",
+        tracks: [
+          { key: "productive", title: "Productive (Get Things Done)", placeholder: "High impact work, core deliverables..." },
+          { key: "admin", title: "Admin & Operations", placeholder: "Logistics, operations, emails..." }
+        ]
+      },
+      {
+        id: "phase_evening",
+        title: "Creative Evening",
+        timeRange: "18:00 — 23:00",
+        colorClass: "emerald",
+        tracks: [
+          { key: "evening_huro", title: "Huro", placeholder: "Huro development & creative..." },
+          { key: "evening_kana", title: "Kana", placeholder: "Kana clothing & store..." },
+          { key: "evening_bana", title: "Bana", placeholder: "Bana projects..." },
+          { key: "evening_curio", title: "Curio", placeholder: "Curio research..." },
+          { key: "evening_survivi", title: "Survivo", placeholder: "Survivo survival tools..." },
+          { key: "evening_random", title: "Random", placeholder: "Spontaneous thoughts & tests..." }
+        ]
+      },
+      {
+        id: "phase_health",
+        title: "Diet & Exercise",
+        timeRange: "05:00 — 06:00",
+        colorClass: "emerald",
+        tracks: [
+          { key: "health_workout", title: "Workout (5-6 AM)", placeholder: "Push/Pull/Legs, Cardio..." },
+          { key: "health_diet", title: "Diet & Meals", placeholder: "Nutrition, macro targets, meal timing..." },
+          { key: "health_habits", title: "Hydration & Supplements", placeholder: "Water, vitamins, minerals, creatine..." },
+          { key: "health_recovery", title: "Body & Recovery", placeholder: "Mobility, stretching, sleep prep..." }
+        ]
+      }
+    ]
+  },
+
+  freelancer_builder: {
+    id: "freelancer_builder",
+    name: "Freelancer & Builder",
+    description: "Client Deliverables, Own Products, Growth, Invoicing & Reset",
+    phases: [
+      {
+        id: "free_client",
+        title: "Deep Client Deliverables",
+        timeRange: "08:00 — 12:00",
+        colorClass: "amber",
+        tracks: [
+          { key: "free_client_core", title: "Main Client Project", placeholder: "Core feature deliverables, pull requests..." },
+          { key: "free_client_qa", title: "Secondary Client / QA", placeholder: "Fixes, staging deployments, client reviews..." }
+        ]
+      },
+      {
+        id: "free_product",
+        title: "Own Products & Growth",
+        timeRange: "13:00 — 17:00",
+        colorClass: "violet",
+        tracks: [
+          { key: "free_saas_build", title: "Product Dev & Features", placeholder: "SaaS architecture, user onboarding, database..." },
+          { key: "free_marketing", title: "Marketing & Lead Gen", placeholder: "Content, Twitter/X, outreach, demos..." }
+        ]
+      },
+      {
+        id: "free_ops",
+        title: "Operations & Admin",
+        timeRange: "17:00 — 20:00",
+        colorClass: "cyan",
+        tracks: [
+          { key: "free_invoicing", title: "Invoicing & Client Comms", placeholder: "Slack, emails, proposals, bookkeeping..." },
+          { key: "free_learning", title: "Skill Upgrades & Reading", placeholder: "New frameworks, books, tech exploration..." }
+        ]
+      },
+      {
+        id: "free_health",
+        title: "Health & Wind Down",
+        timeRange: "Evening / Morning",
+        colorClass: "emerald",
+        tracks: [
+          { key: "free_workout", title: "Fitness & Movement", placeholder: "Gym, run, mobility..." },
+          { key: "free_reflection", title: "Daily Review & Wins", placeholder: "Daily retro, tomorrow's 3 big wins..." }
+        ]
+      }
+    ]
+  },
+
+  deep_work_research: {
+    id: "deep_work_research",
+    name: "Deep Work & Research",
+    description: "Math, Theory, Implementation, Experiments & Technical Writing",
+    phases: [
+      {
+        id: "res_theory",
+        title: "Math & Deep Theory",
+        timeRange: "06:00 — 11:00",
+        colorClass: "amber",
+        tracks: [
+          { key: "res_math", title: "Mathematical Derivations", placeholder: "Proofs, linear algebra, probability, loss surfaces..." },
+          { key: "res_papers", title: "ArXiv & Paper Deep Dives", placeholder: "Latest architectures, benchmarks, paper notes..." }
+        ]
+      },
+      {
+        id: "res_impl",
+        title: "Implementation & Compute",
+        timeRange: "12:00 — 17:00",
+        colorClass: "violet",
+        tracks: [
+          { key: "res_experiments", title: "Model Training & Eval", placeholder: "PyTorch/JAX pipelines, training runs, metrics..." },
+          { key: "res_infra", title: "Infrastructure & Compute", placeholder: "GPU clusters, CUDA kernels, data pipelines..." }
+        ]
+      },
+      {
+        id: "res_synthesis",
+        title: "Writing & Physical Training",
+        timeRange: "18:00 — 22:00",
+        colorClass: "emerald",
+        tracks: [
+          { key: "res_writing", title: "Technical Writing & Docs", placeholder: "Blog posts, research writeups, documentation..." },
+          { key: "res_fitness", title: "Physical Training & Sleep", placeholder: "Workout, sauna, sleep prep..." }
+        ]
+      }
+    ]
+  },
+
+  simple_3_flow: {
+    id: "simple_3_flow",
+    name: "Simple 3-Phase Flow",
+    description: "Morning High Priority, Afternoon Execution, Evening Wind-Down",
+    phases: [
+      {
+        id: "flow_morning",
+        title: "Morning Most Important Tasks",
+        timeRange: "Morning Focus",
+        colorClass: "amber",
+        tracks: [
+          { key: "flow_mit_1", title: "#1 Most Important Task", placeholder: "The one thing that makes today a win..." },
+          { key: "flow_mit_2", title: "#2 High-Value Focus", placeholder: "Second major milestone..." }
+        ]
+      },
+      {
+        id: "flow_afternoon",
+        title: "Afternoon Momentum",
+        timeRange: "Afternoon Execution",
+        colorClass: "violet",
+        tracks: [
+          { key: "flow_execution", title: "Tasks & Deliverables", placeholder: "Batching execution tasks..." },
+          { key: "flow_admin", title: "Comms & Quick Tasks", placeholder: "Replies, coordination, errands..." }
+        ]
+      },
+      {
+        id: "flow_evening",
+        title: "Evening Reset & Reflection",
+        timeRange: "Evening Reset",
+        colorClass: "emerald",
+        tracks: [
+          { key: "flow_personal", title: "Personal Projects & Reading", placeholder: "Unstructured creative time..." },
+          { key: "flow_reflection", title: "Daily Review & Habits", placeholder: "Gratitude, workout check, tomorrow plan..." }
+        ]
+      }
+    ]
+  }
+};
+
 const ALL_BLOCK_KEYS = [
   'health_workout', 'health_diet', 'health_habits', 'health_recovery',
   'part1_quad1', 'part1_quad2', 'part1_quad3', 'part1_quad4',
@@ -73,6 +259,290 @@ const ALL_BLOCK_KEYS = [
   'evening_huro', 'evening_kana', 'evening_bana',
   'evening_curio', 'evening_survivi', 'evening_random'
 ];
+
+function getActiveBlockKeys() {
+  const keys = new Set(ALL_BLOCK_KEYS);
+  document.querySelectorAll('.cool-card, .block-card').forEach(card => {
+    const k = card.getAttribute('data-block');
+    if (k) keys.add(k);
+  });
+  if (currentDayData && typeof currentDayData === 'object') {
+    Object.keys(currentDayData).forEach(k => {
+      if (k !== 'date' && k !== 'updatedAt' && k !== 'importedFrom' && k !== 'importedAt') {
+        keys.add(k);
+      }
+    });
+  }
+  return Array.from(keys);
+}
+
+function getActiveLayout() {
+  try {
+    const saved = safeStorage.getItem('mrt_custom_layout');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed && Array.isArray(parsed.phases) && parsed.phases.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn("Could not load custom layout:", e);
+  }
+  return PRESETS.default_polymath;
+}
+
+function applyLayout(layout) {
+  const workspaceEl = document.querySelector('.planner-workspace');
+  if (!workspaceEl) return;
+
+  if (!layout || layout.id === 'default_polymath') {
+    safeStorage.removeItem('mrt_custom_layout');
+    if (defaultWorkspaceHTML) {
+      workspaceEl.innerHTML = defaultWorkspaceHTML;
+    }
+  } else {
+    safeStorage.setItem('mrt_custom_layout', JSON.stringify(layout));
+    renderCustomWorkspace(layout, workspaceEl);
+  }
+
+  // Re-bind events to all cards and populate current day
+  bindCardEvents();
+  renderCurrentDay();
+}
+
+function renderCustomWorkspace(layout, workspaceEl) {
+  const bannerHTML = `
+    <div id="carryover-banner" class="carryover-banner" style="display: none;">
+      <div class="carryover-left">
+        <div class="carryover-icon-box">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"></polyline><path d="M20 20v-7a4 4 0 0 0-4-4H4"></path></svg>
+        </div>
+        <div class="carryover-info">
+          <span class="carryover-title" id="carryover-title">Pending Tasks from Yesterday</span>
+          <span class="carryover-subtitle" id="carryover-preview">Unfinished items ready to roll over</span>
+        </div>
+      </div>
+      <div class="carryover-actions">
+        <button id="btn-carryover-apply" class="carryover-btn btn-primary" title="Roll all pending tasks and inherit notes into today">↳ Roll Over into Today</button>
+        <button id="btn-carryover-choose" class="carryover-btn btn-secondary" title="Pick another date to import from">Pick Date...</button>
+        <button id="btn-carryover-dismiss" class="carryover-btn btn-ghost" title="Start blank today without importing past tasks">Start Blank (No Import)</button>
+      </div>
+    </div>
+  `;
+
+  const phases = layout.phases || [];
+  const half = Math.ceil(phases.length / 2);
+  const topPhases = phases.slice(0, half);
+  const bottomPhases = phases.slice(half);
+
+  function renderPhaseCol(p, pIdx) {
+    const color = p.colorClass || 'amber';
+    const tracks = p.tracks || [];
+    return `
+      <div class="planner-col phase-col-custom" style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 12px;">
+        <div class="col-master-banner banner-${color}-master">
+          <div class="master-banner-left">
+            <span class="column-time-pill pill-${color}">${escapeHtml(p.timeRange || '')}</span>
+            <span class="column-name">${escapeHtml(p.title)}</span>
+          </div>
+        </div>
+        <div class="cards-grid-dynamic">
+          ${tracks.map((t, tIdx) => `
+            <div class="cool-card dynamic-col-card" data-block="${t.key || ('custom_' + p.id + '_' + tIdx)}">
+              <div class="card-bar">
+                <div class="card-bar-left">
+                  <span class="track-indicator dot-${color}"></span>
+                  <input type="text" class="card-title-input" value="${escapeHtml(t.title)}" placeholder="${escapeHtml(t.title)}" spellcheck="false" title="Click to rename this column" />
+                </div>
+                <div class="card-bar-right">
+                  <span class="card-checklist-stat"></span>
+                  <button class="btn-check-insert" title="Insert Checkbox">☐</button>
+                  <button class="btn-bullet-insert" title="Insert Bullet">•</button>
+                </div>
+              </div>
+              <div class="card-editor-area">
+                <textarea class="card-text-editor" placeholder="${escapeHtml(t.placeholder || 'Tasks and notes...')}"></textarea>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  const topRowHTML = `
+    <section class="planner-row row-top" id="planner-row-top" style="display: flex; gap: 20px; align-items: stretch;">
+      ${topPhases.map((p, i) => renderPhaseCol(p, i)).join('')}
+    </section>
+  `;
+
+  const dividerHTML = `
+    <div class="phase-transition-fold phase-fold-divider" id="phase-fold-divider">
+      <span class="neon-line"></span>
+      <div class="phase-pill-glow">
+        <span class="pill-sparkle">✦</span>
+        <span>WORKSPACE FLOW</span>
+        <span class="pill-sparkle">✦</span>
+      </div>
+      <span class="neon-line"></span>
+    </div>
+  `;
+
+  const bottomRowHTML = bottomPhases.length > 0 ? `
+    <section class="planner-row row-bottom phase-row-evening" id="phase-row-evening" style="display: flex; gap: 20px; align-items: stretch;">
+      ${bottomPhases.map((p, i) => renderPhaseCol(p, half + i)).join('')}
+    </section>
+  ` : '';
+
+  workspaceEl.innerHTML = bannerHTML + topRowHTML + dividerHTML + bottomRowHTML;
+
+  // Re-bind carryover banner buttons
+  const bApply = document.getElementById('btn-carryover-apply');
+  if (bApply) bApply.addEventListener('click', applyPendingCarryover);
+  const bChoose = document.getElementById('btn-carryover-choose');
+  if (bChoose) bChoose.addEventListener('click', () => openImportModal(currentPendingCarryoverSourceDate));
+  const bDismiss = document.getElementById('btn-carryover-dismiss');
+  if (bDismiss) bDismiss.addEventListener('click', dismissCarryover);
+}
+
+function openCustomizeModal() {
+  const modal = document.getElementById('customize-layout-modal');
+  if (!modal) return;
+  currentEditingLayout = JSON.parse(JSON.stringify(getActiveLayout()));
+  renderPresetCards();
+  renderPhaseCustomizer();
+  modal.classList.add('open');
+}
+
+function closeCustomizeModal() {
+  const modal = document.getElementById('customize-layout-modal');
+  if (modal) modal.classList.remove('open');
+}
+
+function renderPresetCards() {
+  const grid = document.getElementById('preset-cards-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  const presetList = [
+    { id: 'default_polymath', icon: '🌟', name: "Polymath Golden Routine", desc: "4-9 Foundation (4 quads) + 9-6 + 6-11 + Health" },
+    { id: 'freelancer_builder', icon: '💼', name: "Freelancer & Builder", desc: "Client Deliverables, Own Products, Growth, Ops" },
+    { id: 'deep_work_research', icon: '🔬', name: "Deep Work & Research", desc: "Math & Theory, Implementation, Writing & Gym" },
+    { id: 'simple_3_flow', icon: '🎯', name: "Simple 3-Phase Flow", desc: "Morning #1 Focus, Afternoon Momentum, Evening Reset" }
+  ];
+
+  presetList.forEach(p => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `preset-card-btn ${currentEditingLayout.id === p.id ? 'active' : ''}`;
+    btn.innerHTML = `
+      <div class="preset-card-title">
+        <span>${p.icon}</span>
+        <span>${escapeHtml(p.name)}</span>
+      </div>
+      <div class="preset-card-desc">${escapeHtml(p.desc)}</div>
+    `;
+    btn.addEventListener('click', () => {
+      const selected = PRESETS[p.id];
+      if (selected) {
+        currentEditingLayout = JSON.parse(JSON.stringify(selected));
+        renderPresetCards();
+        renderPhaseCustomizer();
+      }
+    });
+    grid.appendChild(btn);
+  });
+}
+
+function renderPhaseCustomizer() {
+  const container = document.getElementById('phase-customizer-container');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const phases = currentEditingLayout.phases || [];
+  phases.forEach((phase, phaseIdx) => {
+    const box = document.createElement('div');
+    box.className = 'phase-customizer-box';
+
+    // Header: phase title and time
+    const header = document.createElement('div');
+    header.className = 'phase-customizer-header';
+    header.innerHTML = `
+      <input type="text" class="phase-customizer-title-input" value="${escapeHtml(phase.title || '')}" placeholder="Phase Title (e.g. Morning Focus)" />
+      <input type="text" class="phase-customizer-time-input" value="${escapeHtml(phase.timeRange || '')}" placeholder="Time (09:00 — 18:00)" />
+    `;
+
+    const titleInput = header.querySelector('.phase-customizer-title-input');
+    titleInput.addEventListener('input', () => {
+      phase.title = titleInput.value;
+      currentEditingLayout.id = 'custom';
+    });
+    const timeInput = header.querySelector('.phase-customizer-time-input');
+    timeInput.addEventListener('input', () => {
+      phase.timeRange = timeInput.value;
+      currentEditingLayout.id = 'custom';
+    });
+    box.appendChild(header);
+
+    // Tracks list
+    const trackList = document.createElement('div');
+    trackList.className = 'track-edit-list';
+
+    (phase.tracks || []).forEach((track, trackIdx) => {
+      const row = document.createElement('div');
+      row.className = 'track-edit-row';
+      row.innerHTML = `
+        <span class="track-indicator dot-${phase.colorClass || 'cyan'}"></span>
+        <input type="text" class="track-edit-input" value="${escapeHtml(track.title || '')}" placeholder="Column Title" />
+        <input type="text" class="track-edit-sub-input" value="${escapeHtml(track.placeholder || '')}" placeholder="Subtitle / details hint..." />
+        ${(phase.tracks.length > 1) ? `<button type="button" class="track-edit-del-btn" title="Remove Column">✕</button>` : ''}
+      `;
+
+      const tInput = row.querySelector('.track-edit-input');
+      tInput.addEventListener('input', () => {
+        track.title = tInput.value;
+        currentEditingLayout.id = 'custom';
+      });
+      const sInput = row.querySelector('.track-edit-sub-input');
+      sInput.addEventListener('input', () => {
+        track.placeholder = sInput.value;
+        currentEditingLayout.id = 'custom';
+      });
+
+      const delBtn = row.querySelector('.track-edit-del-btn');
+      if (delBtn) {
+        delBtn.addEventListener('click', () => {
+          phase.tracks.splice(trackIdx, 1);
+          currentEditingLayout.id = 'custom';
+          renderPhaseCustomizer();
+        });
+      }
+
+      trackList.appendChild(row);
+    });
+    box.appendChild(trackList);
+
+    // Add track button
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'btn-add-track-col';
+    addBtn.innerHTML = `<span>+</span> <span>Add Column to ${escapeHtml(phase.title || 'Phase')}</span>`;
+    addBtn.addEventListener('click', () => {
+      if (!Array.isArray(phase.tracks)) phase.tracks = [];
+      const newKey = `custom_${phase.id || 'phase'}_${Date.now()}`;
+      phase.tracks.push({
+        key: newKey,
+        title: `Column ${phase.tracks.length + 1}`,
+        placeholder: "Tasks, research, notes..."
+      });
+      currentEditingLayout.id = 'custom';
+      renderPhaseCustomizer();
+    });
+    box.appendChild(addBtn);
+
+    container.appendChild(box);
+  });
+}
 
 // DOM Elements
 const currentDateLabel = document.getElementById('current-date-label');
@@ -119,6 +589,14 @@ const previewContentSummary = document.getElementById('preview-content-summary')
 const chkImportTasks = document.getElementById('chk-import-tasks');
 const chkImportNotes = document.getElementById('chk-import-notes');
 const chkImportTitles = document.getElementById('chk-import-titles');
+
+// Customize Layout Modal DOM Elements
+const btnCustomizeLayout = document.getElementById('btn-customize-layout');
+const customizeLayoutModal = document.getElementById('customize-layout-modal');
+const btnCloseCustomizeModal = document.getElementById('btn-close-customize-modal');
+const btnCancelCustomize = document.getElementById('btn-cancel-customize');
+const btnSaveCustomLayout = document.getElementById('btn-save-custom-layout');
+const btnResetDefaultLayout = document.getElementById('btn-reset-default-layout');
 
 // Phase Isolation & Lock-In Deep Work DOM Elements
 let currentPhase = safeStorage.getItem('mrt_phase') || 'all';
@@ -199,7 +677,28 @@ function getDefaultTitle(blockKey) {
     health_habits: "Hydration & Supplements",
     health_recovery: "Body & Recovery"
   };
-  return titles[blockKey] || "";
+  if (titles[blockKey]) return titles[blockKey];
+
+  // Check card title in active DOM
+  const domInput = document.querySelector(`.cool-card[data-block="${blockKey}"] .card-title-input`);
+  if (domInput && domInput.value && domInput.value.trim()) {
+    return domInput.value.trim();
+  }
+
+  // Check active layout presets / phases
+  try {
+    const layout = getActiveLayout();
+    if (layout && Array.isArray(layout.phases)) {
+      for (const p of layout.phases) {
+        for (const t of (p.tracks || [])) {
+          if (t.key === blockKey && t.title) return t.title;
+        }
+      }
+    }
+  } catch (e) { }
+
+  // Fallback to formatted key
+  return blockKey.replace(/^custom_/, '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
 
 // Default Block Data Structure (Tasks & Notes are completely independent)
@@ -214,7 +713,7 @@ function getDefaultBlockData(defaultTitle) {
 
 // Default Data Structure
 function getDefaultDayData(dateKey) {
-  return {
+  const data = {
     date: dateKey,
     part1_quad1: getDefaultBlockData("CS & SWE"),
     part1_quad2: getDefaultBlockData("Core AI"),
@@ -235,6 +734,22 @@ function getDefaultDayData(dateKey) {
     health_recovery: getDefaultBlockData("Body & Recovery"),
     updatedAt: new Date().toISOString()
   };
+
+  // Also initialize any custom tracks from active layout if present
+  try {
+    const layout = getActiveLayout();
+    if (layout && Array.isArray(layout.phases)) {
+      layout.phases.forEach(p => {
+        (p.tracks || []).forEach(t => {
+          if (t.key && !data[t.key]) {
+            data[t.key] = getDefaultBlockData(t.title || getDefaultTitle(t.key));
+          }
+        });
+      });
+    }
+  } catch (e) { }
+
+  return data;
 }
 
 // Normalize a block, separating tasks and notes cleanly and ensuring backward compatibility
@@ -354,7 +869,14 @@ function normalizeDayData(raw, dateKey) {
     if (raw.evening.random) raw.evening_random = raw.evening.random;
   }
 
-  for (const k of ALL_BLOCK_KEYS) {
+  const allKeys = new Set(ALL_BLOCK_KEYS);
+  for (const k of Object.keys(raw)) {
+    if (!['date', 'updatedAt', 'importedFrom', 'importedAt', 'evening', 'part1', 'health'].includes(k)) {
+      allKeys.add(k);
+    }
+  }
+
+  for (const k of allKeys) {
     normalized[k] = normalizeBlockData(raw[k], getDefaultTitle(k));
   }
 
@@ -1445,7 +1967,7 @@ function analyzeSourceDay(dayData) {
   const blockNotes = {};
   const blockTitles = {};
 
-  for (const k of ALL_BLOCK_KEYS) {
+  for (const k of getActiveBlockKeys()) {
     const block = dayData[k];
     if (block) {
       if (block.title) {
@@ -1693,7 +2215,7 @@ async function removeImport() {
     try {
       const srcData = await loadDay(sourceDateKey);
       if (srcData) {
-        for (const k of ALL_BLOCK_KEYS) {
+        for (const k of getActiveBlockKeys()) {
           if (srcData[k] && Array.isArray(srcData[k].tasks)) {
             srcData[k].tasks.forEach(t => {
               if (t && typeof t.text === 'string' && t.text.trim()) {
@@ -1708,7 +2230,7 @@ async function removeImport() {
     }
   }
 
-  for (const blockKey of ALL_BLOCK_KEYS) {
+  for (const blockKey of getActiveBlockKeys()) {
     const curBlock = currentDayData[blockKey];
     if (curBlock && Array.isArray(curBlock.tasks)) {
       const remaining = [];
@@ -1802,7 +2324,7 @@ async function quickSync(preferredSourceDate = null, silent = false) {
     let updatedCount = 0;
     let preservedCustomCount = 0;
 
-    for (const blockKey of ALL_BLOCK_KEYS) {
+    for (const blockKey of getActiveBlockKeys()) {
       if (!currentDayData[blockKey]) {
         currentDayData[blockKey] = getDefaultBlockData(getDefaultTitle(blockKey));
       }
@@ -2180,7 +2702,7 @@ async function executeImport(sourceDateKey, options = { tasks: true, notes: true
     let updatedTitlesCount = 0;
     let preservedCustomCount = 0;
 
-    for (const blockKey of ALL_BLOCK_KEYS) {
+    for (const blockKey of getActiveBlockKeys()) {
       if (!currentDayData[blockKey]) {
         currentDayData[blockKey] = getDefaultBlockData(getDefaultTitle(blockKey));
       }
@@ -2417,7 +2939,20 @@ function getPhaseForBlock(blockKey) {
   if (blockKey.startsWith('health_')) {
     return 'Phase 5-6: Diet & Exercise';
   }
-  return 'Phase 6-11: Creative Evening';
+  if (blockKey.startsWith('evening_')) {
+    return 'Phase 6-11: Creative Evening';
+  }
+  try {
+    const layout = getActiveLayout();
+    if (layout && Array.isArray(layout.phases)) {
+      for (const p of layout.phases) {
+        if ((p.tracks || []).some(t => t.key === blockKey)) {
+          return `${p.title}${p.timeRange ? ' (' + p.timeRange + ')' : ''}`;
+        }
+      }
+    }
+  } catch (e) { }
+  return 'Focused Work Track';
 }
 
 function renderLockinSubtasks(task, blockKey, taskIdx) {
@@ -2778,29 +3313,40 @@ if (btnExport) {
     const dateKey = formatDateKey(currentDate);
     let md = `# MRT Daily Planner — ${formatDateDisplay(currentDate)}\n\n`;
 
-    md += `## 🌅 04:00 — 09:00 (Learning & Core Tracks)\n\n`;
-    md += `### ${currentDayData.part1_quad1?.title || 'CS & SWE'}\n${currentDayData.part1_quad1?.content || ''}\n\n`;
-    md += `### ${currentDayData.part1_quad2?.title || 'Core AI'}\n${currentDayData.part1_quad2?.content || ''}\n\n`;
-    md += `### ${currentDayData.part1_quad3?.title || 'Applications'}\n${currentDayData.part1_quad3?.content || ''}\n\n`;
-    md += `### ${currentDayData.part1_quad4?.title || 'RSWE'}\n${currentDayData.part1_quad4?.content || ''}\n\n`;
+    const activeLayout = getActiveLayout();
+    if (activeLayout && activeLayout.id !== 'default_polymath' && Array.isArray(activeLayout.phases)) {
+      activeLayout.phases.forEach(phase => {
+        md += `## ${phase.title}${phase.timeRange ? ' (' + phase.timeRange + ')' : ''}\n\n`;
+        (phase.tracks || []).forEach(track => {
+          const b = currentDayData[track.key];
+          md += `### ${b?.title || track.title}\n${b?.content || ''}\n\n`;
+        });
+      });
+    } else {
+      md += `## 🌅 04:00 — 09:00 (Learning & Core Tracks)\n\n`;
+      md += `### ${currentDayData.part1_quad1?.title || 'CS & SWE'}\n${currentDayData.part1_quad1?.content || ''}\n\n`;
+      md += `### ${currentDayData.part1_quad2?.title || 'Core AI'}\n${currentDayData.part1_quad2?.content || ''}\n\n`;
+      md += `### ${currentDayData.part1_quad3?.title || 'Applications'}\n${currentDayData.part1_quad3?.content || ''}\n\n`;
+      md += `### ${currentDayData.part1_quad4?.title || 'RSWE'}\n${currentDayData.part1_quad4?.content || ''}\n\n`;
 
-    md += `## ⚡ ${currentDayData.part2?.title || 'Breadth'}\n${currentDayData.part2?.content || ''}\n\n`;
-    md += `## 🚀 ${currentDayData.productive?.title || 'Productive (09:00 - 14:00)'}\n${currentDayData.productive?.content || ''}\n\n`;
-    md += `## 📋 ${currentDayData.admin?.title || 'Admin & Chores (14:00 - 18:00)'}\n${currentDayData.admin?.content || ''}\n\n`;
+      md += `## ⚡ ${currentDayData.part2?.title || 'Breadth'}\n${currentDayData.part2?.content || ''}\n\n`;
+      md += `## 🚀 ${currentDayData.productive?.title || 'Productive (09:00 - 14:00)'}\n${currentDayData.productive?.content || ''}\n\n`;
+      md += `## 📋 ${currentDayData.admin?.title || 'Admin & Chores (14:00 - 18:00)'}\n${currentDayData.admin?.content || ''}\n\n`;
 
-    md += `## 🌙 18:00 — 23:00 Evening Phase (6 Tracks)\n\n`;
-    md += `### ${currentDayData.evening_huro?.title || 'Huro'}\n${currentDayData.evening_huro?.content || ''}\n\n`;
-    md += `### ${currentDayData.evening_kana?.title || 'Kana'}\n${currentDayData.evening_kana?.content || ''}\n\n`;
-    md += `### ${currentDayData.evening_bana?.title || 'Bana'}\n${currentDayData.evening_bana?.content || ''}\n\n`;
-    md += `### ${currentDayData.evening_curio?.title || 'Curio'}\n${currentDayData.evening_curio?.content || ''}\n\n`;
-    md += `### ${currentDayData.evening_survivi?.title || 'Survivo'}\n${currentDayData.evening_survivi?.content || ''}\n\n`;
-    md += `### ${currentDayData.evening_random?.title || 'Random'}\n${currentDayData.evening_random?.content || ''}\n\n`;
+      md += `## 🌙 18:00 — 23:00 Evening Phase (6 Tracks)\n\n`;
+      md += `### ${currentDayData.evening_huro?.title || 'Huro'}\n${currentDayData.evening_huro?.content || ''}\n\n`;
+      md += `### ${currentDayData.evening_kana?.title || 'Kana'}\n${currentDayData.evening_kana?.content || ''}\n\n`;
+      md += `### ${currentDayData.evening_bana?.title || 'Bana'}\n${currentDayData.evening_bana?.content || ''}\n\n`;
+      md += `### ${currentDayData.evening_curio?.title || 'Curio'}\n${currentDayData.evening_curio?.content || ''}\n\n`;
+      md += `### ${currentDayData.evening_survivi?.title || 'Survivo'}\n${currentDayData.evening_survivi?.content || ''}\n\n`;
+      md += `### ${currentDayData.evening_random?.title || 'Random'}\n${currentDayData.evening_random?.content || ''}\n\n`;
 
-    md += `## 🏋️ 05:00 — 06:00 Diet & Exercise Phase (4 Tracks)\n\n`;
-    md += `### ${currentDayData.health_workout?.title || 'Workout (5-6 AM)'}\n${currentDayData.health_workout?.content || ''}\n\n`;
-    md += `### ${currentDayData.health_diet?.title || 'Diet & Meals'}\n${currentDayData.health_diet?.content || ''}\n\n`;
-    md += `### ${currentDayData.health_habits?.title || 'Hydration & Supplements'}\n${currentDayData.health_habits?.content || ''}\n\n`;
-    md += `### ${currentDayData.health_recovery?.title || 'Body & Recovery'}\n${currentDayData.health_recovery?.content || ''}\n\n`;
+      md += `## 🏋️ 05:00 — 06:00 Diet & Exercise Phase (4 Tracks)\n\n`;
+      md += `### ${currentDayData.health_workout?.title || 'Workout (5-6 AM)'}\n${currentDayData.health_workout?.content || ''}\n\n`;
+      md += `### ${currentDayData.health_diet?.title || 'Diet & Meals'}\n${currentDayData.health_diet?.content || ''}\n\n`;
+      md += `### ${currentDayData.health_habits?.title || 'Hydration & Supplements'}\n${currentDayData.health_habits?.content || ''}\n\n`;
+      md += `### ${currentDayData.health_recovery?.title || 'Body & Recovery'}\n${currentDayData.health_recovery?.content || ''}\n\n`;
+    }
 
     const blob = new Blob([md], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
@@ -3026,6 +3572,38 @@ if (importSourceDateInput) {
     if (e.target.value && e.target.value.length === 10) {
       selectImportSourceDate(e.target.value);
     }
+  });
+}
+
+// Customize Layout Modal Event Bindings
+if (btnCustomizeLayout) {
+  btnCustomizeLayout.addEventListener('click', openCustomizeModal);
+}
+if (btnCloseCustomizeModal) {
+  btnCloseCustomizeModal.addEventListener('click', closeCustomizeModal);
+}
+if (btnCancelCustomize) {
+  btnCancelCustomize.addEventListener('click', closeCustomizeModal);
+}
+if (btnResetDefaultLayout) {
+  btnResetDefaultLayout.addEventListener('click', () => {
+    applyLayout(PRESETS.default_polymath);
+    closeCustomizeModal();
+    showToast("Restored Polymath Golden Workflow");
+  });
+}
+if (btnSaveCustomLayout) {
+  btnSaveCustomLayout.addEventListener('click', () => {
+    if (currentEditingLayout) {
+      applyLayout(currentEditingLayout);
+      closeCustomizeModal();
+      showToast("Custom workflow applied & saved");
+    }
+  });
+}
+if (customizeLayoutModal) {
+  customizeLayoutModal.addEventListener('click', (e) => {
+    if (e.target === customizeLayoutModal) closeCustomizeModal();
   });
 }
 
@@ -3313,7 +3891,18 @@ window.addEventListener('keydown', (e) => {
     } else {
       openCalendarModal();
     }
+  } else if (e.key === 'p' || e.key === 'P') {
+    e.preventDefault();
+    if (customizeLayoutModal?.classList.contains('open')) {
+      closeCustomizeModal();
+    } else {
+      openCustomizeModal();
+    }
   } else if (e.key === 'Escape') {
+    if (customizeLayoutModal?.classList.contains('open')) {
+      closeCustomizeModal();
+      return;
+    }
     if (importModal?.classList.contains('open')) {
       closeImportModal();
       return;
@@ -3325,6 +3914,25 @@ window.addEventListener('keydown', (e) => {
 
 // Initialization (Instant Synchronous UI + Non-blocking Background Sync)
 function init() {
+  // Capture default workspace HTML on initial load before any custom mutation
+  const workspaceEl = document.querySelector('.planner-workspace');
+  if (workspaceEl && !defaultWorkspaceHTML) {
+    defaultWorkspaceHTML = workspaceEl.innerHTML;
+  }
+
+  // Restore saved custom layout if one exists
+  const savedLayoutStr = safeStorage.getItem('mrt_custom_layout');
+  if (savedLayoutStr && workspaceEl) {
+    try {
+      const savedLayout = JSON.parse(savedLayoutStr);
+      if (savedLayout && Array.isArray(savedLayout.phases) && savedLayout.phases.length > 0) {
+        renderCustomWorkspace(savedLayout, workspaceEl);
+      }
+    } catch (e) {
+      console.warn("Could not restore custom layout:", e);
+    }
+  }
+
   // 0. Pre-load cached active dates synchronously
   const cachedDates = safeStorage.getItem('mrt_active_dates');
   if (cachedDates) {

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="paper">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,11 +8,14 @@
   <link rel="stylesheet" href="style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
 </head>
+
 <body>
   <div class="app-shell">
-    
+
     <!-- Top macOS Header Navigation -->
     <header class="app-header">
       <div class="header-section left">
@@ -33,19 +37,31 @@
       <div class="header-section center">
         <div class="date-navigator-pill">
           <button id="btn-prev-day" class="nav-arrow-btn" title="Previous Day (Shortcut: [ )">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
           </button>
           <button id="btn-today" class="today-chip" title="Jump to Today (Shortcut: T)">Today</button>
           <button id="btn-next-day" class="nav-arrow-btn" title="Next Day (Shortcut: ] )">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
           </button>
-          
+
           <div class="date-text-container">
             <span id="current-date-label" class="current-date-title">Thursday, Oct 15, 2026</span>
           </div>
 
           <button id="btn-calendar-toggle" class="calendar-pill-btn" title="Open 365-Day Diary Navigator (Shortcut: C)">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
             <span>365 Diary</span>
           </button>
         </div>
@@ -56,8 +72,9 @@
         <!-- Live Task Progress -->
         <div class="progress-badge" title="Daily Tasks Completed">
           <svg class="progress-ring-svg" width="22" height="22">
-            <circle class="ring-bg" stroke="currentColor" stroke-width="2.5" fill="transparent" r="8" cx="11" cy="11"/>
-            <circle id="progress-circle" class="ring-fill" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" fill="transparent" r="8" cx="11" cy="11"/>
+            <circle class="ring-bg" stroke="currentColor" stroke-width="2.5" fill="transparent" r="8" cx="11" cy="11" />
+            <circle id="progress-circle" class="ring-fill" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" fill="transparent" r="8" cx="11" cy="11" />
           </svg>
           <span id="progress-text" class="progress-label">0/0</span>
         </div>
@@ -70,12 +87,17 @@
 
         <!-- Open Data Folder Button -->
         <button id="btn-open-folder" class="tool-btn" title="Open Local Storage Folder">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
         </button>
 
         <!-- Quick Sync with Linked/Previous Day -->
-        <button id="btn-quick-sync" class="header-action-pill btn-quick-sync" title="Sync with Linked/Previous Day (Shortcut: S) — Reflects newly finished tasks and syncs unfinished items without altering today's custom tasks">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <button id="btn-quick-sync" class="header-action-pill btn-quick-sync"
+          title="Sync with Linked/Previous Day (Shortcut: S) — Reflects newly finished tasks and syncs unfinished items without altering today's custom tasks">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
             <polyline points="23 4 23 10 17 10"></polyline>
             <polyline points="1 20 1 14 7 14"></polyline>
             <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
@@ -84,8 +106,10 @@
         </button>
 
         <!-- Roll Over / Import Planner Button -->
-        <button id="btn-import-planner" class="header-action-pill btn-rollover" title="Roll Over or Import from a specific date (Shortcut: R)">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <button id="btn-import-planner" class="header-action-pill btn-rollover"
+          title="Roll Over or Import from a specific date (Shortcut: R)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
             <polyline points="9 14 4 9 9 4"></polyline>
             <path d="M20 20v-7a4 4 0 0 0-4-4H4"></path>
           </svg>
@@ -95,13 +119,43 @@
 
         <!-- Theme Toggle -->
         <button id="btn-theme" class="tool-btn" title="Toggle Theme (Pen & Paper / Chalk / Satin Clay)">
-          <svg class="theme-icon-dark" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-          <svg class="theme-icon-light" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+          <svg class="theme-icon-dark" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+          <svg class="theme-icon-light" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
         </button>
 
         <!-- Export Markdown -->
         <button id="btn-export" class="tool-btn" title="Export Day as Markdown">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+        </button>
+
+        <!-- Customize Columns & Workflows -->
+        <button id="btn-customize-layout" class="tool-btn" title="Customize Columns & Workflow Presets (Shortcut: P)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path
+              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+            </path>
+          </svg>
         </button>
       </div>
     </header>
@@ -114,21 +168,24 @@
         <span class="phase-sub">Full Day · 13 Tracks</span>
       </button>
 
-      <button type="button" class="phase-tab-btn" data-phase="learning" title="Focus on 4-9 Foundation & Learning (Shortcut: 1)">
+      <button type="button" class="phase-tab-btn" data-phase="learning"
+        title="Focus on 4-9 Foundation & Learning (Shortcut: 1)">
         <span class="phase-pill-key">1</span>
         <span class="phase-time">4-9</span>
         <span class="phase-title">Foundation & Learning</span>
         <span class="phase-sub">CS · SWE · AI · Apps · RSWE · Breadth</span>
       </button>
 
-      <button type="button" class="phase-tab-btn" data-phase="productive" title="Focus on 9-6 Productive & Admin (Shortcut: 2)">
+      <button type="button" class="phase-tab-btn" data-phase="productive"
+        title="Focus on 9-6 Productive & Admin (Shortcut: 2)">
         <span class="phase-pill-key">2</span>
         <span class="phase-time">9-6</span>
         <span class="phase-title">Productive & Admin</span>
         <span class="phase-sub">High-Impact Work · Operations</span>
       </button>
 
-      <button type="button" class="phase-tab-btn" data-phase="evening" title="Focus on 6-11 Creative Evening (Shortcut: 3)">
+      <button type="button" class="phase-tab-btn" data-phase="evening"
+        title="Focus on 6-11 Creative Evening (Shortcut: 3)">
         <span class="phase-pill-key">3</span>
         <span class="phase-time">6-11</span>
         <span class="phase-title">Creative Evening</span>
@@ -145,12 +202,16 @@
 
     <!-- Main Planner Workspace (Two Rows Layout) -->
     <main class="planner-workspace">
-      
+
       <!-- Smart Task Carryover Banner -->
       <div id="carryover-banner" class="carryover-banner" style="display: none;">
         <div class="carryover-left">
           <div class="carryover-icon-box">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"></polyline><path d="M20 20v-7a4 4 0 0 0-4-4H4"></path></svg>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 14 4 9 9 4"></polyline>
+              <path d="M20 20v-7a4 4 0 0 0-4-4H4"></path>
+            </svg>
           </div>
           <div class="carryover-info">
             <span class="carryover-title" id="carryover-title">Pending Tasks from Yesterday</span>
@@ -158,9 +219,12 @@
           </div>
         </div>
         <div class="carryover-actions">
-          <button id="btn-carryover-apply" class="carryover-btn btn-primary" title="Roll all pending tasks and inherit notes into today">↳ Roll Over into Today</button>
-          <button id="btn-carryover-choose" class="carryover-btn btn-secondary" title="Pick another date to import from">Pick Date...</button>
-          <button id="btn-carryover-dismiss" class="carryover-btn btn-ghost" title="Start blank today without importing past tasks">Start Blank (No Import)</button>
+          <button id="btn-carryover-apply" class="carryover-btn btn-primary"
+            title="Roll all pending tasks and inherit notes into today">↳ Roll Over into Today</button>
+          <button id="btn-carryover-choose" class="carryover-btn btn-secondary"
+            title="Pick another date to import from">Pick Date...</button>
+          <button id="btn-carryover-dismiss" class="carryover-btn btn-ghost"
+            title="Start blank today without importing past tasks">Start Blank (No Import)</button>
         </div>
       </div>
 
@@ -170,12 +234,12 @@
            Right: 9-6 (9-2 Productive + 2-6 Admin)
            ====================================================================== -->
       <section class="planner-row row-top" id="planner-row-top">
-        
+
         <!-- ================================================================
              COLUMN 1 (LEFT): 04:00 — 09:00 FOUNDATION & LEARNING
              ================================================================ -->
         <div class="planner-col col-left phase-col-learning" id="phase-col-learning">
-          
+
           <!-- Master Header: 4-9AM Foundation & Learning -->
           <div class="col-master-banner banner-learning-master">
             <div class="master-banner-left">
@@ -192,13 +256,14 @@
 
             <!-- 2x2 Quadrants Grid -->
             <div class="quadrants-grid">
-              
+
               <!-- Quad 1 -->
               <div class="cool-card quad-card" data-block="part1_quad1">
                 <div class="card-bar">
                   <div class="card-bar-left">
                     <span class="track-indicator dot-cyan"></span>
-                    <input type="text" class="card-title-input" value="CS & SWE" placeholder="Track 1" spellcheck="false" />
+                    <input type="text" class="card-title-input" value="CS & SWE" placeholder="Track 1"
+                      spellcheck="false" />
                   </div>
                   <div class="card-bar-right">
                     <span class="card-checklist-stat"></span>
@@ -207,7 +272,8 @@
                   </div>
                 </div>
                 <div class="card-editor-area">
-                  <textarea class="card-text-editor" placeholder="Data structures, algorithms, system design..."></textarea>
+                  <textarea class="card-text-editor"
+                    placeholder="Data structures, algorithms, system design..."></textarea>
                 </div>
               </div>
 
@@ -216,7 +282,8 @@
                 <div class="card-bar">
                   <div class="card-bar-left">
                     <span class="track-indicator dot-indigo"></span>
-                    <input type="text" class="card-title-input" value="Core AI" placeholder="Track 2" spellcheck="false" />
+                    <input type="text" class="card-title-input" value="Core AI" placeholder="Track 2"
+                      spellcheck="false" />
                   </div>
                   <div class="card-bar-right">
                     <span class="card-checklist-stat"></span>
@@ -234,7 +301,8 @@
                 <div class="card-bar">
                   <div class="card-bar-left">
                     <span class="track-indicator dot-amber"></span>
-                    <input type="text" class="card-title-input" value="Applications" placeholder="Track 3" spellcheck="false" />
+                    <input type="text" class="card-title-input" value="Applications" placeholder="Track 3"
+                      spellcheck="false" />
                   </div>
                   <div class="card-bar-right">
                     <span class="card-checklist-stat"></span>
@@ -243,7 +311,8 @@
                   </div>
                 </div>
                 <div class="card-editor-area">
-                  <textarea class="card-text-editor" placeholder="Agentic AI systems, tooling, applications..."></textarea>
+                  <textarea class="card-text-editor"
+                    placeholder="Agentic AI systems, tooling, applications..."></textarea>
                 </div>
               </div>
 
@@ -261,7 +330,8 @@
                   </div>
                 </div>
                 <div class="card-editor-area">
-                  <textarea class="card-text-editor" placeholder="Robotics software engineering, ROS, control..."></textarea>
+                  <textarea class="card-text-editor"
+                    placeholder="Robotics software engineering, ROS, control..."></textarea>
                 </div>
               </div>
 
@@ -281,7 +351,8 @@
               <div class="card-bar">
                 <div class="card-bar-left">
                   <span class="track-indicator dot-orange"></span>
-                  <input type="text" class="card-title-input" value="Breadth" placeholder="Breadth (Neuroscience, Electronics, Quantum...)" spellcheck="false" />
+                  <input type="text" class="card-title-input" value="Breadth"
+                    placeholder="Breadth (Neuroscience, Electronics, Quantum...)" spellcheck="false" />
                 </div>
                 <div class="card-bar-right">
                   <span class="card-checklist-stat"></span>
@@ -290,7 +361,8 @@
                 </div>
               </div>
               <div class="card-editor-area">
-                <textarea class="card-text-editor" placeholder="Neuroscience, electronics, quantum computing, adjacent disciplines..."></textarea>
+                <textarea class="card-text-editor"
+                  placeholder="Neuroscience, electronics, quantum computing, adjacent disciplines..."></textarea>
               </div>
             </div>
           </div>
@@ -301,7 +373,7 @@
              COLUMN 2 (RIGHT): 09:00 — 18:00 WORK & EXECUTION
              ================================================================ -->
         <div class="planner-col col-right phase-col-productive" id="phase-col-productive">
-          
+
           <!-- Master Header: 9-6 Work & Execution -->
           <div class="col-master-banner banner-work-master">
             <div class="master-banner-left">
@@ -320,7 +392,8 @@
               <div class="card-bar">
                 <div class="card-bar-left">
                   <span class="track-indicator dot-violet"></span>
-                  <input type="text" class="card-title-input" value="Productive (Get Things Done)" placeholder="Productive Title" spellcheck="false" />
+                  <input type="text" class="card-title-input" value="Productive (Get Things Done)"
+                    placeholder="Productive Title" spellcheck="false" />
                 </div>
                 <div class="card-bar-right">
                   <span class="card-checklist-stat"></span>
@@ -329,7 +402,8 @@
                 </div>
               </div>
               <div class="card-editor-area">
-                <textarea class="card-text-editor" placeholder="High-impact tasks, shipping features, core deliverables, code reviews..."></textarea>
+                <textarea class="card-text-editor"
+                  placeholder="High-impact tasks, shipping features, core deliverables, code reviews..."></textarea>
               </div>
             </div>
           </div>
@@ -347,7 +421,8 @@
               <div class="card-bar">
                 <div class="card-bar-left">
                   <span class="track-indicator dot-sky"></span>
-                  <input type="text" class="card-title-input" value="Admin & Operations" placeholder="Admin Title" spellcheck="false" />
+                  <input type="text" class="card-title-input" value="Admin & Operations" placeholder="Admin Title"
+                    spellcheck="false" />
                 </div>
                 <div class="card-bar-right">
                   <span class="card-checklist-stat"></span>
@@ -356,7 +431,8 @@
                 </div>
               </div>
               <div class="card-editor-area">
-                <textarea class="card-text-editor" placeholder="Job applications, emails, communication, digital cleanup, life maintenance..."></textarea>
+                <textarea class="card-text-editor"
+                  placeholder="Job applications, emails, communication, digital cleanup, life maintenance..."></textarea>
               </div>
             </div>
           </div>
@@ -384,7 +460,7 @@
            Row 2: Curio | Survivi | Random
            ====================================================================== -->
       <section class="planner-row row-bottom phase-row-evening" id="phase-row-evening">
-        
+
         <!-- Master Header: 6-11 Creative Evening (visible in isolated 6-11 mode) -->
         <div class="col-master-banner banner-evening-master" id="banner-evening-master">
           <div class="master-banner-left">
@@ -394,7 +470,7 @@
         </div>
 
         <div class="evening-grid">
-          
+
           <!-- Track 1: Huro (Row 1) -->
           <div class="cool-card evening-col-card" data-block="evening_huro">
             <div class="card-bar">
@@ -409,7 +485,8 @@
               </div>
             </div>
             <div class="card-editor-area">
-              <textarea class="card-text-editor" placeholder="Humanoid robotics, sensor fusion, mechanics..."></textarea>
+              <textarea class="card-text-editor"
+                placeholder="Humanoid robotics, sensor fusion, mechanics..."></textarea>
             </div>
           </div>
 
@@ -499,7 +576,8 @@
               </div>
             </div>
             <div class="card-editor-area">
-              <textarea class="card-text-editor" placeholder="Spontaneous thoughts, bookmarks, reflections..."></textarea>
+              <textarea class="card-text-editor"
+                placeholder="Spontaneous thoughts, bookmarks, reflections..."></textarea>
             </div>
           </div>
 
@@ -511,7 +589,7 @@
            4 Cards: Workout (5-6 AM) | Diet & Meals | Hydration & Supplements | Body & Recovery
            ====================================================================== -->
       <section class="planner-row row-health phase-section-health" id="phase-section-health" style="display: none;">
-        
+
         <!-- Master Header: Diet & Exercise -->
         <div class="col-master-banner banner-health-master" id="banner-health-master">
           <div class="master-banner-left">
@@ -524,13 +602,14 @@
         </div>
 
         <div class="health-grid">
-          
+
           <!-- Track 1: Workout (5-6 AM) -->
           <div class="cool-card health-col-card" data-block="health_workout">
             <div class="card-bar">
               <div class="card-bar-left">
                 <span class="track-indicator dot-rose"></span>
-                <input type="text" class="card-title-input" value="Workout (5-6 AM)" placeholder="Workout Title" spellcheck="false" />
+                <input type="text" class="card-title-input" value="Workout (5-6 AM)" placeholder="Workout Title"
+                  spellcheck="false" />
               </div>
               <div class="card-bar-right">
                 <span class="card-checklist-stat"></span>
@@ -539,7 +618,8 @@
               </div>
             </div>
             <div class="card-editor-area">
-              <textarea class="card-text-editor" placeholder="Warmup, routine split, sets, reps, weight, cardio, stretching..."></textarea>
+              <textarea class="card-text-editor"
+                placeholder="Warmup, routine split, sets, reps, weight, cardio, stretching..."></textarea>
             </div>
           </div>
 
@@ -548,7 +628,8 @@
             <div class="card-bar">
               <div class="card-bar-left">
                 <span class="track-indicator dot-amber"></span>
-                <input type="text" class="card-title-input" value="Diet & Meals" placeholder="Diet Title" spellcheck="false" />
+                <input type="text" class="card-title-input" value="Diet & Meals" placeholder="Diet Title"
+                  spellcheck="false" />
               </div>
               <div class="card-bar-right">
                 <span class="card-checklist-stat"></span>
@@ -557,7 +638,8 @@
               </div>
             </div>
             <div class="card-editor-area">
-              <textarea class="card-text-editor" placeholder="Breakfast, lunch, dinner, snacks, protein & macro targets, clean eating log..."></textarea>
+              <textarea class="card-text-editor"
+                placeholder="Breakfast, lunch, dinner, snacks, protein & macro targets, clean eating log..."></textarea>
             </div>
           </div>
 
@@ -566,7 +648,8 @@
             <div class="card-bar">
               <div class="card-bar-left">
                 <span class="track-indicator dot-cyan"></span>
-                <input type="text" class="card-title-input" value="Hydration & Supplements" placeholder="Supplements Title" spellcheck="false" />
+                <input type="text" class="card-title-input" value="Hydration & Supplements"
+                  placeholder="Supplements Title" spellcheck="false" />
               </div>
               <div class="card-bar-right">
                 <span class="card-checklist-stat"></span>
@@ -575,7 +658,8 @@
               </div>
             </div>
             <div class="card-editor-area">
-              <textarea class="card-text-editor" placeholder="Water intake (3-4L), whey protein, creatine, multivitamins, daily health habits..."></textarea>
+              <textarea class="card-text-editor"
+                placeholder="Water intake (3-4L), whey protein, creatine, multivitamins, daily health habits..."></textarea>
             </div>
           </div>
 
@@ -584,7 +668,8 @@
             <div class="card-bar">
               <div class="card-bar-left">
                 <span class="track-indicator dot-violet"></span>
-                <input type="text" class="card-title-input" value="Body & Recovery" placeholder="Recovery Title" spellcheck="false" />
+                <input type="text" class="card-title-input" value="Body & Recovery" placeholder="Recovery Title"
+                  spellcheck="false" />
               </div>
               <div class="card-bar-right">
                 <span class="card-checklist-stat"></span>
@@ -593,7 +678,8 @@
               </div>
             </div>
             <div class="card-editor-area">
-              <textarea class="card-text-editor" placeholder="Sleep quality, body weight, physical energy score, recovery notes, reflections..."></textarea>
+              <textarea class="card-text-editor"
+                placeholder="Sleep quality, body weight, physical energy score, recovery notes, reflections..."></textarea>
             </div>
           </div>
 
@@ -653,7 +739,8 @@
               <span class="active-import-icon">🔗</span>
               <span>Currently imported from <strong id="modal-active-import-date"></strong></span>
             </div>
-            <button type="button" id="btn-modal-quick-remove" class="btn-modal-quick-remove" title="Remove all imported tasks and keep custom today tasks">✕ Remove Import</button>
+            <button type="button" id="btn-modal-quick-remove" class="btn-modal-quick-remove"
+              title="Remove all imported tasks and keep custom today tasks">✕ Remove Import</button>
           </div>
 
           <!-- Step 1: Select Source Date -->
@@ -685,7 +772,8 @@
               <input type="checkbox" id="chk-import-tasks" checked />
               <div class="check-text">
                 <span class="check-main">Roll Over Unfinished Tasks & Subtasks</span>
-                <span class="check-sub">Pending tasks and milestones are carried forward. Finished tasks stay in past history.</span>
+                <span class="check-sub">Pending tasks and milestones are carried forward. Finished tasks stay in past
+                  history.</span>
               </div>
             </label>
 
@@ -693,7 +781,8 @@
               <input type="checkbox" id="chk-import-notes" checked />
               <div class="check-text">
                 <span class="check-main">Carry Over Block Notes & Routines</span>
-                <span class="check-sub">Copies research notes, workout routines, diet logs, and references to today.</span>
+                <span class="check-sub">Copies research notes, workout routines, diet logs, and references to
+                  today.</span>
               </div>
             </label>
 
@@ -708,10 +797,56 @@
         </div>
 
         <div class="modal-footer import-modal-footer">
-          <button type="button" id="btn-import-reset-blank" class="btn-import-blank-link" title="Remove imported tasks or reset today to blank">✕ Remove Imported Tasks</button>
+          <button type="button" id="btn-import-reset-blank" class="btn-import-blank-link"
+            title="Remove imported tasks or reset today to blank">✕ Remove Imported Tasks</button>
           <div class="import-footer-right">
             <button type="button" id="btn-import-cancel" class="btn-import-cancel">Cancel</button>
             <button type="button" id="btn-import-execute" class="btn-import-execute">↳ Roll Over into Today</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================================
+         Customize Columns & Layout Modal
+         ====================================================================== -->
+    <div id="customize-layout-modal" class="modal-backdrop">
+      <div class="modal-card customize-modal-card">
+        <div class="modal-header">
+          <div class="modal-header-left">
+            <h2>⚙ Customize Columns & Tracks</h2>
+            <p class="modal-sub">Personalize your daily tracks, select workflow presets, or add custom columns.</p>
+          </div>
+          <button id="btn-close-customize-modal" class="modal-close-btn" title="Close (Esc)">&times;</button>
+        </div>
+
+        <div class="modal-body customize-modal-body">
+          <!-- Step 1: Preset Chooser -->
+          <div class="customize-section">
+            <label class="customize-section-title">Workflow Presets:</label>
+            <div class="preset-cards-grid" id="preset-cards-grid">
+              <!-- Dynamically populated preset cards -->
+            </div>
+          </div>
+
+          <!-- Step 2: Custom Columns Builder -->
+          <div class="customize-section">
+            <div class="customize-section-header">
+              <label class="customize-section-title">Columns by Phase:</label>
+              <span class="customize-sub-hint">Rename or delete tracks, or add new columns to any phase</span>
+            </div>
+            <div class="phase-customizer-container" id="phase-customizer-container">
+              <!-- Dynamically populated phases and track list -->
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer customize-modal-footer">
+          <button type="button" id="btn-reset-default-layout" class="btn-layout-reset"
+            title="Restore Default Polymath routine">↺ Reset to Default Routine</button>
+          <div class="customize-footer-right">
+            <button type="button" id="btn-cancel-customize" class="btn-import-cancel">Cancel</button>
+            <button type="button" id="btn-save-custom-layout" class="btn-import-execute">✓ Save & Apply Layout</button>
           </div>
         </div>
       </div>
@@ -723,7 +858,7 @@
     <div id="lockin-focus-modal" class="lockin-modal" style="display: none;">
       <div class="lockin-backdrop"></div>
       <div class="lockin-card">
-        
+
         <!-- Top Bar -->
         <div class="lockin-header">
           <div class="lockin-meta">
@@ -738,10 +873,14 @@
           <div class="lockin-timer-cluster">
             <div class="lockin-timeblock-presets">
               <span class="timeblock-label">Block:</span>
-              <button type="button" class="timeblock-preset-btn" data-mins="15" title="15-minute Time Block">15m</button>
-              <button type="button" class="timeblock-preset-btn active" data-mins="25" title="25-minute Time Block">25m</button>
-              <button type="button" class="timeblock-preset-btn" data-mins="45" title="45-minute Time Block">45m</button>
-              <button type="button" class="timeblock-preset-btn" data-mins="60" title="60-minute Time Block">60m</button>
+              <button type="button" class="timeblock-preset-btn" data-mins="15"
+                title="15-minute Time Block">15m</button>
+              <button type="button" class="timeblock-preset-btn active" data-mins="25"
+                title="25-minute Time Block">25m</button>
+              <button type="button" class="timeblock-preset-btn" data-mins="45"
+                title="45-minute Time Block">45m</button>
+              <button type="button" class="timeblock-preset-btn" data-mins="60"
+                title="60-minute Time Block">60m</button>
             </div>
             <span class="timer-separator">|</span>
             <span id="lockin-timer-display" class="lockin-timer-digits">25:00</span>
@@ -757,12 +896,14 @@
         <!-- Single Task Hero Row -->
         <div class="lockin-task-hero">
           <button type="button" id="btn-lockin-check" class="lockin-check-circle" title="Mark Done (Space)">
-            <svg class="lockin-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <svg class="lockin-check-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+              stroke-linecap="round" stroke-linejoin="round">
               <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
           </button>
           <div class="lockin-task-body">
-            <input type="text" id="lockin-task-input" class="lockin-task-input" placeholder="Type your single deep work target..." spellcheck="false" />
+            <input type="text" id="lockin-task-input" class="lockin-task-input"
+              placeholder="Type your single deep work target..." spellcheck="false" />
             <div class="lockin-shortcuts-hint">
               <span>Task-specific deep focus</span>
               <span>•</span>
@@ -788,7 +929,9 @@
             <span class="lockin-notes-title">Task-Specific Notes & Context</span>
             <span class="lockin-notes-status" id="lockin-notes-sync-status">Saved directly to this task</span>
           </div>
-          <textarea id="lockin-notes-area" class="lockin-notes-area" placeholder="Task-specific notes, sub-steps, debug logs, findings, or links..." spellcheck="false"></textarea>
+          <textarea id="lockin-notes-area" class="lockin-notes-area"
+            placeholder="Task-specific notes, sub-steps, debug logs, findings, or links..."
+            spellcheck="false"></textarea>
         </div>
 
       </div>
@@ -801,4 +944,5 @@
 
   <script src="app.js"></script>
 </body>
+
 </html>
