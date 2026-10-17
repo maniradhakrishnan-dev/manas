@@ -73,13 +73,23 @@
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
         </button>
 
+        <!-- Quick Sync with Linked/Previous Day -->
+        <button id="btn-quick-sync" class="header-action-pill btn-quick-sync" title="Sync with Linked/Previous Day (Shortcut: S) — Reflects newly finished tasks and syncs unfinished items without altering today's custom tasks">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+          <span id="sync-btn-label">Sync</span>
+        </button>
+
         <!-- Roll Over / Import Planner Button -->
-        <button id="btn-import-planner" class="header-action-pill btn-rollover" title="Roll Over Unfinished Tasks & Notes from Previous Date (Shortcut: R)">
+        <button id="btn-import-planner" class="header-action-pill btn-rollover" title="Roll Over or Import from a specific date (Shortcut: R)">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="9 14 4 9 9 4"></polyline>
             <path d="M20 20v-7a4 4 0 0 0-4-4H4"></path>
           </svg>
-          <span>Roll Over / Import</span>
+          <span>Import</span>
         </button>
 
 
@@ -150,7 +160,7 @@
         <div class="carryover-actions">
           <button id="btn-carryover-apply" class="carryover-btn btn-primary" title="Roll all pending tasks and inherit notes into today">↳ Roll Over into Today</button>
           <button id="btn-carryover-choose" class="carryover-btn btn-secondary" title="Pick another date to import from">Pick Date...</button>
-          <button id="btn-carryover-dismiss" class="carryover-btn btn-ghost" title="Start blank today">Dismiss</button>
+          <button id="btn-carryover-dismiss" class="carryover-btn btn-ghost" title="Start blank today without importing past tasks">Start Blank (No Import)</button>
         </div>
       </div>
 
@@ -637,6 +647,15 @@
         </div>
 
         <div class="modal-body import-modal-body">
+          <!-- Active Import Status Banner & Remove Action -->
+          <div id="modal-active-import-notice" class="modal-active-import-notice" style="display: none;">
+            <div class="active-import-text">
+              <span class="active-import-icon">🔗</span>
+              <span>Currently imported from <strong id="modal-active-import-date"></strong></span>
+            </div>
+            <button type="button" id="btn-modal-quick-remove" class="btn-modal-quick-remove" title="Remove all imported tasks and keep custom today tasks">✕ Remove Import</button>
+          </div>
+
           <!-- Step 1: Select Source Date -->
           <div class="import-section">
             <label class="import-section-label">Select Date to Import From:</label>
@@ -689,8 +708,11 @@
         </div>
 
         <div class="modal-footer import-modal-footer">
-          <button type="button" id="btn-import-cancel" class="btn-import-cancel">Cancel</button>
-          <button type="button" id="btn-import-execute" class="btn-import-execute">↳ Roll Over into Today</button>
+          <button type="button" id="btn-import-reset-blank" class="btn-import-blank-link" title="Remove imported tasks or reset today to blank">✕ Remove Imported Tasks</button>
+          <div class="import-footer-right">
+            <button type="button" id="btn-import-cancel" class="btn-import-cancel">Cancel</button>
+            <button type="button" id="btn-import-execute" class="btn-import-execute">↳ Roll Over into Today</button>
+          </div>
         </div>
       </div>
     </div>

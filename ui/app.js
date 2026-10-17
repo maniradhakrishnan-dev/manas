@@ -21,6 +21,14 @@ const safeStorage = {
     } catch (e) {
       console.warn("localStorage restricted, using memory cache:", e);
     }
+  },
+  removeItem: (key) => {
+    delete memoryCache[key];
+    try {
+      localStorage.removeItem(key);
+    } catch (e) {
+      console.warn("localStorage restricted, using memory cache:", e);
+    }
   }
 };
 
@@ -96,11 +104,13 @@ const btnCarryoverChoose = document.getElementById('btn-carryover-choose');
 const btnCarryoverDismiss = document.getElementById('btn-carryover-dismiss');
 
 // Roll Over & Import Day Modal Elements
+const btnQuickSync = document.getElementById('btn-quick-sync');
 const btnImportPlanner = document.getElementById('btn-import-planner');
 const importModal = document.getElementById('import-planner-modal');
 const btnCloseImportModal = document.getElementById('btn-close-import-modal');
 const btnImportCancel = document.getElementById('btn-import-cancel');
 const btnImportExecute = document.getElementById('btn-import-execute');
+const btnImportResetBlank = document.getElementById('btn-import-reset-blank');
 const importQuickChips = document.getElementById('import-quick-chips');
 const importSourceDateInput = document.getElementById('import-source-date-input');
 const previewDateBadge = document.getElementById('preview-date-badge');
@@ -281,10 +291,12 @@ function normalizeBlockData(rawBlock, defaultTitle) {
       notes: typeof t.notes === 'string' ? t.notes : '',
       subtasks: Array.isArray(t.subtasks)
         ? t.subtasks.map(s => ({
-            text: typeof s === 'string' ? s : (s.text || ''),
-            done: !!s.done
-          }))
-        : []
+          text: typeof s === 'string' ? s : (s.text || ''),
+          done: !!s.done
+        }))
+        : [],
+      importedFrom: t.importedFrom || null,
+      sourceTaskId: t.sourceTaskId || null
     }));
   } else {
     tasks = [];
@@ -348,6 +360,8 @@ function normalizeDayData(raw, dateKey) {
 
   normalized.date = dateKey || raw.date || formatDateKey(new Date());
   normalized.updatedAt = raw.updatedAt || new Date().toISOString();
+  if (raw.importedFrom) normalized.importedFrom = raw.importedFrom;
+  if (raw.importedAt) normalized.importedAt = raw.importedAt;
 
   // Strict normalization for Part 2 (Breadth)
   const p2Title = (normalized.part2.title || '').trim().toLowerCase();
@@ -366,19 +380,39 @@ function normalizeDayData(raw, dateKey) {
 
 // Storage Operations
 async function loadDay(dateKey) {
-  const data = await callTauri('get_day', { date: dateKey });
-  if (data && typeof data === 'object') {
-    return normalizeDayData(data, dateKey);
+  // If requesting current active day, flush dirty state and return currentDayData
+  if (formatDateKey(currentDate) === dateKey && currentDayData && currentDayData.date === dateKey) {
+    if (isDirty) {
+      saveDay(dateKey, currentDayData);
+    }
+    return normalizeDayData(currentDayData, dateKey);
   }
 
+  let localData = null;
   const localStr = safeStorage.getItem(`mrt_${dateKey}`);
   if (localStr) {
     try {
-      return normalizeDayData(JSON.parse(localStr), dateKey);
+      localData = normalizeDayData(JSON.parse(localStr), dateKey);
     } catch (e) {
       console.warn("Parse error for local entry:", e);
     }
   }
+
+  let diskData = null;
+  const data = await callTauri('get_day', { date: dateKey });
+  if (data && typeof data === 'object') {
+    diskData = normalizeDayData(data, dateKey);
+  }
+
+  // Always prefer the freshest record between safeStorage and disk
+  if (localData && diskData) {
+    const localTime = new Date(localData.updatedAt || 0).getTime();
+    const diskTime = new Date(diskData.updatedAt || 0).getTime();
+    return (localTime >= diskTime) ? localData : diskData;
+  }
+
+  if (localData) return localData;
+  if (diskData) return diskData;
 
   return getDefaultDayData(dateKey);
 }
@@ -406,6 +440,7 @@ function syncBlockContent(blockKey) {
 }
 
 function saveDay(targetDateKey = null, targetData = null) {
+  clearTimeout(autoSaveTimer);
   if (!isDirty && !targetData) return;
   const dateKey = targetDateKey || formatDateKey(currentDate);
   const dataToSave = targetData ? JSON.parse(JSON.stringify(targetData)) : JSON.parse(JSON.stringify(currentDayData));
@@ -527,9 +562,9 @@ function renderCardTasks(card, blockKey) {
     row.dataset.taskIdx = idx;
 
     const hasNotes = typeof task.notes === 'string' && task.notes.trim().length > 0;
-    const lockinBtnLabel = hasNotes ? '⏱ Notes •' : '⏱ Lock-in';
+    const lockinBtnLabel = hasNotes ? '⏱ Notes •' : '⏱';
     const lockinBtnTitle = hasNotes ? 'Task-specific notes attached. Click to open focus & notes.' : 'Lock-in on this task (Time Block & Notes)';
-    
+
     if (!Array.isArray(task.subtasks)) {
       task.subtasks = [];
     }
@@ -569,13 +604,19 @@ function renderCardTasks(card, blockKey) {
       e.stopPropagation();
       setActiveTaskSelection(blockKey, idx);
       task.done = !task.done;
+      // When parent is toggled, cascade state to all subtasks
+      if (Array.isArray(task.subtasks)) {
+        task.subtasks.forEach(s => s.done = task.done);
+      }
       row.classList.toggle('is-completed', task.done);
       checkBtn.classList.toggle('checked', task.done);
       if (input) input.classList.toggle('task-done', task.done);
       syncBlockContent(blockKey);
       updateCardTabBadges(card, blockKey);
       updateTotalProgress();
-      triggerAutoSave();
+      renderCardTasks(card, blockKey);
+      isDirty = true;
+      saveDay(); // Immediately persist checkbox state
     });
 
     // 2. Edit Task Text (NEVER toggles checkbox)
@@ -583,6 +624,11 @@ function renderCardTasks(card, blockKey) {
       task.text = input.value;
       syncBlockContent(blockKey);
       triggerAutoSave();
+      // If user is actively typing new tasks on this day, dismiss carryover banner so it doesn't get in their way
+      if (carryoverBanner && carryoverBanner.style.display !== 'none' && !safeStorage.getItem(`mrt_imported_${formatDateKey(currentDate)}`)) {
+        carryoverBanner.style.display = 'none';
+        safeStorage.setItem(`mrt_carryover_dismissed_${formatDateKey(currentDate)}`, 'true');
+      }
     });
 
     // Enter to insert new task below; Tab to add subtask; Backspace on empty to delete
@@ -707,11 +753,19 @@ function renderCardTasks(card, blockKey) {
           subCheck.classList.toggle('checked', sub.done);
           subInput.classList.toggle('task-done', sub.done);
           subRow.classList.toggle('is-completed', sub.done);
+          // If all non-empty subtasks are done, auto-mark parent task done; if any subtask unchecked, uncheck parent
+          const nonBlankSubs = task.subtasks.filter(s => s.text && s.text.trim().length > 0);
+          if (nonBlankSubs.length > 0 && nonBlankSubs.every(s => s.done)) {
+            task.done = true;
+          } else if (!sub.done && task.done) {
+            task.done = false;
+          }
           syncBlockContent(blockKey);
           updateCardTabBadges(card, blockKey);
           updateTotalProgress();
           renderCardTasks(card, blockKey);
-          triggerAutoSave();
+          isDirty = true;
+          saveDay(); // Immediately persist subtask state
         });
 
         // Subtask input typing
@@ -999,6 +1053,22 @@ function renderCurrentDay() {
   });
 
   updateTotalProgress();
+
+  // Update Sync action button title in Header
+  const targetDateKey = formatDateKey(currentDate);
+  const activeSourceDate = currentDayData.importedFrom || safeStorage.getItem(`mrt_last_imported_source_${targetDateKey}`);
+  const hasImport = !!(currentDayData.importedFrom || (activeSourceDate && safeStorage.getItem(`mrt_imported_${targetDateKey}`)));
+
+  const syncBtn = document.getElementById('btn-quick-sync');
+  const syncBtnLabel = document.getElementById('sync-btn-label');
+  if (syncBtn) {
+    syncBtn.title = hasImport && activeSourceDate
+      ? `Sync with ${activeSourceDate} (Shortcut: S) — Updates unfinished tasks without altering today's custom tasks`
+      : `Sync with previous day (Shortcut: S)`;
+  }
+  if (syncBtnLabel) {
+    syncBtnLabel.textContent = 'Sync';
+  }
 }
 
 function updateTotalProgress() {
@@ -1249,15 +1319,27 @@ function changeDate(newDate) {
   }
   renderCurrentDay();
 
+  // If day has an active import link, sync unfinished tasks from source day
+  if (currentDayData.importedFrom) {
+    quickSync(currentDayData.importedFrom, true);
+  }
+
   // Check carryover for target date
   checkPendingCarryover(targetDateKey);
 
   // 4. Background fetch from native filesystem if available
   callTauri('get_day', { date: targetDateKey }).then(diskData => {
     if (formatDateKey(currentDate) === targetDateKey && diskData && typeof diskData === 'object') {
-      currentDayData = normalizeDayData(diskData, targetDateKey);
-      renderCurrentDay();
-      checkPendingCarryover(targetDateKey);
+      const diskTime = new Date(diskData.updatedAt || 0).getTime();
+      const curTime = new Date(currentDayData.updatedAt || 0).getTime();
+      if (diskTime > curTime) {
+        currentDayData = normalizeDayData(diskData, targetDateKey);
+        renderCurrentDay();
+        if (currentDayData.importedFrom) {
+          quickSync(currentDayData.importedFrom, true);
+        }
+        checkPendingCarryover(targetDateKey);
+      }
     }
   });
 }
@@ -1277,7 +1359,7 @@ async function getAllStoredDates() {
         if (/^\d{4}-\d{2}-\d{2}$/.test(d)) dates.add(d);
       });
     }
-  } catch (e) {}
+  } catch (e) { }
 
   // 2. Fetch from safeStorage cached active dates
   try {
@@ -1286,7 +1368,7 @@ async function getAllStoredDates() {
       const parsed = JSON.parse(cachedDates);
       if (Array.isArray(parsed)) parsed.forEach(d => dates.add(d));
     }
-  } catch (e) {}
+  } catch (e) { }
 
   // 3. Scan localStorage for any mrt_YYYY-MM-DD keys
   try {
@@ -1301,7 +1383,7 @@ async function getAllStoredDates() {
         }
       }
     }
-  } catch (e) {}
+  } catch (e) { }
 
   activeDatesSet = dates;
   return Array.from(dates).sort().reverse();
@@ -1309,7 +1391,7 @@ async function getAllStoredDates() {
 
 async function findLatestActiveDayBefore(targetDateKey) {
   const allDates = await getAllStoredDates();
-  
+
   // Find dates strictly before targetDateKey
   const pastDates = allDates.filter(d => d < targetDateKey);
 
@@ -1337,10 +1419,16 @@ async function findLatestActiveDayBefore(targetDateKey) {
   return null;
 }
 
+function isTaskDone(task) {
+  if (!task || typeof task !== 'object') return true;
+  return Boolean(task.done);
+}
+
 function analyzeSourceDay(dayData) {
   if (!dayData || typeof dayData !== 'object') {
     return {
       unfinishedTasks: [],
+      finishedTasks: [],
       completedTasksCount: 0,
       totalTasks: 0,
       notesCount: 0,
@@ -1350,6 +1438,7 @@ function analyzeSourceDay(dayData) {
   }
 
   const unfinishedTasks = [];
+  const finishedTasks = [];
   let completedTasksCount = 0;
   let totalTasks = 0;
   let notesCount = 0;
@@ -1370,8 +1459,13 @@ function analyzeSourceDay(dayData) {
         block.tasks.forEach(task => {
           if (!task || !task.text || task.text.trim().length === 0) return;
           totalTasks++;
-          if (task.done) {
+          if (isTaskDone(task)) {
             completedTasksCount++;
+            finishedTasks.push({
+              blockKey: k,
+              blockTitle: block.title || getDefaultTitle(k),
+              text: task.text.trim()
+            });
           } else {
             unfinishedTasks.push({
               blockKey: k,
@@ -1388,6 +1482,7 @@ function analyzeSourceDay(dayData) {
 
   return {
     unfinishedTasks,
+    finishedTasks,
     completedTasksCount,
     totalTasks,
     notesCount,
@@ -1403,8 +1498,8 @@ function extractUnfinishedTasks(dayData) {
 async function checkPendingCarryover(targetDateKey, forcePrompt = false) {
   if (!carryoverBanner) return;
 
-  // If already dismissed for this day and not explicitly forced by user
-  if (!forcePrompt && safeStorage.getItem(`mrt_carryover_dismissed_${targetDateKey}`) === 'true') {
+  // 1. If user explicitly chose to start blank for this day, respect it completely and stay quiet
+  if (!forcePrompt && safeStorage.getItem(`mrt_start_blank_${targetDateKey}`) === 'true') {
     carryoverBanner.style.display = 'none';
     currentPendingCarryover = [];
     currentPendingCarryoverSourceDate = null;
@@ -1415,7 +1510,7 @@ async function checkPendingCarryover(targetDateKey, forcePrompt = false) {
   currentPendingCarryover = [];
   currentPendingCarryoverSourceDate = null;
 
-  // Find the latest active day before targetDateKey
+  // Find the latest active day before targetDateKey (or check previous import source)
   const activeDayResult = await findLatestActiveDayBefore(targetDateKey);
   if (!activeDayResult) {
     if (forcePrompt) {
@@ -1434,13 +1529,34 @@ async function checkPendingCarryover(targetDateKey, forcePrompt = false) {
     return !currentBlock.tasks.some(t => t.text && t.text.trim().toLowerCase() === item.text.toLowerCase());
   });
 
+  // Check if any finished tasks from source day are lingering as active in today
+  const tasksToClear = [];
+  if (analysis.finishedTasks && Array.isArray(analysis.finishedTasks)) {
+    analysis.finishedTasks.forEach(item => {
+      const curBlock = currentDayData[item.blockKey];
+      if (curBlock && Array.isArray(curBlock.tasks)) {
+        if (curBlock.tasks.some(t => t.text && t.text.trim().toLowerCase() === item.text.toLowerCase() && !t.done)) {
+          tasksToClear.push(item);
+        }
+      }
+    });
+  }
+
+  // 2. If already dismissed for this day and there are no newly finished tasks to clear, stay hidden
+  if (!forcePrompt && safeStorage.getItem(`mrt_carryover_dismissed_${targetDateKey}`) === 'true' && tasksToClear.length === 0) {
+    carryoverBanner.style.display = 'none';
+    currentPendingCarryover = [];
+    currentPendingCarryoverSourceDate = null;
+    return;
+  }
+
   // Check if current day has any content
   const targetHasContent = hasContent(currentDayData);
 
-  // If target day has no pending tasks AND already has content or source has no notes, nothing to prompt
-  if (pendingTasks.length === 0 && (targetHasContent || analysis.notesCount === 0)) {
+  // If nothing to add, nothing to clear, and (target already has content or source has no notes), nothing to prompt
+  if (pendingTasks.length === 0 && tasksToClear.length === 0 && (targetHasContent || analysis.notesCount === 0)) {
     if (forcePrompt) {
-      showToast("All pending tasks already exist in today's planner! 👍");
+      showToast("All tasks are already in sync with previous days! 👍");
     }
     return;
   }
@@ -1459,7 +1575,9 @@ async function checkPendingCarryover(targetDateKey, forcePrompt = false) {
   const sourceName = isYesterday ? "Yesterday" : sourceDateKey;
 
   if (carryoverTitle) {
-    if (pendingTasks.length > 0) {
+    if (tasksToClear.length > 0 && pendingTasks.length === 0) {
+      carryoverTitle.textContent = `Sync Tasks from ${sourceName} (${tasksToClear.length} completed)`;
+    } else if (pendingTasks.length > 0) {
       carryoverTitle.textContent = `${pendingTasks.length} Unfinished Task${pendingTasks.length > 1 ? 's' : ''} from ${sourceName}`;
     } else {
       carryoverTitle.textContent = `Inherit Notes & Setup from ${sourceName}`;
@@ -1467,8 +1585,11 @@ async function checkPendingCarryover(targetDateKey, forcePrompt = false) {
   }
 
   if (carryoverPreview) {
-    if (pendingTasks.length > 0) {
-      const previewSummary = `${pendingTasks[0].blockTitle}: "${pendingTasks[0].text}"${pendingTasks.length > 1 ? ` (+${pendingTasks.length - 1} more)` : ''}${analysis.notesCount > 0 ? ' · Notes included' : ''}`;
+    if (tasksToClear.length > 0 && pendingTasks.length === 0) {
+      carryoverPreview.textContent = `⚡ ${tasksToClear.length} task${tasksToClear.length > 1 ? 's' : ''} marked completed on ${sourceName} will be cleared from today`;
+    } else if (pendingTasks.length > 0) {
+      const clearSuffix = tasksToClear.length > 0 ? ` · ${tasksToClear.length} completed to clear` : '';
+      const previewSummary = `${pendingTasks[0].blockTitle}: "${pendingTasks[0].text}"${pendingTasks.length > 1 ? ` (+${pendingTasks.length - 1} more)` : ''}${analysis.notesCount > 0 ? ' · Notes included' : ''}${clearSuffix}`;
       carryoverPreview.textContent = previewSummary;
     } else {
       carryoverPreview.textContent = `${analysis.notesCount} block notes ready to inherit without re-typing`;
@@ -1476,19 +1597,23 @@ async function checkPendingCarryover(targetDateKey, forcePrompt = false) {
   }
 
   if (btnCarryoverApply) {
-    btnCarryoverApply.textContent = "↳ Roll Over into Today";
+    if (tasksToClear.length > 0 && pendingTasks.length === 0) {
+      btnCarryoverApply.textContent = "↳ Sync Completed into Today";
+    } else {
+      btnCarryoverApply.textContent = "↳ Roll Over into Today";
+    }
   }
 
   carryoverBanner.style.display = 'flex';
   if (forcePrompt) {
-    showToast(`Found records from ${sourceName} to roll over`);
+    showToast(`Found records from ${sourceName} to sync`);
   }
 }
 
 function applyPendingCarryover() {
   const sourceDate = currentPendingCarryoverSourceDate;
   if (!sourceDate) {
-    openImportModal();
+    quickSync();
     return;
   }
   executeImport(sourceDate, {
@@ -1500,13 +1625,324 @@ function applyPendingCarryover() {
 
 function dismissCarryover() {
   const targetDateKey = formatDateKey(currentDate);
+  safeStorage.setItem(`mrt_start_blank_${targetDateKey}`, 'true');
   safeStorage.setItem(`mrt_carryover_dismissed_${targetDateKey}`, 'true');
   if (carryoverBanner) {
     carryoverBanner.style.display = 'none';
   }
   currentPendingCarryover = [];
   currentPendingCarryoverSourceDate = null;
-  showToast("Dismissed rollover for today");
+  showToast("Blank day setup. No tasks will be auto-imported today. (Use Sync or Import Date anytime)");
+}
+
+// Revert last accidental import or wipe day to completely blank
+function handleUndoOrResetBlank() {
+  const targetDateKey = formatDateKey(currentDate);
+  const backupStr = safeStorage.getItem(`mrt_pre_import_${targetDateKey}`);
+
+  if (backupStr && backupStr !== 'null' && backupStr !== 'undefined') {
+    try {
+      const backupData = JSON.parse(backupStr);
+      currentDayData = normalizeDayData(backupData, targetDateKey);
+      safeStorage.removeItem(`mrt_pre_import_${targetDateKey}`);
+      safeStorage.removeItem(`mrt_imported_${targetDateKey}`);
+      safeStorage.removeItem(`mrt_last_imported_source_${targetDateKey}`);
+      safeStorage.setItem(`mrt_start_blank_${targetDateKey}`, 'true');
+      safeStorage.setItem(`mrt_carryover_dismissed_${targetDateKey}`, 'true');
+      isDirty = true;
+      saveDay(targetDateKey, currentDayData);
+      renderCurrentDay();
+      closeImportModal();
+      if (carryoverBanner) carryoverBanner.style.display = 'none';
+      showToast("Import undone! Reverted to state before import.", null, null, 3500);
+      return;
+    } catch (e) {
+      console.error("Failed to restore backup snapshot:", e);
+    }
+  }
+
+  // If no snapshot exists or user wants fresh blank start
+  safeStorage.setItem(`mrt_pre_import_${targetDateKey}`, JSON.stringify(currentDayData));
+  currentDayData = getDefaultDayData(targetDateKey);
+  safeStorage.removeItem(`mrt_imported_${targetDateKey}`);
+  safeStorage.removeItem(`mrt_last_imported_source_${targetDateKey}`);
+  safeStorage.setItem(`mrt_start_blank_${targetDateKey}`, 'true');
+  safeStorage.setItem(`mrt_carryover_dismissed_${targetDateKey}`, 'true');
+  isDirty = true;
+  saveDay(targetDateKey, currentDayData);
+  renderCurrentDay();
+  closeImportModal();
+  if (carryoverBanner) carryoverBanner.style.display = 'none';
+  showToast("Day reset to blank. Auto-import disabled.", "Undo", handleUndoOrResetBlank, 6000);
+}
+
+// Remove all tasks that were imported from a linked date, preserving custom tasks
+async function removeImport() {
+  const targetDateKey = formatDateKey(currentDate);
+  const sourceDateKey = currentDayData.importedFrom || safeStorage.getItem(`mrt_last_imported_source_${targetDateKey}`);
+
+  // Take backup snapshot so user can undo
+  safeStorage.setItem(`mrt_pre_import_${targetDateKey}`, JSON.stringify(currentDayData));
+
+  let removedCount = 0;
+  let customKeptCount = 0;
+
+  // Build task text set from source day to also catch any legacy untagged imports
+  const sourceTaskSet = new Set();
+  if (sourceDateKey) {
+    try {
+      const srcData = await loadDay(sourceDateKey);
+      if (srcData) {
+        for (const k of ALL_BLOCK_KEYS) {
+          if (srcData[k] && Array.isArray(srcData[k].tasks)) {
+            srcData[k].tasks.forEach(t => {
+              if (t && typeof t.text === 'string' && t.text.trim()) {
+                sourceTaskSet.add(`${k}:::${t.text.trim().toLowerCase()}`);
+              }
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Could not load source day for removeImport verification:", e);
+    }
+  }
+
+  for (const blockKey of ALL_BLOCK_KEYS) {
+    const curBlock = currentDayData[blockKey];
+    if (curBlock && Array.isArray(curBlock.tasks)) {
+      const remaining = [];
+      for (const t of curBlock.tasks) {
+        if (!t || typeof t.text !== 'string' || !t.text.trim()) continue;
+        const key = `${blockKey}:::${t.text.trim().toLowerCase()}`;
+        const isImported = (t.importedFrom && (t.importedFrom === sourceDateKey || !sourceDateKey)) ||
+          (sourceDateKey && sourceTaskSet.has(key));
+
+        if (isImported) {
+          removedCount++;
+        } else {
+          remaining.push(t);
+          customKeptCount++;
+        }
+      }
+      curBlock.tasks = remaining;
+      syncBlockContent(blockKey);
+    }
+  }
+
+  // Clear import link metadata
+  delete currentDayData.importedFrom;
+  delete currentDayData.importedAt;
+  safeStorage.removeItem(`mrt_imported_${targetDateKey}`);
+  safeStorage.removeItem(`mrt_last_imported_source_${targetDateKey}`);
+  safeStorage.setItem(`mrt_start_blank_${targetDateKey}`, 'true');
+  safeStorage.setItem(`mrt_carryover_dismissed_${targetDateKey}`, 'true');
+
+  isDirty = true;
+  saveDay(targetDateKey, currentDayData);
+  renderCurrentDay();
+
+  if (carryoverBanner) carryoverBanner.style.display = 'none';
+  closeImportModal();
+
+  const sourceName = sourceDateKey || "previous day";
+  if (removedCount > 0) {
+    showToast(`Removed ${removedCount} imported task${removedCount > 1 ? 's' : ''} from ${sourceName}. (${customKeptCount} custom today tasks kept)`, "Undo", handleUndoOrResetBlank, 6000);
+  } else {
+    showToast(`Import link removed. Today is now an independent blank day.`, "Undo", handleUndoOrResetBlank, 6000);
+  }
+}
+
+// 1-Click Smart Sync with Linked Date (or previous active day)
+async function quickSync(preferredSourceDate = null, silent = false) {
+  const targetDateKey = formatDateKey(currentDate);
+
+  if (btnQuickSync) {
+    btnQuickSync.classList.add('is-syncing');
+  }
+
+  try {
+    // 1. Determine source date: check linked date on day, or last imported source, or yesterday
+    let sourceDateKey = preferredSourceDate || currentDayData.importedFrom || safeStorage.getItem(`mrt_last_imported_source_${targetDateKey}`);
+
+    if (!sourceDateKey) {
+      const [y, m, d] = targetDateKey.split('-').map(Number);
+      const targetDateObj = new Date(y, m - 1, d);
+      const yestDateObj = new Date(targetDateObj);
+      yestDateObj.setDate(yestDateObj.getDate() - 1);
+      const yestKey = formatDateKey(yestDateObj);
+
+      const yestData = await loadDay(yestKey);
+      if (hasContent(yestData)) {
+        sourceDateKey = yestKey;
+      } else {
+        const latestActive = await findLatestActiveDayBefore(targetDateKey);
+        sourceDateKey = latestActive ? latestActive.dateKey : yestKey;
+      }
+    }
+
+    if (!sourceDateKey || sourceDateKey >= targetDateKey) {
+      if (!silent) showToast("No earlier records found to sync with.");
+      return;
+    }
+
+    // 2. Fetch freshest source data
+    const sourceData = await loadDay(sourceDateKey);
+    if (!sourceData) {
+      if (!silent) showToast(`Could not load data for ${sourceDateKey}`);
+      return;
+    }
+
+    // Store pre-sync backup snapshot so accidental sync can be undone
+    safeStorage.setItem(`mrt_pre_import_${targetDateKey}`, JSON.stringify(currentDayData));
+
+    // 3. Reconcile with current target day
+    let clearedCount = 0;
+    let addedCount = 0;
+    let updatedCount = 0;
+    let preservedCustomCount = 0;
+
+    for (const blockKey of ALL_BLOCK_KEYS) {
+      if (!currentDayData[blockKey]) {
+        currentDayData[blockKey] = getDefaultBlockData(getDefaultTitle(blockKey));
+      }
+      const curBlock = currentDayData[blockKey];
+      const srcBlock = sourceData[blockKey];
+      if (!Array.isArray(curBlock.tasks)) curBlock.tasks = [];
+
+      if (!srcBlock || !Array.isArray(srcBlock.tasks)) {
+        preservedCustomCount += curBlock.tasks.filter(t => t && typeof t.text === 'string' && t.text.trim().length > 0).length;
+        continue;
+      }
+
+      // Check tasks on source
+      const srcFinished = srcBlock.tasks.filter(t => t && isTaskDone(t) && typeof t.text === 'string' && t.text.trim().length > 0);
+      const srcUnfinished = srcBlock.tasks.filter(t => t && !isTaskDone(t) && typeof t.text === 'string' && t.text.trim().length > 0);
+
+      // A. Finished tasks on source day: remove from today's pending tasks
+      srcFinished.forEach(fTask => {
+        const fText = fTask.text.trim().toLowerCase();
+        const matchIdx = curBlock.tasks.findIndex(
+          t => t && typeof t.text === 'string' && t.text.trim().toLowerCase() === fText && !t.done
+        );
+        if (matchIdx !== -1) {
+          curBlock.tasks.splice(matchIdx, 1);
+          clearedCount++;
+        }
+      });
+
+      // B. Unfinished tasks on source day: import or sync subtasks & notes
+      srcUnfinished.forEach(uTask => {
+        const uText = uTask.text.trim();
+        const existing = curBlock.tasks.find(
+          t => t && typeof t.text === 'string' && t.text.trim().toLowerCase() === uText.toLowerCase()
+        );
+
+        if (!existing) {
+          curBlock.tasks.push({
+            text: uText,
+            done: false,
+            notes: uTask.notes || '',
+            subtasks: Array.isArray(uTask.subtasks) ? JSON.parse(JSON.stringify(uTask.subtasks)) : [],
+            importedFrom: sourceDateKey
+          });
+          addedCount++;
+        } else {
+          // If task exists on today, sync any changes to its notes or subtasks from source day!
+          let modified = false;
+          if (uTask.notes && existing.notes !== uTask.notes) {
+            existing.notes = uTask.notes;
+            modified = true;
+          }
+          if (Array.isArray(uTask.subtasks)) {
+            const newSubsStr = JSON.stringify(uTask.subtasks);
+            if (JSON.stringify(existing.subtasks || []) !== newSubsStr) {
+              existing.subtasks = JSON.parse(newSubsStr);
+              modified = true;
+            }
+          }
+          if (!existing.importedFrom) {
+            existing.importedFrom = sourceDateKey;
+          }
+          if (modified) updatedCount++;
+        }
+      });
+
+      // C. Tasks deleted from source day: if a task was imported from sourceDateKey but is no longer on source, remove it
+      curBlock.tasks = curBlock.tasks.filter(t => {
+        if (t && t.importedFrom === sourceDateKey) {
+          const inUnfinished = srcUnfinished.some(st => st.text.trim().toLowerCase() === t.text.trim().toLowerCase());
+          const inFinished = srcFinished.some(st => st.text.trim().toLowerCase() === t.text.trim().toLowerCase());
+          if (!inUnfinished && !inFinished) {
+            clearedCount++;
+            return false;
+          }
+        }
+        return true;
+      });
+
+      // Count custom tasks created today (never existed in source block)
+      curBlock.tasks.forEach(t => {
+        if (!t || typeof t.text !== 'string' || !t.text.trim()) return;
+        const existsInSrc = srcBlock.tasks.some(st => st && typeof st.text === 'string' && st.text.trim().toLowerCase() === t.text.trim().toLowerCase());
+        if (!existsInSrc) {
+          preservedCustomCount++;
+        }
+      });
+
+      // Clean up empty tasks
+      curBlock.tasks = curBlock.tasks.filter(t => t && typeof t.text === 'string' && t.text.trim().length > 0);
+      syncBlockContent(blockKey);
+    }
+
+    // Save and re-render
+    isDirty = true;
+    currentDayData.importedFrom = sourceDateKey;
+    currentDayData.importedAt = new Date().toISOString();
+    safeStorage.setItem(`mrt_last_imported_source_${targetDateKey}`, sourceDateKey);
+    safeStorage.setItem(`mrt_imported_${targetDateKey}`, 'true');
+    safeStorage.removeItem(`mrt_start_blank_${targetDateKey}`);
+    saveDay(targetDateKey, currentDayData);
+    renderCurrentDay();
+
+    if (carryoverBanner) carryoverBanner.style.display = 'none';
+    currentPendingCarryover = [];
+    currentPendingCarryoverSourceDate = null;
+
+    // Source date label
+    const [ty, tm, td] = targetDateKey.split('-').map(Number);
+    const targetDateObj = new Date(ty, tm - 1, td);
+    const yestDateObj = new Date(targetDateObj);
+    yestDateObj.setDate(yestDateObj.getDate() - 1);
+    const isYesterday = (sourceDateKey === formatDateKey(yestDateObj));
+    const label = isYesterday ? "Yesterday" : sourceDateKey;
+
+    const parts = [];
+    if (clearedCount > 0) parts.push(`cleared ${clearedCount} completed`);
+    if (addedCount > 0) parts.push(`+${addedCount} new task${addedCount > 1 ? 's' : ''}`);
+    if (updatedCount > 0) parts.push(`${updatedCount} updated`);
+    if (preservedCustomCount > 0) parts.push(`${preservedCustomCount} custom today task${preservedCustomCount > 1 ? 's' : ''} kept`);
+
+    if (clearedCount === 0 && addedCount === 0 && updatedCount === 0) {
+      if (!silent) {
+        if (preservedCustomCount > 0) {
+          showToast(`In sync with ${label}. All ${preservedCustomCount} custom today tasks preserved. 👍`);
+        } else {
+          showToast(`Already fully in sync with ${label} 👍`);
+        }
+      }
+    } else {
+      showToast(`Synced with ${label}: ${parts.join(', ')} ⚡`, "Undo", handleUndoOrResetBlank, 6000);
+    }
+
+  } catch (err) {
+    console.error("quickSync error:", err);
+    if (!silent) showToast(`Sync error: ${err?.message || err}`);
+  } finally {
+    if (btnQuickSync) {
+      setTimeout(() => btnQuickSync.classList.remove('is-syncing'), 450);
+    }
+  }
 }
 
 function manualCheckCarryover() {
@@ -1541,10 +1977,30 @@ async function openImportModal(preferredDate = null) {
     importSourceDateInput.max = targetDateKey;
   }
 
+  // Update Active Import Banner and Undo / Reset Blank button label
+  const activeNotice = document.getElementById('modal-active-import-notice');
+  const activeDateSpan = document.getElementById('modal-active-import-date');
+  const hasImport = currentDayData.importedFrom || safeStorage.getItem(`mrt_imported_${targetDateKey}`);
+  const importSource = currentDayData.importedFrom || safeStorage.getItem(`mrt_last_imported_source_${targetDateKey}`);
+
+  if (activeNotice && activeDateSpan) {
+    if (hasImport && importSource) {
+      activeNotice.style.display = 'flex';
+      activeDateSpan.textContent = importSource;
+    } else {
+      activeNotice.style.display = 'none';
+    }
+  }
+
+  if (btnImportResetBlank) {
+    btnImportResetBlank.textContent = hasImport ? "✕ Remove Imported Tasks" : "↺ Start Blank Day";
+    btnImportResetBlank.title = hasImport ? "Remove all imported tasks and keep custom today tasks" : "Clear all tasks to start clean";
+  }
+
   // Populate smart quick chips
   if (importQuickChips) {
     importQuickChips.innerHTML = '';
-    
+
     const chipDates = [];
     const allStored = await getAllStoredDates();
     const pastStored = allStored.filter(k => k < targetDateKey);
@@ -1638,11 +2094,7 @@ async function updateImportPreview(sourceDateKey) {
   const sourceData = await loadDay(sourceDateKey);
   const analysis = analyzeSourceDay(sourceData);
 
-  const pendingTasks = analysis.unfinishedTasks.filter(item => {
-    const curBlock = currentDayData[item.blockKey];
-    if (!curBlock || !Array.isArray(curBlock.tasks)) return true;
-    return !curBlock.tasks.some(t => t.text && t.text.trim().toLowerCase() === item.text.toLowerCase());
-  });
+  const unfinishedList = analysis.unfinishedTasks || [];
 
   const notesList = Object.keys(analysis.blockNotes).map(k => {
     return analysis.blockTitles[k] || getDefaultTitle(k);
@@ -1650,16 +2102,16 @@ async function updateImportPreview(sourceDateKey) {
 
   if (previewStatPill) {
     const statParts = [];
-    statParts.push(`${pendingTasks.length} pending task${pendingTasks.length !== 1 ? 's' : ''}`);
-    statParts.push(`${notesList.length} note block${notesList.length !== 1 ? 's' : ''}`);
-    previewStatPill.textContent = statParts.join(' · ');
+    if (unfinishedList.length > 0) statParts.push(`${unfinishedList.length} unfinished task${unfinishedList.length !== 1 ? 's' : ''}`);
+    if (notesList.length > 0) statParts.push(`${notesList.length} note block${notesList.length !== 1 ? 's' : ''}`);
+    previewStatPill.textContent = statParts.join(' · ') || 'No unfinished items';
   }
 
-  if (pendingTasks.length === 0 && notesList.length === 0) {
+  if (unfinishedList.length === 0 && notesList.length === 0) {
     previewContentSummary.innerHTML = `
       <div class="preview-empty">
-        <p>No new tasks or notes found on <strong>${sourceDateKey}</strong>.</p>
-        <span class="preview-sub-hint">Pick another date from the chips above or using the date picker.</span>
+        <p>No unfinished tasks or notes found on <strong>${sourceDateKey}</strong>.</p>
+        <span class="preview-sub-hint">All tasks on ${sourceDateKey} are completed or empty.</span>
       </div>
     `;
     if (btnImportExecute) btnImportExecute.disabled = false;
@@ -1668,28 +2120,28 @@ async function updateImportPreview(sourceDateKey) {
 
   let html = '';
 
-  if (pendingTasks.length > 0) {
-    html += `<div class="preview-group-header">Tasks to Roll Over (${pendingTasks.length}):</div>`;
+  // Unfinished tasks only - NO finished tasks ever shown in import!
+  if (unfinishedList.length > 0) {
+    html += `<div class="preview-group-header">Tasks to Roll Over (${unfinishedList.length}):</div>`;
     html += `<div class="preview-task-list">`;
-    pendingTasks.forEach(item => {
+    unfinishedList.forEach(item => {
+      const curBlock = currentDayData[item.blockKey];
+      const isInToday = curBlock && Array.isArray(curBlock.tasks) && curBlock.tasks.some(
+        t => t && typeof t.text === 'string' && t.text.trim().toLowerCase() === item.text.toLowerCase()
+      );
       const subInfo = item.subtasks.length > 0 ? ` <span class="preview-sub-badge">${item.subtasks.length} subtask${item.subtasks.length > 1 ? 's' : ''}</span>` : '';
       const notesInfo = item.notes ? ` <span class="preview-task-notes-badge" title="Has task notes">📝</span>` : '';
+      const syncBadge = isInToday ? ` <span class="preview-status-badge in-today" title="Already in today's planner">In Today</span>` : '';
+
       html += `
         <div class="preview-task-row">
           <span class="preview-block-tag">${escapeHtml(item.blockTitle)}</span>
           <span class="preview-task-text">${escapeHtml(item.text)}${subInfo}${notesInfo}</span>
+          ${syncBadge}
         </div>
       `;
     });
     html += `</div>`;
-  }
-
-  if (analysis.completedTasksCount > 0) {
-    html += `
-      <div class="preview-archived-hint">
-        ✓ ${analysis.completedTasksCount} completed task${analysis.completedTasksCount > 1 ? 's' : ''} on ${sourceDateKey} will remain safely recorded in past history.
-      </div>
-    `;
   }
 
   if (notesList.length > 0) {
@@ -1702,100 +2154,168 @@ async function updateImportPreview(sourceDateKey) {
   }
 
   previewContentSummary.innerHTML = html;
-  if (btnImportExecute) btnImportExecute.disabled = false;
+  if (btnImportExecute) {
+    btnImportExecute.disabled = false;
+    btnImportExecute.textContent = "↳ Roll Over into Today";
+  }
 }
 
 async function executeImport(sourceDateKey, options = { tasks: true, notes: true, titles: true }) {
   if (!sourceDateKey) return;
-  const sourceData = await loadDay(sourceDateKey);
-  if (!sourceData) {
-    showToast(`Could not load data for ${sourceDateKey}`);
-    return;
-  }
-
-  let importedTasksCount = 0;
-  let inheritedNotesCount = 0;
-  let updatedTitlesCount = 0;
-
-  for (const blockKey of ALL_BLOCK_KEYS) {
-    if (!currentDayData[blockKey]) {
-      currentDayData[blockKey] = getDefaultBlockData(getDefaultTitle(blockKey));
+  try {
+    const sourceData = await loadDay(sourceDateKey);
+    if (!sourceData) {
+      showToast(`Could not load data for ${sourceDateKey}`);
+      return;
     }
-    const currentBlock = currentDayData[blockKey];
-    const sourceBlock = sourceData[blockKey];
-    if (!sourceBlock) continue;
 
-    // 1. Inherit Custom Block Titles
-    if (options.titles && sourceBlock.title) {
-      const defTitle = getDefaultTitle(blockKey);
-      if (sourceBlock.title !== defTitle && currentBlock.title === defTitle) {
-        currentBlock.title = sourceBlock.title;
-        updatedTitlesCount++;
+    const targetDateKey = formatDateKey(currentDate);
+    // Store backup snapshot before importing so user can redo/undo
+    safeStorage.setItem(`mrt_pre_import_${targetDateKey}`, JSON.stringify(currentDayData));
+
+    let importedTasksCount = 0;
+    let removedFinishedCount = 0;
+    let updatedTasksCount = 0;
+    let inheritedNotesCount = 0;
+    let updatedTitlesCount = 0;
+    let preservedCustomCount = 0;
+
+    for (const blockKey of ALL_BLOCK_KEYS) {
+      if (!currentDayData[blockKey]) {
+        currentDayData[blockKey] = getDefaultBlockData(getDefaultTitle(blockKey));
       }
-    }
+      const currentBlock = currentDayData[blockKey];
+      const sourceBlock = sourceData[blockKey];
+      if (!sourceBlock) continue;
 
-    // 2. Inherit Notes (Routines, Diet, Focus & Reference Notes)
-    if (options.notes && sourceBlock.notes && sourceBlock.notes.trim().length > 0) {
-      const srcNote = sourceBlock.notes.trim();
-      const curNote = (currentBlock.notes || '').trim();
-      if (!curNote) {
-        currentBlock.notes = srcNote;
-        inheritedNotesCount++;
-      } else if (!curNote.includes(srcNote)) {
-        currentBlock.notes = `${curNote}\n\n${srcNote}`;
-        inheritedNotesCount++;
+      // 1. Inherit Custom Block Titles
+      if (options.titles && sourceBlock.title) {
+        const defTitle = getDefaultTitle(blockKey);
+        if (sourceBlock.title !== defTitle && currentBlock.title === defTitle) {
+          currentBlock.title = sourceBlock.title;
+          updatedTitlesCount++;
+        }
       }
-    }
 
-    // 3. Roll Over Unfinished Tasks & Subtasks
-    if (options.tasks && Array.isArray(sourceBlock.tasks)) {
-      if (!Array.isArray(currentBlock.tasks)) currentBlock.tasks = [];
-      sourceBlock.tasks.forEach(srcTask => {
-        if (!srcTask.done && srcTask.text && srcTask.text.trim().length > 0) {
-          const taskText = srcTask.text.trim();
-          const exists = currentBlock.tasks.some(
-            t => t.text && t.text.trim().toLowerCase() === taskText.toLowerCase()
+      // 2. Inherit Notes (Routines, Diet, Focus & Reference Notes)
+      if (options.notes && sourceBlock.notes && typeof sourceBlock.notes === 'string' && sourceBlock.notes.trim().length > 0) {
+        const srcNote = sourceBlock.notes.trim();
+        const curNote = (currentBlock.notes || '').trim();
+        if (!curNote) {
+          currentBlock.notes = srcNote;
+          inheritedNotesCount++;
+        } else if (!curNote.includes(srcNote)) {
+          currentBlock.notes = `${curNote}\n\n${srcNote}`;
+          inheritedNotesCount++;
+        }
+      }
+
+      // 3. Iterative Task Rollover & Synchronization
+      if (options.tasks && Array.isArray(sourceBlock.tasks)) {
+        if (!Array.isArray(currentBlock.tasks)) currentBlock.tasks = [];
+
+        // A. Finished Tasks on Source Day:
+        // If a task is COMPLETED on source day, ensure it does NOT linger as an active/uncompleted task in today!
+        const finishedOnSource = sourceBlock.tasks.filter(t => t && isTaskDone(t) && typeof t.text === 'string' && t.text.trim().length > 0);
+        finishedOnSource.forEach(finishedTask => {
+          const textKey = finishedTask.text.trim().toLowerCase();
+          // Look for any uncompleted instance of this finished task in today's planner
+          const matchIdx = currentBlock.tasks.findIndex(
+            t => t && typeof t.text === 'string' && t.text.trim().toLowerCase() === textKey && !t.done
           );
-          if (!exists) {
+          if (matchIdx !== -1) {
+            currentBlock.tasks.splice(matchIdx, 1);
+            removedFinishedCount++;
+          }
+        });
+
+        // B. Unfinished Tasks on Source Day:
+        const unfinishedOnSource = sourceBlock.tasks.filter(t => t && !isTaskDone(t) && typeof t.text === 'string' && t.text.trim().length > 0);
+        unfinishedOnSource.forEach(srcTask => {
+          const taskText = srcTask.text.trim();
+          const existingTask = currentBlock.tasks.find(
+            t => t && typeof t.text === 'string' && t.text.trim().toLowerCase() === taskText.toLowerCase()
+          );
+
+          if (!existingTask) {
+            // Brand new unfinished task: import it
             currentBlock.tasks.push({
               text: taskText,
               done: false,
               notes: srcTask.notes || '',
-              subtasks: Array.isArray(srcTask.subtasks) ? JSON.parse(JSON.stringify(srcTask.subtasks)) : []
+              subtasks: Array.isArray(srcTask.subtasks) ? JSON.parse(JSON.stringify(srcTask.subtasks)) : [],
+              importedFrom: sourceDateKey
             });
             importedTasksCount++;
+          } else if (!existingTask.done) {
+            // Task is already in today and still pending: sync subtasks & notes if today's are empty
+            let modified = false;
+            if ((!existingTask.notes || existingTask.notes.trim().length === 0) && srcTask.notes) {
+              existingTask.notes = srcTask.notes;
+              modified = true;
+            }
+            if ((!Array.isArray(existingTask.subtasks) || existingTask.subtasks.length === 0) && Array.isArray(srcTask.subtasks) && srcTask.subtasks.length > 0) {
+              existingTask.subtasks = JSON.parse(JSON.stringify(srcTask.subtasks));
+              modified = true;
+            }
+            if (!existingTask.importedFrom) {
+              existingTask.importedFrom = sourceDateKey;
+            }
+            if (modified) updatedTasksCount++;
           }
-        }
-      });
+        });
+
+        // Count custom tasks created today (never existed in source block)
+        currentBlock.tasks.forEach(t => {
+          if (!t || typeof t.text !== 'string' || !t.text.trim()) return;
+          const existsInSrc = sourceBlock.tasks.some(st => st && typeof st.text === 'string' && st.text.trim().toLowerCase() === t.text.trim().toLowerCase());
+          if (!existsInSrc) {
+            preservedCustomCount++;
+          }
+        });
+
+        // Clean up any empty stray tasks in today
+        currentBlock.tasks = currentBlock.tasks.filter(t => t && typeof t.text === 'string' && t.text.trim().length > 0);
+      }
+
+      syncBlockContent(blockKey);
     }
 
-    syncBlockContent(blockKey);
-  }
+    // Save changes immediately
+    isDirty = true;
+    currentDayData.importedFrom = sourceDateKey;
+    currentDayData.importedAt = new Date().toISOString();
+    safeStorage.setItem(`mrt_last_imported_source_${targetDateKey}`, sourceDateKey);
+    safeStorage.setItem(`mrt_imported_${targetDateKey}`, 'true');
+    safeStorage.removeItem(`mrt_start_blank_${targetDateKey}`);
+    safeStorage.setItem(`mrt_carryover_dismissed_${targetDateKey}`, 'true');
+    saveDay(targetDateKey, currentDayData);
+    renderCurrentDay();
 
-  // Save changes
-  isDirty = true;
-  const targetDateKey = formatDateKey(currentDate);
-  safeStorage.setItem(`mrt_carryover_dismissed_${targetDateKey}`, 'true');
-  saveDay(targetDateKey, currentDayData);
-  renderCurrentDay();
+    // Hide banner if visible
+    if (carryoverBanner) carryoverBanner.style.display = 'none';
+    currentPendingCarryover = [];
+    currentPendingCarryoverSourceDate = null;
 
-  // Hide banner if visible
-  if (carryoverBanner) carryoverBanner.style.display = 'none';
-  currentPendingCarryover = [];
-  currentPendingCarryoverSourceDate = null;
+    closeImportModal();
 
-  closeImportModal();
-
-  // Feedback toast
-  const parts = [];
-  if (importedTasksCount > 0) parts.push(`${importedTasksCount} task${importedTasksCount > 1 ? 's' : ''}`);
-  if (inheritedNotesCount > 0) parts.push(`${inheritedNotesCount} note block${inheritedNotesCount > 1 ? 's' : ''}`);
-  if (parts.length === 0) {
-    showToast(`Planner is already up to date with ${sourceDateKey}`);
-  } else {
-    showToast(`Rolled over ${parts.join(' & ')} from ${sourceDateKey}! 🎯`);
+    // Informative feedback toast
+    const parts = [];
+    if (importedTasksCount > 0) parts.push(`+${importedTasksCount} new task${importedTasksCount > 1 ? 's' : ''}`);
+    if (removedFinishedCount > 0) parts.push(`cleared ${removedFinishedCount} completed`);
+    if (preservedCustomCount > 0) parts.push(`${preservedCustomCount} custom today task${preservedCustomCount > 1 ? 's' : ''} kept`);
+    if (inheritedNotesCount > 0) parts.push(`${inheritedNotesCount} note block${inheritedNotesCount > 1 ? 's' : ''}`);
+    if (parts.length === 0) {
+      showToast(`Planner is already in sync with ${sourceDateKey} 👍`);
+    } else {
+      showToast(`Synced with ${sourceDateKey}: ${parts.join(', ')} 🎯`, "Remove Import", removeImport, 6000);
+    }
+  } catch (err) {
+    console.error("executeImport error:", err);
+    showToast(`Import error: ${err?.message || err}`);
   }
 }
+
 
 // ==========================================================================
 // Phase Isolation Controller (Anti-Task-Switching View)
@@ -2107,6 +2627,7 @@ function completeLockInTask() {
     const task = block.tasks[lockinTaskIdx];
     if (task.done) {
       task.done = false;
+      if (Array.isArray(task.subtasks)) task.subtasks.forEach(s => s.done = false);
       if (btnLockinCheck) btnLockinCheck.classList.remove('completed');
       syncBlockContent(lockinBlockKey);
       updateTotalProgress();
@@ -2115,6 +2636,7 @@ function completeLockInTask() {
       return;
     }
     task.done = true;
+    if (Array.isArray(task.subtasks)) task.subtasks.forEach(s => s.done = true);
   } else {
     const textVal = (lockinTaskInput ? lockinTaskInput.value : '').trim();
     if (textVal.length > 0) {
@@ -2303,12 +2825,35 @@ if (btnOpenFolder) {
   });
 }
 
-// Toast Helper
-function showToast(msg) {
+// Interactive Toast Helper (Supports text + optional 1-click action like Undo)
+let toastTimer = null;
+function showToast(msg, actionText = null, onAction = null, duration = 2400) {
   if (!toastEl) return;
-  toastEl.textContent = msg;
+  clearTimeout(toastTimer);
+  toastEl.innerHTML = '';
+
+  const textNode = document.createElement('span');
+  textNode.className = 'toast-text';
+  textNode.textContent = msg;
+  toastEl.appendChild(textNode);
+
+  if (actionText && typeof onAction === 'function') {
+    const actBtn = document.createElement('button');
+    actBtn.type = 'button';
+    actBtn.className = 'toast-action-btn';
+    actBtn.textContent = actionText;
+    actBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toastEl.classList.remove('show');
+      onAction();
+    });
+    toastEl.appendChild(actBtn);
+  }
+
   toastEl.classList.add('show');
-  setTimeout(() => toastEl.classList.remove('show'), 2200);
+  toastTimer = setTimeout(() => {
+    toastEl.classList.remove('show');
+  }, duration);
 }
 
 // 365 Calendar Modal
@@ -2418,6 +2963,21 @@ if (btnCarryoverCheck) {
   btnCarryoverCheck.addEventListener('click', manualCheckCarryover);
 }
 
+// Quick Sync Header Button
+if (btnQuickSync) {
+  btnQuickSync.addEventListener('click', () => {
+    quickSync();
+  });
+}
+
+// Remove Import Button inside Import Modal Notice
+const btnModalQuickRemove = document.getElementById('btn-modal-quick-remove');
+if (btnModalQuickRemove) {
+  btnModalQuickRemove.addEventListener('click', () => {
+    removeImport();
+  });
+}
+
 // Roll Over & Import Day Modal Event Bindings
 if (btnImportPlanner) {
   btnImportPlanner.addEventListener('click', () => {
@@ -2429,6 +2989,17 @@ if (btnCloseImportModal) {
 }
 if (btnImportCancel) {
   btnImportCancel.addEventListener('click', closeImportModal);
+}
+if (btnImportResetBlank) {
+  btnImportResetBlank.addEventListener('click', () => {
+    const targetDateKey = formatDateKey(currentDate);
+    const hasImport = currentDayData.importedFrom || safeStorage.getItem(`mrt_imported_${targetDateKey}`);
+    if (hasImport) {
+      removeImport();
+    } else {
+      handleUndoOrResetBlank();
+    }
+  });
 }
 if (importModal) {
   importModal.addEventListener('click', (e) => {
@@ -2668,9 +3239,9 @@ window.addEventListener('keydown', (e) => {
       return;
     }
     // Space completes the task when not actively typing text or subtasks
-    const isTyping = document.activeElement === lockinNotesArea || 
-                     document.activeElement === lockinTaskInput || 
-                     (document.activeElement && document.activeElement.closest('#lockin-subtasks-list'));
+    const isTyping = document.activeElement === lockinNotesArea ||
+      document.activeElement === lockinTaskInput ||
+      (document.activeElement && document.activeElement.closest('#lockin-subtasks-list'));
     if (e.key === ' ' && !isTyping) {
       e.preventDefault();
       completeLockInTask();
@@ -2732,6 +3303,9 @@ window.addEventListener('keydown', (e) => {
     } else {
       openImportModal();
     }
+  } else if (e.key === 's' || e.key === 'S') {
+    e.preventDefault();
+    quickSync();
   } else if (e.key === 'c' || e.key === 'C') {
     e.preventDefault();
     if (calendarModal?.classList.contains('open')) {
@@ -2754,7 +3328,7 @@ function init() {
   // 0. Pre-load cached active dates synchronously
   const cachedDates = safeStorage.getItem('mrt_active_dates');
   if (cachedDates) {
-    try { activeDatesSet = new Set(JSON.parse(cachedDates)); } catch (e) {}
+    try { activeDatesSet = new Set(JSON.parse(cachedDates)); } catch (e) { }
   }
 
   // 1. Immediately bind cards and inputs
@@ -2793,9 +3367,13 @@ function init() {
   // 4. Background non-blocking sync with native disk
   callTauri('get_day', { date: dateKey }).then(diskData => {
     if (formatDateKey(currentDate) === dateKey && diskData && typeof diskData === 'object') {
-      currentDayData = normalizeDayData(diskData, dateKey);
-      renderCurrentDay();
-      checkPendingCarryover(dateKey);
+      const diskTime = new Date(diskData.updatedAt || 0).getTime();
+      const curTime = new Date(currentDayData.updatedAt || 0).getTime();
+      if (diskTime > curTime) {
+        currentDayData = normalizeDayData(diskData, dateKey);
+        renderCurrentDay();
+        checkPendingCarryover(dateKey);
+      }
     }
   });
 
@@ -2814,7 +3392,7 @@ function init() {
     } else {
       const cached = safeStorage.getItem('mrt_active_dates');
       if (cached) {
-        try { activeDatesSet = new Set(JSON.parse(cached)); } catch (e) {}
+        try { activeDatesSet = new Set(JSON.parse(cached)); } catch (e) { }
       }
     }
   });
