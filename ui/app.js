@@ -167,13 +167,218 @@ const PRESETS = {
     ]
   },
 
+  deep_work_sprint: {
+    id: "deep_work_sprint",
+    name: "Deep Work Sprint",
+    description: "Morning Deep Focus + Afternoon Execution + Evening Wrap-up",
+    phases: [
+      {
+        id: "phase_sprint_morning",
+        title: "Morning Deep Focus",
+        timeRange: "08:30 — 12:30",
+        colorClass: "amber",
+        orientation: "vertical",
+        rows: [
+          {
+            id: "row_sprint_core",
+            title: "DEEP FOCUS (NO DISTRACTIONS)",
+            tracks: [
+              { key: "sprint_arch", title: "Architecture & Logic", placeholder: "Core problem solving, algorithms..." },
+              { key: "sprint_code", title: "Implementation", placeholder: "Coding, tests, features..." }
+            ]
+          }
+        ]
+      },
+      {
+        id: "phase_sprint_afternoon",
+        title: "Execution & Collaboration",
+        timeRange: "13:30 — 17:30",
+        colorClass: "violet",
+        orientation: "vertical",
+        rows: [
+          {
+            id: "row_sprint_reviews",
+            title: "EXECUTION & OPS",
+            tracks: [
+              { key: "sprint_reviews", title: "PRs & Code Reviews", placeholder: "Unblock teammates, code reviews..." },
+              { key: "sprint_deploy", title: "Testing & Deployments", placeholder: "CI/CD, deployments, bug fixes..." }
+            ]
+          }
+        ]
+      },
+      {
+        id: "phase_sprint_evening",
+        title: "Daily Wrap-up & Retrospective",
+        timeRange: "17:30 — 19:00",
+        colorClass: "cyan",
+        orientation: "horizontal",
+        rows: [
+          {
+            id: "row_sprint_wrap",
+            title: "",
+            tracks: [
+              { key: "sprint_retro", title: "Retrospective & Wins", placeholder: "Key achievements, lessons, blockers..." },
+              { key: "sprint_tomorrow", title: "Top 3 for Tomorrow", placeholder: "Top priorities for next morning..." }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+
+  weekend_flow: {
+    id: "weekend_flow",
+    name: "Weekend & Reflection",
+    description: "Morning Outdoors + Creative Tinkering + Rest",
+    phases: [
+      {
+        id: "phase_wk_morning",
+        title: "Morning Outdoors & Health",
+        timeRange: "07:00 — 11:00",
+        colorClass: "emerald",
+        orientation: "horizontal",
+        rows: [
+          {
+            id: "row_wk_morning",
+            title: "",
+            tracks: [
+              { key: "wk_fitness", title: "Outdoor Run & Workout", placeholder: "Trails, gym, sunlight, mobility..." },
+              { key: "wk_reading", title: "Deep Reading & Books", placeholder: "Non-fiction, philosophy, papers..." }
+            ]
+          }
+        ]
+      },
+      {
+        id: "phase_wk_creative",
+        title: "Creative Tinkering & Projects",
+        timeRange: "12:00 — 17:00",
+        colorClass: "amber",
+        orientation: "horizontal",
+        rows: [
+          {
+            id: "row_wk_creative",
+            title: "",
+            tracks: [
+              { key: "wk_project", title: "Personal Hardware / Code Hack", placeholder: "Creative side projects, exploratory coding..." },
+              { key: "wk_writing", title: "Essays & Reflection", placeholder: "Journaling, long-term vision, thoughts..." }
+            ]
+          }
+        ]
+      },
+      {
+        id: "phase_wk_evening",
+        title: "Family, Social & Recovery",
+        timeRange: "17:00 — 22:00",
+        colorClass: "violet",
+        orientation: "horizontal",
+        rows: [
+          {
+            id: "row_wk_evening",
+            title: "",
+            tracks: [
+              { key: "wk_family", title: "Family & Social Connection", placeholder: "Dinner, conversations, relaxing..." },
+              { key: "wk_recharge", title: "Weekly Planning & Recharge", placeholder: "Prep for upcoming week, sleep early..." }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+
   blank_canvas: {
     id: "blank_canvas",
-    name: "Blank / Custom Canvas",
-    description: "100% clean slate. Build your own sections, rows, and columns",
+    name: "Blank Canvas",
+    description: "100% clean slate. Build your own sections, rows, and columns from scratch",
     phases: []
   }
 };
+
+function getUserTemplates() {
+  try {
+    const raw = safeStorage.getItem('mrt_user_templates');
+    if (raw) return JSON.parse(raw);
+  } catch (e) { }
+  return [];
+}
+
+function saveUserTemplate(name, layout) {
+  if (!name || !name.trim()) return null;
+  const templates = getUserTemplates();
+  const tplId = `template_${Date.now()}`;
+  const newTpl = {
+    id: tplId,
+    name: name.trim(),
+    description: `Custom layout with ${(layout.phases || []).length} sections`,
+    phases: JSON.parse(JSON.stringify(layout.phases || []))
+  };
+  templates.push(newTpl);
+  safeStorage.setItem('mrt_user_templates', JSON.stringify(templates));
+  return newTpl;
+}
+
+function deleteUserTemplate(tplId) {
+  let templates = getUserTemplates();
+  templates = templates.filter(t => t.id !== tplId);
+  safeStorage.setItem('mrt_user_templates', JSON.stringify(templates));
+}
+
+function renderLevel1TopBarHTML(activeLayout) {
+  const currentId = activeLayout ? activeLayout.id : 'default_polymath';
+  const userTemplates = getUserTemplates();
+
+  const standardOptions = [
+    { id: 'default_polymath', label: "🌟 Polymath Golden Routine (Default)" },
+    { id: 'deep_work_sprint', label: "🚀 Deep Work Sprint" },
+    { id: 'weekend_flow', label: "🏖️ Weekend & Reflection" },
+    { id: 'blank_canvas', label: "📄 Blank Canvas" }
+  ];
+
+  let isKnown = standardOptions.some(o => o.id === currentId) || userTemplates.some(t => t.id === currentId);
+
+  let optionsHTML = standardOptions.map(o => `
+    <option value="${o.id}" ${currentId === o.id ? 'selected' : ''}>${escapeHtml(o.label)}</option>
+  `).join('');
+
+  if (userTemplates.length > 0) {
+    optionsHTML += `
+      <optgroup label="My Custom Templates">
+        ${userTemplates.map(t => `
+          <option value="${t.id}" ${currentId === t.id ? 'selected' : ''}>📌 ${escapeHtml(t.name)}</option>
+        `).join('')}
+      </optgroup>
+    `;
+  }
+
+  if (!isKnown) {
+    optionsHTML += `<option value="custom" selected>✦ Custom (${escapeHtml(formatDateDisplay(currentDate))})</option>`;
+  }
+
+  return `
+    <div class="workspace-level1-bar" id="workspace-level1-bar">
+      <div class="level1-brand-group">
+        <span class="level1-badge">LEVEL 1</span>
+        <span class="level1-title">Add Sections:</span>
+      </div>
+      <div class="level1-actions">
+        <button type="button" class="btn-level1-action btn-add-vert" id="btn-top-add-vertical" title="Add a full-height vertical column section">
+          <span class="btn-level1-icon">↕</span> + Column Section (Vertical)
+        </button>
+        <button type="button" class="btn-level1-action btn-add-horiz" id="btn-top-add-horizontal" title="Add a full-width horizontal row section">
+          <span class="btn-level1-icon">↔</span> + Row Section (Horizontal)
+        </button>
+      </div>
+      <div class="level1-divider"></div>
+      <div class="level1-template-group">
+        <span class="level1-template-label">Routine:</span>
+        <select id="level1-template-select" class="level1-template-select" title="Switch layout template for today">
+          ${optionsHTML}
+        </select>
+        <button type="button" class="btn-level1-pill btn-save-template" id="btn-top-save-template" title="Save today's layout as a reusable template for different purposes">💾 Save Template</button>
+        <button type="button" class="btn-level1-pill btn-reset-polymath" id="btn-top-reset-polymath" title="Restore Polymath Golden Routine golden routine">↺ Polymath Golden Routine</button>
+      </div>
+    </div>
+  `;
+}
 
 const ALL_BLOCK_KEYS = [
   'health_workout', 'health_diet', 'health_habits', 'health_recovery',
@@ -239,6 +444,44 @@ function getPhaseRows(phase) {
   return [];
 }
 
+function syncLevel1Bar(layout) {
+  const bar = document.getElementById('workspace-level1-bar');
+  if (!bar) return;
+  const select = bar.querySelector('#level1-template-select');
+  if (!select) return;
+  const currentId = layout ? layout.id : 'default_polymath';
+  const userTemplates = getUserTemplates();
+
+  const standardOptions = [
+    { id: 'default_polymath', label: "🌟 Polymath Golden Routine (Default)" },
+    { id: 'deep_work_sprint', label: "🚀 Deep Work Sprint" },
+    { id: 'weekend_flow', label: "🏖️ Weekend & Reflection" },
+    { id: 'blank_canvas', label: "📄 Blank Canvas" }
+  ];
+
+  let isKnown = standardOptions.some(o => o.id === currentId) || userTemplates.some(t => t.id === currentId);
+
+  let html = standardOptions.map(o => `
+    <option value="${o.id}" ${currentId === o.id ? 'selected' : ''}>${escapeHtml(o.label)}</option>
+  `).join('');
+
+  if (userTemplates.length > 0) {
+    html += `
+      <optgroup label="My Custom Templates">
+        ${userTemplates.map(t => `
+          <option value="${t.id}" ${currentId === t.id ? 'selected' : ''}>📌 ${escapeHtml(t.name)}</option>
+        `).join('')}
+      </optgroup>
+    `;
+  }
+
+  if (!isKnown) {
+    html += `<option value="custom" selected>✦ Custom (${escapeHtml(formatDateDisplay(currentDate))})</option>`;
+  }
+
+  select.innerHTML = html;
+}
+
 function syncWorkspaceLayoutForDate(dateKey, dayData) {
   const workspaceEl = document.querySelector('.planner-workspace');
   if (!workspaceEl) return;
@@ -251,6 +494,8 @@ function syncWorkspaceLayoutForDate(dateKey, dayData) {
   } else {
     renderCustomWorkspace(layout, workspaceEl);
   }
+
+  syncLevel1Bar(layout);
 
   // Attach dynamic + Row, + Column and ✕ Delete Column controls on canvas
   attachCanvasLayoutControls(layout);
@@ -494,22 +739,11 @@ function handleCanvasAddSection(orientation = 'vertical') {
     timeRange: "Custom Hours",
     orientation: isHoriz ? 'horizontal' : 'vertical',
     colorClass: pIdx % 2 === 0 ? "violet" : "cyan",
-    rows: [
-      {
-        id: `row_${Date.now()}`,
-        title: "",
-        tracks: isHoriz ? [
-          { key: `custom_${Date.now()}_1`, title: "Track 1", placeholder: "Tasks, notes..." },
-          { key: `custom_${Date.now()}_2`, title: "Track 2", placeholder: "Tasks, notes..." }
-        ] : [
-          { key: `custom_${Date.now()}`, title: "Focus Track 1", placeholder: "Tasks, milestones, notes..." }
-        ]
-      }
-    ]
+    rows: [] // Starts 100% blank without any dummy tracks or columns!
   });
   activeLayout.id = 'custom';
   saveAndApplyLayoutForToday(activeLayout);
-  showToast(`Added ${isHoriz ? 'Horizontal Row' : 'Vertical Column'} Section!`);
+  showToast(`Added blank ${isHoriz ? 'Horizontal Row' : 'Vertical Column'} Section!`);
 }
 
 function handleCanvasToggleOrientation(phaseId) {
@@ -527,6 +761,46 @@ function handleCanvasToggleOrientation(phaseId) {
   }
 }
 
+function promptSaveCurrentLayoutAsTemplate() {
+  const activeLayout = getActiveLayout();
+  const defName = (activeLayout.name && activeLayout.id !== 'default_polymath' && activeLayout.id !== 'custom')
+    ? activeLayout.name
+    : "My Custom Routine";
+  const name = prompt("Enter a name for this custom template (e.g. 'Deep Work Sprint', 'Weekend Flow', 'Study Planner'):", defName);
+  if (!name || !name.trim()) return;
+  const saved = saveUserTemplate(name.trim(), activeLayout);
+  if (saved) {
+    showToast(`Saved template "${saved.name}"!`);
+    const dateKey = formatDateKey(currentDate);
+    syncWorkspaceLayoutForDate(dateKey, currentDayData);
+  }
+}
+
+// Global delegated change listener for template selection
+document.addEventListener('change', (e) => {
+  if (e.target && e.target.id === 'level1-template-select') {
+    const tplId = e.target.value;
+    if (tplId === 'custom') return;
+    if (PRESETS[tplId]) {
+      saveAndApplyLayoutForToday(PRESETS[tplId]);
+      showToast(`Switched today to "${PRESETS[tplId].name}"`);
+    } else {
+      const userTpls = getUserTemplates();
+      const match = userTpls.find(t => t.id === tplId);
+      if (match) {
+        const tplLayout = {
+          id: match.id,
+          name: match.name,
+          description: match.description,
+          phases: JSON.parse(JSON.stringify(match.phases || []))
+        };
+        saveAndApplyLayoutForToday(tplLayout);
+        showToast(`Switched today to "${match.name}"`);
+      }
+    }
+  }
+});
+
 // Global delegated click listener for canvas layout modifications
 document.addEventListener('click', (e) => {
   // 1. Delete column button
@@ -540,8 +814,8 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // 2. Add row button
-  const addRowBtn = e.target.closest('.btn-canvas-add-row');
+  // 2. Add row button (master banner, row block, or blank section starter)
+  const addRowBtn = e.target.closest('.btn-canvas-add-row, .btn-starter-add-row');
   if (addRowBtn) {
     e.preventDefault();
     e.stopPropagation();
@@ -550,8 +824,8 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // 3. Add column button
-  const addColBtn = e.target.closest('.btn-canvas-add-col, .btn-canvas-add-col-to-row');
+  // 3. Add column button (master banner, row block, or blank section starter)
+  const addColBtn = e.target.closest('.btn-canvas-add-col, .btn-canvas-add-col-to-row, .btn-starter-add-col');
   if (addColBtn) {
     e.preventDefault();
     e.stopPropagation();
@@ -597,8 +871,8 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // 7. Add Vertical Section buttons (Blank canvas or bottom bar)
-  const addVertBtn = e.target.closest('#btn-canvas-bottom-add-vertical, #btn-blank-canvas-add-vertical, .btn-add-vertical-section');
+  // 7. Add Vertical Section buttons (Level 1 Top bar, blank canvas, or bottom bar)
+  const addVertBtn = e.target.closest('#btn-top-add-vertical, #btn-canvas-bottom-add-vertical, #btn-blank-canvas-add-vertical, .btn-add-vertical-section');
   if (addVertBtn) {
     e.preventDefault();
     e.stopPropagation();
@@ -606,8 +880,8 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // 8. Add Horizontal Section buttons (Blank canvas or bottom bar)
-  const addHorizBtn = e.target.closest('#btn-canvas-bottom-add-horizontal, #btn-blank-canvas-add-horizontal, .btn-add-horizontal-section');
+  // 8. Add Horizontal Section buttons (Level 1 Top bar, blank canvas, or bottom bar)
+  const addHorizBtn = e.target.closest('#btn-top-add-horizontal, #btn-canvas-bottom-add-horizontal, #btn-blank-canvas-add-horizontal, .btn-add-horizontal-section');
   if (addHorizBtn) {
     e.preventDefault();
     e.stopPropagation();
@@ -615,8 +889,17 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // 9. Restore Polymath Routine
-  const restorePolyBtn = e.target.closest('#btn-canvas-bottom-restore-polymath, #btn-blank-canvas-restore-polymath');
+  // 9. Save as template button (Level 1 Top bar)
+  const saveTplBtn = e.target.closest('#btn-top-save-template');
+  if (saveTplBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    promptSaveCurrentLayoutAsTemplate();
+    return;
+  }
+
+  // 10. Restore Polymath Routine (Level 1 Top bar, bottom bar, or blank canvas)
+  const restorePolyBtn = e.target.closest('#btn-top-reset-polymath, #btn-canvas-bottom-restore-polymath, #btn-blank-canvas-restore-polymath');
   if (restorePolyBtn) {
     e.preventDefault();
     e.stopPropagation();
@@ -650,11 +933,11 @@ function renderCustomWorkspace(layout, workspaceEl) {
 
   // If 100% full blank canvas (0 phases), render welcoming blank state
   if (phases.length === 0) {
-    workspaceEl.innerHTML = bannerHTML + `
+    workspaceEl.innerHTML = bannerHTML + renderLevel1TopBarHTML(layout) + `
       <div class="blank-canvas-welcome">
         <div class="blank-canvas-icon">✦</div>
         <h3>100% Blank Canvas for ${escapeHtml(formatDateDisplay(currentDate))}</h3>
-        <p>No columns or sections exist yet. Build your custom layout for today from scratch, or restore a routine:</p>
+        <p>No columns or sections exist yet. Build your custom layout for today from scratch, or switch routines above:</p>
         <div class="blank-canvas-actions">
           <button type="button" class="btn-canvas-action-btn btn-canvas-welcome-add-vertical" id="btn-blank-canvas-add-vertical">+ Add Vertical Section (Column)</button>
           <button type="button" class="btn-canvas-action-btn btn-canvas-welcome-add-horizontal" id="btn-blank-canvas-add-horizontal">+ Add Horizontal Section (Row)</button>
@@ -698,10 +981,16 @@ function renderCustomWorkspace(layout, workspaceEl) {
         </div>
         <div class="phase-rows-container" style="display: flex; flex-direction: column; gap: 14px;">
           ${rows.length === 0 ? `
-            <div class="empty-row-hint" style="padding: 16px; border: 1px dashed var(--border-glass); border-radius: 8px; justify-content: center;">
-              No rows or columns in this section.
-              <button type="button" class="btn-canvas-add-row" data-phase-id="${p.id}">+ Add Row</button>
-              <button type="button" class="btn-canvas-add-col" data-phase-id="${p.id}">+ Add Column</button>
+            <div class="empty-section-starter" data-phase-id="${p.id}">
+              <div class="starter-header">
+                <span class="starter-level-tag">LEVEL 2</span>
+                <span class="starter-heading">Blank Section</span>
+              </div>
+              <p class="starter-desc">This section starts blank. Add columns or rows to organize your tasks:</p>
+              <div class="starter-actions">
+                <button type="button" class="btn-canvas-action-btn btn-starter-add-col" data-phase-id="${p.id}" title="Add a column card to start typing tasks">+ Add Column (Card)</button>
+                <button type="button" class="btn-canvas-action-btn btn-starter-add-row" data-phase-id="${p.id}" title="Add a row to group multiple columns">+ Add Row</button>
+              </div>
             </div>
           ` : rows.map((row, rIdx) => {
             const trackCount = (row.tracks || []).length;
@@ -709,7 +998,7 @@ function renderCustomWorkspace(layout, workspaceEl) {
             let gridStyle = '';
             if (isHoriz) {
               gridClass = 'cards-grid-horizontal';
-              gridStyle = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; width: 100%;';
+              gridStyle = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 360px)); gap: 14px; width: 100%;';
             } else {
               if (trackCount === 4) {
                 gridClass = 'quadrants-grid';
@@ -814,7 +1103,7 @@ function renderCustomWorkspace(layout, workspaceEl) {
     </div>
   `;
 
-  workspaceEl.innerHTML = bannerHTML + groupsHTML + bottomToolbarHTML;
+  workspaceEl.innerHTML = bannerHTML + renderLevel1TopBarHTML(layout) + groupsHTML + bottomToolbarHTML;
 
   // Re-bind carryover banner buttons
   const bApply = document.getElementById('btn-carryover-apply');
@@ -851,22 +1140,46 @@ function renderPresetCards() {
 
   const presetList = [
     { id: 'default_polymath', icon: '🌟', name: "Polymath Golden Routine (Default)", desc: "4-9 Foundation (5 tracks) + 9-6 Work + 6-11 Evening + Health" },
-    { id: 'blank_canvas', icon: '📄', name: "Blank / Custom Canvas", desc: "100% clean slate. Build your own sections, rows, and columns" }
+    { id: 'deep_work_sprint', icon: '🚀', name: "Deep Work Sprint", desc: "Morning Deep Focus + Afternoon Execution + Evening Wrap-up" },
+    { id: 'weekend_flow', icon: '🏖️', name: "Weekend & Reflection", desc: "Morning Rejuvenation + Creative Tinkering + Rest" },
+    { id: 'blank_canvas', icon: '📄', name: "Blank Canvas", desc: "100% clean slate. Build custom sections, rows, and columns" }
   ];
 
+  const userTemplates = getUserTemplates();
+  userTemplates.forEach(t => {
+    presetList.push({
+      id: t.id,
+      icon: '📌',
+      name: t.name,
+      desc: t.description || 'User Custom Template',
+      isUser: true
+    });
+  });
+
   presetList.forEach(p => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
+    const btn = document.createElement('div');
     btn.className = `preset-card-btn ${currentEditingLayout && currentEditingLayout.id === p.id ? 'active' : ''}`;
     btn.innerHTML = `
-      <div class="preset-card-title">
-        <span>${p.icon}</span>
-        <span>${escapeHtml(p.name)}</span>
+      <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+        <div class="preset-card-title">
+          <span>${p.icon}</span>
+          <span>${escapeHtml(p.name)}</span>
+        </div>
+        ${p.isUser ? `<button type="button" class="btn-del-user-template" data-tpl-id="${p.id}" title="Delete this custom template" style="background: none; border: none; color: #ef4444; font-size: 13px; cursor: pointer; padding: 0 4px;">✕</button>` : ''}
       </div>
       <div class="preset-card-desc">${escapeHtml(p.desc)}</div>
     `;
-    btn.addEventListener('click', () => {
-      const selected = PRESETS[p.id];
+    btn.addEventListener('click', (e) => {
+      if (e.target.closest('.btn-del-user-template')) {
+        e.stopPropagation();
+        const tplId = e.target.closest('.btn-del-user-template').getAttribute('data-tpl-id');
+        if (confirm(`Delete template "${p.name}"?`)) {
+          deleteUserTemplate(tplId);
+          renderPresetCards();
+        }
+        return;
+      }
+      const selected = PRESETS[p.id] || userTemplates.find(t => t.id === p.id);
       if (selected) {
         currentEditingLayout = JSON.parse(JSON.stringify(selected));
         renderPresetCards();
@@ -4142,18 +4455,7 @@ function addPhaseToModal(orientation = 'vertical') {
     timeRange: "Custom Hours",
     orientation: isHoriz ? 'horizontal' : 'vertical',
     colorClass: pIdx % 2 === 0 ? "violet" : "cyan",
-    rows: [
-      {
-        id: `row_${Date.now()}`,
-        title: "",
-        tracks: isHoriz ? [
-          { key: `custom_${Date.now()}_1`, title: "Track 1", placeholder: "Tasks, notes..." },
-          { key: `custom_${Date.now()}_2`, title: "Track 2", placeholder: "Tasks, notes..." }
-        ] : [
-          { key: `custom_${Date.now()}`, title: "Focus Track 1", placeholder: "Tasks, milestones, notes..." }
-        ]
-      }
-    ]
+    rows: [] // Starts 100% blank without dummy tracks!
   });
   currentEditingLayout.id = 'custom';
   renderPresetCards();
