@@ -70,208 +70,6 @@ let defaultWorkspaceHTML = '';
 let currentEditingLayout = null;
 
 const PRESETS = {
-  default_polymath: {
-    id: "default_polymath",
-    name: "Polymath Golden Routine (Default)",
-    description: "4-9 Foundation (5 tracks) + 9-6 Work + 6-11 Evening + Health",
-    pageRows: [
-      {
-        id: "prow_top",
-        title: "MORNING & DAYTIME (04:00 — 18:00)",
-        sections: [
-          {
-            id: "phase_learning",
-            title: "Foundation & Learning",
-            timeRange: "04:00 — 09:00",
-            colorClass: "amber",
-            rows: [
-              {
-                id: "row_learning_part1",
-                title: "PART 1 — DEPTH",
-                tracks: [
-                  { key: "part1_quad1", title: "CS & SWE", placeholder: "Data structures, algorithms, system design..." },
-                  { key: "part1_quad2", title: "Core AI", placeholder: "Math, transformers, LLM architectures..." },
-                  { key: "part1_quad3", title: "Applications", placeholder: "Web apps, backends, products..." },
-                  { key: "part1_quad4", title: "RSWE", placeholder: "Reliability, observability, metrics..." }
-                ]
-              },
-              {
-                id: "row_learning_part2",
-                title: "PART 2 — BREADTH",
-                tracks: [
-                  { key: "part2", title: "Breadth", placeholder: "Adjacent disciplines, cross-domain knowledge..." }
-                ]
-              }
-            ]
-          },
-          {
-            id: "phase_productive",
-            title: "Work & Execution",
-            timeRange: "09:00 — 18:00",
-            colorClass: "violet",
-            rows: [
-              {
-                id: "row_work_productive",
-                title: "09:00 — 14:00 · PRODUCTIVE",
-                tracks: [
-                  { key: "productive", title: "Productive (Get Things Done)", placeholder: "High impact work, core deliverables..." }
-                ]
-              },
-              {
-                id: "row_work_admin",
-                title: "14:00 — 18:00 · ADMIN",
-                tracks: [
-                  { key: "admin", title: "Admin & Operations", placeholder: "Logistics, operations, emails..." }
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      {
-        id: "prow_evening",
-        title: "EVENING PROJECTS (18:00 — 23:00)",
-        sections: [
-          {
-            id: "phase_evening",
-            title: "Creative Evening",
-            timeRange: "18:00 — 23:00",
-            colorClass: "emerald",
-            rows: [
-              {
-                id: "row_evening_projects",
-                title: "",
-                tracks: [
-                  { key: "evening_huro", title: "Huro", placeholder: "Huro development & creative..." },
-                  { key: "evening_kana", title: "Kana", placeholder: "Kana clothing & store..." },
-                  { key: "evening_bana", title: "Bana", placeholder: "Bana projects..." },
-                  { key: "evening_curio", title: "Curio", placeholder: "Curio research..." },
-                  { key: "evening_survivi", title: "Survivo", placeholder: "Survivo survival tools..." },
-                  { key: "evening_random", title: "Random", placeholder: "Spontaneous thoughts & tests..." }
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      {
-        id: "prow_health",
-        title: "HEALTH & WELLBEING (05:00 — 06:00)",
-        sections: [
-          {
-            id: "phase_health",
-            title: "Diet & Exercise",
-            timeRange: "05:00 — 06:00",
-            colorClass: "emerald",
-            rows: [
-              {
-                id: "row_health_habits",
-                title: "",
-                tracks: [
-                  { key: "health_workout", title: "Workout (5-6 AM)", placeholder: "Push/Pull/Legs, Cardio..." },
-                  { key: "health_diet", title: "Diet & Meals", placeholder: "Nutrition, macro targets, meal timing..." },
-                  { key: "health_habits", title: "Hydration & Supplements", placeholder: "Water, vitamins, minerals, creatine..." },
-                  { key: "health_recovery", title: "Body & Recovery", placeholder: "Mobility, stretching, sleep prep..." }
-                ]
-              }
-            ]
-          }
-        ]
-      }
-    ],
-    phases: [
-      {
-        id: "phase_learning",
-        title: "Foundation & Learning",
-        timeRange: "04:00 — 09:00",
-        colorClass: "amber",
-        orientation: "vertical",
-        rows: [
-          {
-            id: "row_learning_part1",
-            title: "PART 1 — DEPTH",
-            tracks: [
-              { key: "part1_quad1", title: "CS & SWE", placeholder: "Data structures, algorithms, system design..." },
-              { key: "part1_quad2", title: "Core AI", placeholder: "Math, transformers, LLM architectures..." },
-              { key: "part1_quad3", title: "Applications", placeholder: "Web apps, backends, products..." },
-              { key: "part1_quad4", title: "RSWE", placeholder: "Reliability, observability, metrics..." }
-            ]
-          },
-          {
-            id: "row_learning_part2",
-            title: "PART 2 — BREADTH",
-            tracks: [
-              { key: "part2", title: "Breadth", placeholder: "Adjacent disciplines, cross-domain knowledge..." }
-            ]
-          }
-        ]
-      },
-      {
-        id: "phase_productive",
-        title: "Work & Execution",
-        timeRange: "09:00 — 18:00",
-        colorClass: "violet",
-        orientation: "vertical",
-        rows: [
-          {
-            id: "row_work_productive",
-            title: "09:00 — 14:00 · PRODUCTIVE",
-            tracks: [
-              { key: "productive", title: "Productive (Get Things Done)", placeholder: "High impact work, core deliverables..." }
-            ]
-          },
-          {
-            id: "row_work_admin",
-            title: "14:00 — 18:00 · ADMIN",
-            tracks: [
-              { key: "admin", title: "Admin & Operations", placeholder: "Logistics, operations, emails..." }
-            ]
-          }
-        ]
-      },
-      {
-        id: "phase_evening",
-        title: "Creative Evening",
-        timeRange: "18:00 — 23:00",
-        colorClass: "emerald",
-        orientation: "horizontal",
-        rows: [
-          {
-            id: "row_evening_projects",
-            title: "",
-            tracks: [
-              { key: "evening_huro", title: "Huro", placeholder: "Huro development & creative..." },
-              { key: "evening_kana", title: "Kana", placeholder: "Kana clothing & store..." },
-              { key: "evening_bana", title: "Bana", placeholder: "Bana projects..." },
-              { key: "evening_curio", title: "Curio", placeholder: "Curio research..." },
-              { key: "evening_survivi", title: "Survivo", placeholder: "Survivo survival tools..." },
-              { key: "evening_random", title: "Random", placeholder: "Spontaneous thoughts & tests..." }
-            ]
-          }
-        ]
-      },
-      {
-        id: "phase_health",
-        title: "Diet & Exercise",
-        timeRange: "05:00 — 06:00",
-        colorClass: "emerald",
-        orientation: "horizontal",
-        rows: [
-          {
-            id: "row_health_habits",
-            title: "",
-            tracks: [
-              { key: "health_workout", title: "Workout (5-6 AM)", placeholder: "Push/Pull/Legs, Cardio..." },
-              { key: "health_diet", title: "Diet & Meals", placeholder: "Nutrition, macro targets, meal timing..." },
-              { key: "health_habits", title: "Hydration & Supplements", placeholder: "Water, vitamins, minerals, creatine..." },
-              { key: "health_recovery", title: "Body & Recovery", placeholder: "Mobility, stretching, sleep prep..." }
-            ]
-          }
-        ]
-      }
-    ]
-  },
-
   blank_canvas: {
     id: "blank_canvas",
     name: "Blank Canvas",
@@ -313,11 +111,10 @@ function deleteUserTemplate(tplId) {
 }
 
 function renderLevel1TopBarHTML(activeLayout) {
-  const currentId = activeLayout ? activeLayout.id : 'default_polymath';
+  const currentId = activeLayout ? activeLayout.id : 'blank_canvas';
   const userTemplates = getUserTemplates();
 
   const standardOptions = [
-    { id: 'default_polymath', label: "🌟 Polymath Golden Routine (Default)" },
     { id: 'blank_canvas', label: "📄 Blank Canvas" }
   ];
 
@@ -359,7 +156,6 @@ function renderLevel1TopBarHTML(activeLayout) {
           ${optionsHTML}
         </select>
         <button type="button" class="btn-level1-pill btn-save-template" id="btn-top-save-template" title="Save today's layout as a reusable template for different purposes">💾 Save Template</button>
-        <button type="button" class="btn-level1-pill btn-reset-polymath" id="btn-top-reset-polymath" title="Restore Polymath Golden Routine golden routine">↺ Polymath Golden Routine</button>
       </div>
     </div>
   `;
@@ -405,7 +201,16 @@ function getLayoutForDate(dateKey, dayData) {
       }
     } catch (e) { }
   }
-  return PRESETS.default_polymath;
+  const userDef = safeStorage.getItem('mrt_user_default_template');
+  if (userDef) {
+    try {
+      const parsed = JSON.parse(userDef);
+      if (parsed && (Array.isArray(parsed.pageRows) || Array.isArray(parsed.phases))) {
+        return parsed;
+      }
+    } catch (e) { }
+  }
+  return PRESETS.blank_canvas || { id: 'blank_canvas', name: 'Blank Canvas', pageRows: [] };
 }
 
 function getActiveLayout() {
@@ -531,11 +336,10 @@ function syncLevel1Bar(layout) {
   if (!bar) return;
   const select = bar.querySelector('#level1-template-select');
   if (!select) return;
-  const currentId = layout ? layout.id : 'default_polymath';
+  const currentId = layout ? layout.id : 'blank_canvas';
   const userTemplates = getUserTemplates();
 
   const standardOptions = [
-    { id: 'default_polymath', label: "🌟 Polymath Golden Routine (Default)" },
     { id: 'blank_canvas', label: "📄 Blank Canvas" }
   ];
 
@@ -567,31 +371,17 @@ function syncWorkspaceLayoutForDate(dateKey, dayData) {
   if (!workspaceEl) return;
 
   const layout = getLayoutForDate(dateKey, dayData);
-  if (!layout || layout.id === 'default_polymath') {
-    if (defaultWorkspaceHTML) {
-      workspaceEl.innerHTML = defaultWorkspaceHTML;
-    }
-  } else {
-    renderCustomWorkspace(layout, workspaceEl);
-  }
+  renderCustomWorkspace(layout, workspaceEl);
 
   syncLevel1Bar(layout);
-
-  // Attach dynamic + Row, + Column and ✕ Delete Column controls on canvas
-  attachCanvasLayoutControls(layout);
   bindCardEvents();
 }
 
 function saveAndApplyLayoutForToday(layout) {
   const dateKey = formatDateKey(currentDate);
-  if (!layout || layout.id === 'default_polymath') {
-    if (currentDayData) delete currentDayData.customLayout;
-    safeStorage.removeItem(`mrt_layout_${dateKey}`);
-  } else {
-    if (!currentDayData) currentDayData = getDefaultDayData(dateKey);
-    currentDayData.customLayout = layout;
-    safeStorage.setItem(`mrt_layout_${dateKey}`, JSON.stringify(layout));
-  }
+  if (!currentDayData) currentDayData = getDefaultDayData(dateKey);
+  currentDayData.customLayout = layout;
+  safeStorage.setItem(`mrt_layout_${dateKey}`, JSON.stringify(layout));
   isDirty = true;
   triggerAutoSave();
   syncWorkspaceLayoutForDate(dateKey, currentDayData);
@@ -599,48 +389,7 @@ function saveAndApplyLayoutForToday(layout) {
 }
 
 function attachCanvasLayoutControls(currentLayout) {
-  // If rendering custom layout, renderCustomWorkspace already creates clean banner controls
-  if (currentLayout && currentLayout.id !== 'default_polymath') {
-    return;
-  }
-  // Ensure default polymath section banners have + Column and + Row buttons
-  document.querySelectorAll('.col-master-banner').forEach(banner => {
-    let actions = banner.querySelector('.master-banner-actions');
-    if (!actions) {
-      actions = document.createElement('div');
-      actions.className = 'master-banner-actions';
-      banner.appendChild(actions);
-    }
-    if (!actions.querySelector('.btn-canvas-add-col')) {
-      const btnAdd = document.createElement('button');
-      btnAdd.type = 'button';
-      btnAdd.className = 'btn-canvas-add-col btn-canvas-mini';
-      btnAdd.title = 'Add column to this section';
-      btnAdd.textContent = '+ Column';
-      actions.appendChild(btnAdd);
-    }
-    if (!actions.querySelector('.btn-canvas-add-row')) {
-      const btnAddRow = document.createElement('button');
-      btnAddRow.type = 'button';
-      btnAddRow.className = 'btn-canvas-add-row btn-canvas-mini';
-      btnAddRow.title = 'Add row to this section';
-      btnAddRow.textContent = '+ Row';
-      actions.appendChild(btnAddRow);
-    }
-  });
-
-  // Ensure every card header has a ✕ remove button (unrestricted deletion down to 0)
-  document.querySelectorAll('.cool-card, .block-card').forEach(card => {
-    const barRight = card.querySelector('.card-bar-right');
-    if (barRight && !barRight.querySelector('.btn-canvas-del-col')) {
-      const btnDel = document.createElement('button');
-      btnDel.type = 'button';
-      btnDel.className = 'btn-canvas-del-col';
-      btnDel.title = "Delete this column from today's layout";
-      btnDel.textContent = '✕';
-      barRight.appendChild(btnDel);
-    }
-  });
+  // All canvas layout controls are directly rendered inside renderSectionHTML and dynamic cards
 }
 
 function handleCanvasAddPageRow() {
@@ -697,6 +446,13 @@ function handleCanvasAddSectionToRow(rowId) {
     return;
   }
   if (!Array.isArray(targetRow.sections)) targetRow.sections = [];
+
+  const MAX_SECTIONS_PER_PAGE_ROW = 3;
+  if (targetRow.sections.length >= MAX_SECTIONS_PER_PAGE_ROW) {
+    showToast(`Maximum ${MAX_SECTIONS_PER_PAGE_ROW} sections side-by-side in a row. Add another page row below!`);
+    return;
+  }
+
   const sNum = targetRow.sections.length + 1;
   const colors = ['cyan', 'violet', 'amber', 'emerald'];
   const nextColor = colors[(sNum - 1) % colors.length];
@@ -711,7 +467,7 @@ function handleCanvasAddSectionToRow(rowId) {
   activeLayout.pageRows = pageRows;
   delete activeLayout.phases;
   saveAndApplyLayoutForToday(activeLayout);
-  showToast(`Added side-by-side section (${sNum} columns in row)!`);
+  showToast(`Added side-by-side section (${sNum} of ${MAX_SECTIONS_PER_PAGE_ROW})!`);
 }
 
 function handleCanvasDeleteSection(sectionId) {
@@ -791,6 +547,13 @@ function handleCanvasAddColumn(sectionId, targetSubRowId, banner) {
     }
 
     if (!Array.isArray(targetSubRow.tracks)) targetSubRow.tracks = [];
+
+    const MAX_COLS_PER_ROW = 6;
+    if (targetSubRow.tracks.length >= MAX_COLS_PER_ROW) {
+      showToast(`Maximum ${MAX_COLS_PER_ROW} columns reached for this row.`);
+      return;
+    }
+
     const newKey = `custom_${Date.now()}`;
     targetSubRow.tracks.push({
       key: newKey,
@@ -802,7 +565,7 @@ function handleCanvasAddColumn(sectionId, targetSubRowId, banner) {
     activeLayout.pageRows = pageRows;
     delete activeLayout.phases;
     saveAndApplyLayoutForToday(activeLayout);
-    showToast(`Added column to ${targetSec.title || 'Section'}!`);
+    showToast(`Added column (${targetSubRow.tracks.length} of ${MAX_COLS_PER_ROW}) to ${targetSec.title || 'Section'}!`);
   }
 }
 
@@ -841,6 +604,13 @@ function handleCanvasAddRow(sectionId, banner) {
   if (targetSec) {
     targetSec.rows = getSectionSubRows(targetSec);
     delete targetSec.tracks;
+
+    const MAX_ROWS_PER_SECTION = 4;
+    if (targetSec.rows.length >= MAX_ROWS_PER_SECTION) {
+      showToast(`Maximum ${MAX_ROWS_PER_SECTION} rows per section reached.`);
+      return;
+    }
+
     const rIdx = targetSec.rows.length + 1;
     targetSec.rows.push({
       id: `row_${Date.now()}`,
@@ -857,7 +627,7 @@ function handleCanvasAddRow(sectionId, banner) {
     activeLayout.pageRows = pageRows;
     delete activeLayout.phases;
     saveAndApplyLayoutForToday(activeLayout);
-    showToast(`Added row to ${targetSec.title || 'Section'}!`);
+    showToast(`Added row (${rIdx} of ${MAX_ROWS_PER_SECTION}) to ${targetSec.title || 'Section'}!`);
   }
 }
 
@@ -934,7 +704,7 @@ function handleCanvasDeleteColumn(blockKey) {
 
 function promptSaveCurrentLayoutAsTemplate() {
   const activeLayout = getActiveLayout();
-  const defName = (activeLayout.name && activeLayout.id !== 'default_polymath' && activeLayout.id !== 'custom')
+  const defName = (activeLayout.name && activeLayout.id !== 'blank_canvas' && activeLayout.id !== 'custom')
     ? activeLayout.name
     : "My Custom Routine";
   const name = prompt("Enter a name for this custom template (e.g. 'Deep Work Sprint', 'Weekend Flow', 'Study Planner'):", defName);
@@ -1074,13 +844,13 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // 10. Restore Polymath Routine
-  const restorePolyBtn = e.target.closest('#btn-top-reset-polymath, #btn-canvas-bottom-restore-polymath, #btn-blank-canvas-restore-polymath');
-  if (restorePolyBtn) {
+  // 10. Clear to Blank Canvas
+  const resetBlankBtn = e.target.closest('#btn-top-reset-blank, #btn-canvas-bottom-reset-blank');
+  if (resetBlankBtn) {
     e.preventDefault();
     e.stopPropagation();
-    saveAndApplyLayoutForToday(PRESETS.default_polymath);
-    showToast("Restored Polymath Golden Routine");
+    saveAndApplyLayoutForToday(PRESETS.blank_canvas);
+    showToast("Cleared to Blank Canvas");
     return;
   }
 });
@@ -1159,13 +929,6 @@ function renderCustomWorkspace(layout, workspaceEl) {
               </div>
             </div>
           ` : subRows.map((sub, rIdx) => {
-            const trackCount = (sub.tracks || []).length;
-            let gridClass = 'section-cards-grid-multi';
-            if (trackCount === 1) gridClass = 'section-cards-grid-1';
-            else if (trackCount === 2) gridClass = 'section-cards-grid-2';
-            else if (trackCount === 3) gridClass = 'section-cards-grid-3';
-            else if (trackCount === 4) gridClass = 'section-cards-grid-4';
-
             return `
               <div class="phase-row-block" data-section-id="${sec.id}" data-subrow-id="${sub.id}">
                 ${(subRows.length > 1 || sub.title) ? `
@@ -1177,7 +940,7 @@ function renderCustomWorkspace(layout, workspaceEl) {
                     </div>
                   </div>
                 ` : ''}
-                <div class="${gridClass}" data-subrow-id="${sub.id}">
+                <div class="section-cards-scroll-row" data-subrow-id="${sub.id}">
                   ${(sub.tracks || []).map((t, tIdx) => `
                     <div class="cool-card dynamic-col-card" data-block="${t.key || ('custom_' + sec.id + '_' + tIdx)}" data-active-tab="tasks">
                       <div class="card-bar">
@@ -1220,7 +983,7 @@ function renderCustomWorkspace(layout, workspaceEl) {
             <span class="page-row-count-badge">${sections.length} ${sections.length === 1 ? 'section' : 'sections'}</span>
           </div>
           <div class="page-row-actions">
-            <button type="button" class="btn-row-action btn-row-add-sec" data-row-id="${prow.id}" title="Split this row by adding another side-by-side section">+ Add Section (Column)</button>
+            <button type="button" class="btn-row-action btn-row-add-sec" data-row-id="${prow.id}" title="Split this row by adding another side-by-side section">+ Add Section</button>
             <button type="button" class="btn-row-action btn-row-del" data-row-id="${prow.id}" title="Delete this entire page row">✕ Row</button>
           </div>
         </div>
@@ -1228,7 +991,7 @@ function renderCustomWorkspace(layout, workspaceEl) {
           ${sections.length === 0 ? `
             <div class="empty-section-starter" style="width: 100%;">
               <p class="starter-desc">This row is empty. Click below to add a section:</p>
-              <button type="button" class="btn-canvas-action-btn btn-row-add-sec" data-row-id="${prow.id}">+ Add Section (Column)</button>
+              <button type="button" class="btn-canvas-action-btn btn-row-add-sec" data-row-id="${prow.id}">+ Add Section</button>
             </div>
           ` : sections.map((sec, sIdx) => renderSectionHTML(sec, prow.id, sIdx)).join('')}
         </div>
@@ -1245,6 +1008,35 @@ function renderCustomWorkspace(layout, workspaceEl) {
   if (bChoose) bChoose.addEventListener('click', () => openImportModal(currentPendingCarryoverSourceDate));
   const bDismiss = document.getElementById('btn-carryover-dismiss');
   if (bDismiss) bDismiss.addEventListener('click', dismissCarryover);
+
+  initHorizontalMouseWheelScroll();
+}
+
+function initHorizontalMouseWheelScroll() {
+  document.querySelectorAll('.section-cards-scroll-row, .page-row-sections').forEach(scrollContainer => {
+    if (scrollContainer._hasWheelListener) return;
+    scrollContainer._hasWheelListener = true;
+
+    scrollContainer.addEventListener('wheel', (e) => {
+      // If user holds Shift or trackpad already uses horizontal delta, allow native
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+
+      // Check if mouse is hovering over vertically scrollable child that can scroll in this direction
+      const verticalScrollable = e.target.closest('.tasks-scroll-list, .card-notes-editor');
+      if (verticalScrollable) {
+        const canScrollDown = e.deltaY > 0 && (verticalScrollable.scrollTop + verticalScrollable.clientHeight < verticalScrollable.scrollHeight - 1);
+        const canScrollUp = e.deltaY < 0 && (verticalScrollable.scrollTop > 1);
+        if (canScrollDown || canScrollUp) {
+          return;
+        }
+      }
+
+      if (scrollContainer.scrollWidth > scrollContainer.clientWidth) {
+        e.preventDefault();
+        scrollContainer.scrollLeft += e.deltaY;
+      }
+    }, { passive: false });
+  });
 }
 
 
@@ -1283,7 +1075,6 @@ function renderPresetCards() {
   grid.innerHTML = '';
 
   const presetList = [
-    { id: 'default_polymath', icon: '🌟', name: "Polymath Golden Routine (Default)", desc: "4-9 Foundation (5 tracks) + 9-6 Work + 6-11 Evening + Health" },
     { id: 'blank_canvas', icon: '📄', name: "Blank Canvas", desc: "100% clean slate. Build custom sections, rows, and columns" }
   ];
 
@@ -1702,22 +1493,16 @@ function getDefaultDayData(dateKey) {
   const layout = getLayoutForDate(dateKey, null);
   const data = {
     date: dateKey,
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
+    customLayout: layout
   };
 
-  if (!layout || layout.id === 'default_polymath') {
-    ALL_BLOCK_KEYS.forEach(k => {
-      data[k] = getDefaultBlockData(getDefaultTitle(k));
-    });
-  } else {
-    data.customLayout = layout;
-    const tracks = getAllLayoutTracks(layout);
-    tracks.forEach(t => {
-      if (t.key) {
-        data[t.key] = getDefaultBlockData(t.title || getDefaultTitle(t.key));
-      }
-    });
-  }
+  const tracks = getAllLayoutTracks(layout);
+  tracks.forEach(t => {
+    if (t.key) {
+      data[t.key] = getDefaultBlockData(t.title || getDefaultTitle(t.key));
+    }
+  });
 
   return data;
 }
@@ -4307,8 +4092,10 @@ if (btnExport) {
     let md = `# MRT Daily Planner — ${formatDateDisplay(currentDate)}\n\n`;
 
     const activeLayout = getActiveLayout();
-    if (activeLayout && activeLayout.id !== 'default_polymath') {
-      const pageRows = normalizeLayoutPageRows(activeLayout);
+    const pageRows = normalizeLayoutPageRows(activeLayout);
+    if (pageRows.length === 0) {
+      md += `*Blank Canvas — No page rows or columns configured for this date.*\n\n`;
+    } else {
       pageRows.forEach((prow, rIdx) => {
         md += `## ${prow.title || ('PAGE ROW ' + (rIdx + 1))}\n\n`;
         (prow.sections || []).forEach(sec => {
@@ -4317,36 +4104,12 @@ if (btnExport) {
           subRows.forEach(sub => {
             if (sub.title) md += `#### ${sub.title}\n\n`;
             (sub.tracks || []).forEach(track => {
-              const b = currentDayData[track.key];
+              const b = currentDayData ? currentDayData[track.key] : null;
               md += `##### ${b?.title || track.title}\n${b?.content || ''}\n\n`;
             });
           });
         });
       });
-    } else {
-      md += `## 🌅 04:00 — 09:00 (Learning & Core Tracks)\n\n`;
-      md += `### ${currentDayData.part1_quad1?.title || 'CS & SWE'}\n${currentDayData.part1_quad1?.content || ''}\n\n`;
-      md += `### ${currentDayData.part1_quad2?.title || 'Core AI'}\n${currentDayData.part1_quad2?.content || ''}\n\n`;
-      md += `### ${currentDayData.part1_quad3?.title || 'Applications'}\n${currentDayData.part1_quad3?.content || ''}\n\n`;
-      md += `### ${currentDayData.part1_quad4?.title || 'RSWE'}\n${currentDayData.part1_quad4?.content || ''}\n\n`;
-
-      md += `## ⚡ ${currentDayData.part2?.title || 'Breadth'}\n${currentDayData.part2?.content || ''}\n\n`;
-      md += `## 🚀 ${currentDayData.productive?.title || 'Productive (09:00 - 14:00)'}\n${currentDayData.productive?.content || ''}\n\n`;
-      md += `## 📋 ${currentDayData.admin?.title || 'Admin & Chores (14:00 - 18:00)'}\n${currentDayData.admin?.content || ''}\n\n`;
-
-      md += `## 🌙 18:00 — 23:00 Evening Phase (6 Tracks)\n\n`;
-      md += `### ${currentDayData.evening_huro?.title || 'Huro'}\n${currentDayData.evening_huro?.content || ''}\n\n`;
-      md += `### ${currentDayData.evening_kana?.title || 'Kana'}\n${currentDayData.evening_kana?.content || ''}\n\n`;
-      md += `### ${currentDayData.evening_bana?.title || 'Bana'}\n${currentDayData.evening_bana?.content || ''}\n\n`;
-      md += `### ${currentDayData.evening_curio?.title || 'Curio'}\n${currentDayData.evening_curio?.content || ''}\n\n`;
-      md += `### ${currentDayData.evening_survivi?.title || 'Survivo'}\n${currentDayData.evening_survivi?.content || ''}\n\n`;
-      md += `### ${currentDayData.evening_random?.title || 'Random'}\n${currentDayData.evening_random?.content || ''}\n\n`;
-
-      md += `## 🏋️ 05:00 — 06:00 Diet & Exercise Phase (4 Tracks)\n\n`;
-      md += `### ${currentDayData.health_workout?.title || 'Workout (5-6 AM)'}\n${currentDayData.health_workout?.content || ''}\n\n`;
-      md += `### ${currentDayData.health_diet?.title || 'Diet & Meals'}\n${currentDayData.health_diet?.content || ''}\n\n`;
-      md += `### ${currentDayData.health_habits?.title || 'Hydration & Supplements'}\n${currentDayData.health_habits?.content || ''}\n\n`;
-      md += `### ${currentDayData.health_recovery?.title || 'Body & Recovery'}\n${currentDayData.health_recovery?.content || ''}\n\n`;
     }
 
     const blob = new Blob([md], { type: 'text/markdown' });
@@ -4588,9 +4351,9 @@ if (btnCancelCustomize) {
 }
 if (btnResetDefaultLayout) {
   btnResetDefaultLayout.addEventListener('click', () => {
-    saveAndApplyLayoutForToday(PRESETS.default_polymath);
+    saveAndApplyLayoutForToday(PRESETS.blank_canvas);
     closeCustomizeModal();
-    showToast(`Restored Polymath Golden Routine for ${formatDateDisplay(currentDate)}`);
+    showToast(`Reset to Blank Canvas for ${formatDateDisplay(currentDate)}`);
   });
 }
 if (btnSaveCustomLayout) {

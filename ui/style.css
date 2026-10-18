@@ -5389,12 +5389,6 @@ body[data-phase="health"] .health-col-card {
   color: var(--accent-cyan);
 }
 
-.btn-level1-pill.btn-reset-polymath:hover {
-  background: rgba(245, 158, 11, 0.18);
-  border-color: #f59e0b;
-  color: #f59e0b;
-}
-
 .empty-section-starter {
   display: flex;
   align-items: center;
@@ -5496,57 +5490,98 @@ body[data-phase="health"] .health-col-card {
   color: #ef4444;
 }
 
+/* ==========================================================================
+   Horizontal Scrolling Architecture for Modular Canvas
+   Guaranteed minimum usable width (280px) — No more squished cards!
+   ========================================================================== */
 .page-row-sections {
   display: flex;
-  flex-wrap: wrap;
-  gap: 18px;
-  width: 100%;
+  flex-direction: row;
   align-items: stretch;
+  gap: 16px;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 6px;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
 }
 
 .phase-col-custom {
-  flex: 1 1 320px;
-  min-width: 280px;
-  max-width: 100%;
+  flex: 1 1 340px;
+  min-width: 320px;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-/* Equal card spreading inside sections with adaptive wrapping */
-.section-cards-grid-1 {
-  display: grid;
-  grid-template-columns: 1fr;
+/* Horizontal scrollable columns row inside section */
+.section-cards-scroll-row {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
   gap: 12px;
   width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 2px 8px 2px;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
 }
 
-.section-cards-grid-2 {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 12px;
-  width: 100%;
+.section-cards-scroll-row .dynamic-col-card {
+  flex: 1 0 280px;
+  min-width: 280px;
+  max-width: 480px;
+  height: 250px;
+  min-height: 250px;
+  max-height: 250px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 
-.section-cards-grid-3 {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
-  width: 100%;
+/* Single column expands to fill section */
+.section-cards-scroll-row .dynamic-col-card:only-child {
+  max-width: 100%;
 }
 
-.section-cards-grid-4 {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
-  width: 100%;
+/* Slim modern scrollbars for horizontal canvas rows */
+.section-cards-scroll-row::-webkit-scrollbar,
+.page-row-sections::-webkit-scrollbar {
+  height: 5px;
 }
 
-.section-cards-grid-multi {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
-  width: 100%;
+.section-cards-scroll-row::-webkit-scrollbar-track,
+.page-row-sections::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+}
+
+.section-cards-scroll-row::-webkit-scrollbar-thumb,
+.page-row-sections::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+}
+
+.section-cards-scroll-row::-webkit-scrollbar-thumb:hover,
+.page-row-sections::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-cyan);
+}
+
+[data-theme="paper"] .section-cards-scroll-row::-webkit-scrollbar-track,
+[data-theme="paper"] .page-row-sections::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="paper"] .section-cards-scroll-row::-webkit-scrollbar-thumb,
+[data-theme="paper"] .page-row-sections::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.18);
+}
+
+[data-theme="paper"] .section-cards-scroll-row::-webkit-scrollbar-thumb:hover,
+[data-theme="paper"] .page-row-sections::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.35);
 }
 
 .btn-canvas-action-btn {
