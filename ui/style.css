@@ -1233,11 +1233,13 @@ body[data-phase="health"] .health-col-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 14px;
+  padding: 8px 12px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.035);
   border: 1px solid var(--border-glass);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .banner-learning-master {
@@ -1263,7 +1265,10 @@ body[data-phase="health"] .health-col-card {
 .master-banner-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
 }
 
 .column-badge {
@@ -1483,16 +1488,20 @@ body[data-phase="health"] .health-col-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 12px;
+  padding: 5px 8px;
   background: var(--surface-card-bar);
   border-bottom: 1px solid var(--border-glass);
+  gap: 4px;
+  min-width: 0;
 }
 
 .card-bar-left {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex: 1;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 45px;
+  overflow: hidden;
 }
 
 .track-indicator {
@@ -1552,17 +1561,23 @@ body[data-phase="health"] .health-col-card {
   border: none;
   color: var(--text-main);
   font-family: var(--font-main);
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: -0.01em;
   outline: none;
   width: 100%;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .card-bar-right {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .card-checklist-stat {
@@ -1582,16 +1597,30 @@ body[data-phase="health"] .health-col-card {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border-glass);
   color: var(--text-dim);
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
-  padding: 2px 7px;
-  border-radius: 5px;
+  padding: 2px 5px;
+  border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s ease;
   line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  height: 20px;
+  min-width: 20px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+/* Contextual Insert Buttons based on Active Tab: Clean toolbar without clutter! */
+.cool-card:not([data-active-tab="notes"]) .btn-bullet-insert,
+.block-card:not([data-active-tab="notes"]) .btn-bullet-insert {
+  display: none !important;
+}
+.cool-card[data-active-tab="notes"] .btn-check-insert,
+.block-card[data-active-tab="notes"] .btn-check-insert {
+  display: none !important;
 }
 
 [data-theme="chalk"] .btn-check-insert,
@@ -1653,6 +1682,24 @@ body[data-phase="health"] .health-col-card {
 }
 
 /* Fixed Box Sizing for Each Card — Beyond this size, items scroll cleanly */
+.dynamic-col-card {
+  height: 240px;
+  min-height: 240px;
+  max-height: 240px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.dynamic-col-card .card-editor-area {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 8px;
+}
+
 .quad-card {
   height: 180px;
   max-height: 180px;
@@ -1683,6 +1730,48 @@ body[data-phase="health"] .health-col-card {
   box-sizing: border-box;
 }
 
+/* Container query for responsive card toolbar */
+.cool-card,
+.block-card {
+  container-type: inline-size;
+}
+
+@container (max-width: 250px) {
+  .tab-label {
+    display: none;
+  }
+  .card-bar {
+    padding: 4px 6px;
+    gap: 2px;
+  }
+  .card-title-input {
+    font-size: 11px;
+  }
+}
+
+/* Empty Tasks Subtle Prompt */
+.empty-tasks-hint {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  opacity: 0.5;
+  padding: 8px 6px;
+  cursor: pointer;
+  border-radius: 6px;
+  border: 1px dashed transparent;
+  transition: all 0.15s ease;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.empty-tasks-hint:hover {
+  opacity: 0.9;
+  border-color: var(--border-glass-hover);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--accent-cyan);
+}
+
 /* ==========================================================================
    Independent Card Tab Switcher (Tasks | Notes)
    ========================================================================== */
@@ -1691,9 +1780,9 @@ body[data-phase="health"] .health-col-card {
   align-items: center;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  border-radius: 10px;
   padding: 1px;
-  margin-right: 4px;
+  flex-shrink: 0;
 }
 
 [data-theme="paper"] .card-tab-switcher {
@@ -1710,8 +1799,8 @@ body[data-phase="health"] .health-col-card {
   color: var(--text-dim);
   font-size: 10px;
   font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 10px;
+  padding: 2px 5px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.14s ease;
   line-height: 1;
@@ -4777,13 +4866,19 @@ body[data-phase="health"] .health-col-card {
   background: transparent;
   border: none;
   color: var(--text-dim);
-  font-size: 12px;
-  padding: 2px 5px;
+  font-size: 11px;
+  padding: 2px 4px;
   border-radius: 4px;
   cursor: pointer;
-  opacity: 0.35;
+  opacity: 0.45;
   transition: all 0.14s ease;
   line-height: 1;
+  min-width: 18px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .cool-card:hover .btn-canvas-del-col,
@@ -5342,6 +5437,8 @@ body[data-phase="health"] .health-col-card {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .page-row-header-left {
@@ -5369,6 +5466,8 @@ body[data-phase="health"] .health-col-card {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .btn-row-action {
@@ -5414,7 +5513,7 @@ body[data-phase="health"] .health-col-card {
   gap: 12px;
 }
 
-/* Equal card spreading inside sections (Option 1) */
+/* Equal card spreading inside sections with adaptive wrapping */
 .section-cards-grid-1 {
   display: grid;
   grid-template-columns: 1fr;
@@ -5424,28 +5523,28 @@ body[data-phase="health"] .health-col-card {
 
 .section-cards-grid-2 {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 12px;
   width: 100%;
 }
 
 .section-cards-grid-3 {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 12px;
   width: 100%;
 }
 
 .section-cards-grid-4 {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 12px;
   width: 100%;
 }
 
 .section-cards-grid-multi {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 12px;
   width: 100%;
 }

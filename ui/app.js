@@ -417,6 +417,11 @@ function getActiveLayout() {
 function normalizeLayoutPageRows(layout) {
   if (!layout) return [];
   if (Array.isArray(layout.pageRows)) {
+    layout.pageRows.forEach(pr => {
+      (pr.sections || []).forEach(sec => {
+        if (sec.timeRange === 'Custom Hours') sec.timeRange = '';
+      });
+    });
     return layout.pageRows;
   }
   // Backwards compatibility with legacy layout.phases:
@@ -651,7 +656,7 @@ function handleCanvasAddPageRow() {
       {
         id: `sec_${Date.now()}`,
         title: `Section 1`,
-        timeRange: "Custom Hours",
+        timeRange: "",
         colorClass: "cyan",
         rows: []
       }
@@ -698,7 +703,7 @@ function handleCanvasAddSectionToRow(rowId) {
   targetRow.sections.push({
     id: `sec_${Date.now()}`,
     title: `Section ${sNum}`,
-    timeRange: "Custom Hours",
+    timeRange: "",
     colorClass: nextColor,
     rows: []
   });
@@ -1134,7 +1139,9 @@ function renderCustomWorkspace(layout, workspaceEl) {
       <div class="planner-col phase-col-custom" data-section-id="${sec.id}" data-row-id="${rowId}">
         <div class="col-master-banner banner-${color}-master">
           <div class="master-banner-left">
-            <span class="column-time-pill pill-${color}">${escapeHtml(sec.timeRange || '')}</span>
+            ${(sec.timeRange && sec.timeRange.trim() && sec.timeRange !== 'Custom Hours') ? `
+              <span class="column-time-pill pill-${color}">${escapeHtml(sec.timeRange)}</span>
+            ` : ''}
             <span class="column-name">${escapeHtml(sec.title)}</span>
           </div>
           <div class="master-banner-actions">
@@ -1162,9 +1169,9 @@ function renderCustomWorkspace(layout, workspaceEl) {
             return `
               <div class="phase-row-block" data-section-id="${sec.id}" data-subrow-id="${sub.id}">
                 ${(subRows.length > 1 || sub.title) ? `
-                  <div class="sub-split-header-clean" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                  <div class="sub-split-header-clean" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; flex-wrap: wrap; gap: 6px;">
                     <span class="sub-split-tag tag-${color}">${escapeHtml(sub.title || ('Row ' + (rIdx + 1)))}</span>
-                    <div class="row-canvas-actions">
+                    <div class="row-canvas-actions" style="display: flex; align-items: center; gap: 4px; margin-left: auto; flex-shrink: 0;">
                       <button type="button" class="btn-canvas-add-col-to-subrow btn-canvas-mini" data-section-id="${sec.id}" data-subrow-id="${sub.id}" title="Add column to this row">+ Column</button>
                       <button type="button" class="btn-canvas-del-row btn-canvas-mini" data-section-id="${sec.id}" data-subrow-id="${sub.id}" title="Delete this row">✕ Row</button>
                     </div>
@@ -1172,7 +1179,7 @@ function renderCustomWorkspace(layout, workspaceEl) {
                 ` : ''}
                 <div class="${gridClass}" data-subrow-id="${sub.id}">
                   ${(sub.tracks || []).map((t, tIdx) => `
-                    <div class="cool-card dynamic-col-card" data-block="${t.key || ('custom_' + sec.id + '_' + tIdx)}">
+                    <div class="cool-card dynamic-col-card" data-block="${t.key || ('custom_' + sec.id + '_' + tIdx)}" data-active-tab="tasks">
                       <div class="card-bar">
                         <div class="card-bar-left">
                           <span class="track-indicator dot-${color}"></span>
@@ -2045,6 +2052,12 @@ function renderCardTasks(card, blockKey) {
 
   if (tasks.length === 0) {
     updateCardTabBadges(card, blockKey);
+    listEl.innerHTML = `<div class="empty-tasks-hint" title="Click to add a task">+ Add a task or type here...</div>`;
+    listEl.onclick = (e) => {
+      if (e.target.closest('.empty-tasks-hint')) {
+        insertCheckboxTask(card, blockKey, '');
+      }
+    };
     return;
   }
 
@@ -2614,18 +2627,22 @@ function bindCardEvents() {
       tabSwitcher.innerHTML = `
         <button type="button" class="tab-btn tab-tasks active" title="Tasks Checklist">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
-          <span>Tasks</span>
+          <span class="tab-label">Tasks</span>
           <span class="tab-task-badge" style="display:none;">0</span>
         </button>
         <button type="button" class="tab-btn tab-notes" title="Independent Notes">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
-          <span>Notes</span>
+          <span class="tab-label">Notes</span>
         </button>
       `;
       const barRight = card.querySelector('.card-bar-right');
       if (barRight) {
         barRight.prepend(tabSwitcher);
       }
+    }
+
+    if (!card.dataset.activeTab) {
+      card.dataset.activeTab = 'tasks';
     }
 
     // 2. Inject Independent Panels in Editor Area
@@ -4593,7 +4610,7 @@ function addPhaseToModal(orientation = 'vertical') {
   currentEditingLayout.phases.push({
     id: `phase_custom_${Date.now()}`,
     title: isHoriz ? `Row Section ${pIdx}` : `Column Section ${pIdx}`,
-    timeRange: "Custom Hours",
+    timeRange: "",
     orientation: isHoriz ? 'horizontal' : 'vertical',
     colorClass: pIdx % 2 === 0 ? "violet" : "cyan",
     rows: [] // Starts 100% blank without dummy tracks!
