@@ -181,8 +181,99 @@ function getActiveBlockKeys() {
         keys.add(k);
       }
     });
+    if (currentDayData.customLayout) {
+      try {
+        const tracks = getAllLayoutTracks(currentDayData.customLayout);
+        tracks.forEach(t => { if (t && t.key) keys.add(t.key); });
+      } catch (e) { }
+    }
   }
   return Array.from(keys);
+}
+
+function getAllBlockKeysBetween(dayA, dayB) {
+  const keys = new Set(ALL_BLOCK_KEYS);
+  [dayA, dayB].forEach(d => {
+    if (d && typeof d === 'object') {
+      Object.keys(d).forEach(k => {
+        if (!['date', 'updatedAt', 'importedFrom', 'importedAt', 'customLayout'].includes(k)) {
+          keys.add(k);
+        }
+      });
+      if (d.customLayout) {
+        try {
+          const tracks = getAllLayoutTracks(d.customLayout);
+          tracks.forEach(t => { if (t && t.key) keys.add(t.key); });
+        } catch (e) { }
+      }
+    }
+  });
+  document.querySelectorAll('.cool-card, .block-card').forEach(card => {
+    const k = card.getAttribute('data-block');
+    if (k) keys.add(k);
+  });
+  return Array.from(keys);
+}
+
+function normBlockTitle(title) {
+  if (!title || typeof title !== 'string') return '';
+  return title
+    .toLowerCase()
+    .replace(/\(.*?\)/g, '')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function isGenericBlockTitle(title) {
+  if (!title || typeof title !== 'string') return true;
+  const t = title.trim().toLowerCase();
+  if (!t) return true;
+  if (t === 'new column' || t === 'column' || /^column\s*\d+$/i.test(t) || /^row\s*\d+$/i.test(t) || t === 'section' || /^section\s*\d+$/i.test(t)) {
+    return true;
+  }
+  return false;
+}
+
+function hasBlockContent(block) {
+  if (!block || typeof block !== 'object') return false;
+  if (Array.isArray(block.tasks) && block.tasks.some(t => t && typeof t.text === 'string' && t.text.trim().length > 0)) return true;
+  if (block.notes && typeof block.notes === 'string' && block.notes.trim().length > 0) return true;
+  if (block.content && typeof block.content === 'string' && block.content.trim().length > 0) return true;
+  return false;
+}
+
+function findMatchingSourceBlock(sourceData, targetKey, curBlock) {
+  if (!sourceData || typeof sourceData !== 'object') return null;
+
+  // 1. Direct key match with content
+  if (sourceData[targetKey] && hasBlockContent(sourceData[targetKey])) {
+    return { key: targetKey, block: sourceData[targetKey] };
+  }
+
+  // 2. Title-based match if target block has a meaningful non-generic title
+  const curTitle = (curBlock && curBlock.title) ? curBlock.title : getDefaultTitle(targetKey);
+  const targetNorm = normBlockTitle(curTitle);
+
+  if (targetNorm && !isGenericBlockTitle(curTitle)) {
+    for (const [sKey, sVal] of Object.entries(sourceData)) {
+      if (!sVal || typeof sVal !== 'object' || ['date', 'updatedAt', 'importedFrom', 'importedAt', 'customLayout'].includes(sKey)) continue;
+      const sTitle = sVal.title || getDefaultTitle(sKey);
+      const sNorm = normBlockTitle(sTitle);
+      if (!sNorm || isGenericBlockTitle(sTitle)) continue;
+
+      if (targetNorm === sNorm || (targetNorm.length >= 4 && sNorm.length >= 4 && (targetNorm.includes(sNorm) || sNorm.includes(targetNorm)))) {
+        if (hasBlockContent(sVal)) {
+          return { key: sKey, block: sVal };
+        }
+      }
+    }
+  }
+
+  // 3. Exact key match fallback
+  if (sourceData[targetKey]) {
+    return { key: targetKey, block: sourceData[targetKey] };
+  }
+
+  return null;
 }
 
 // Layout helper functions: scoped per-date
@@ -1758,9 +1849,9 @@ function normalizeBlockData(rawBlock, defaultTitle) {
   let tasks = Array.isArray(rawBlock.tasks) ? JSON.parse(JSON.stringify(rawBlock.tasks)) : null;
   let notes = typeof rawBlock.notes === 'string' ? rawBlock.notes : null;
 
-  // Auto-migrate legacy content string if tasks or notes not yet segregated
-  if (tasks === null || notes === null) {
-    const rawContent = rawBlock.content || "";
+  // Auto-migrate legacy content string if tasks or notes not yet segregated, or if content has tasks
+  const rawContent = rawBlock.content || "";
+  if (rawContent && (tasks === null || notes === null || rawContent.includes('- [ ]') || rawContent.includes('- [x]') || rawContent.includes('- [X]'))) {
     const lines = rawContent.split('\n');
     const extractedTasks = [];
     const extractedNotes = [];
@@ -1772,43 +1863,59 @@ function normalizeBlockData(rawBlock, defaultTitle) {
         if (trimmed.startsWith('- [ ]') || trimmed.startsWith('* [ ]')) {
           const parent = extractedTasks[extractedTasks.length - 1];
           if (!Array.isArray(parent.subtasks)) parent.subtasks = [];
-          parent.subtasks.push({ text: trimmed.replace(/^[-*]\s\[\s\]\s?/, ''), done: false });
+          const text = trimmed.replace(/^[-*]\s\[\s\]\s?/, '').trim();
+          if (text) parent.subtasks.push({ text, done: false });
           continue;
         } else if (trimmed.startsWith('- [x]') || trimmed.startsWith('- [X]') || trimmed.startsWith('* [x]') || trimmed.startsWith('* [X]')) {
           const parent = extractedTasks[extractedTasks.length - 1];
           if (!Array.isArray(parent.subtasks)) parent.subtasks = [];
-          parent.subtasks.push({ text: trimmed.replace(/^[-*]\s\[[xX]\]\s?/, ''), done: true });
+          const text = trimmed.replace(/^[-*]\s\[[xX]\]\s?/, '').trim();
+          if (text) parent.subtasks.push({ text, done: true });
           continue;
         }
       }
 
       if (trimmed.startsWith('- [ ]') || trimmed.startsWith('* [ ]')) {
-        extractedTasks.push({ text: trimmed.replace(/^[-*]\s\[\s\]\s?/, ''), done: false, subtasks: [] });
+        const text = trimmed.replace(/^[-*]\s\[\s\]\s?/, '').trim();
+        if (text) extractedTasks.push({ text, done: false, subtasks: [] });
       } else if (trimmed.startsWith('- [x]') || trimmed.startsWith('- [X]') || trimmed.startsWith('* [x]') || trimmed.startsWith('* [X]')) {
-        extractedTasks.push({ text: trimmed.replace(/^[-*]\s\[[xX]\]\s?/, ''), done: true, subtasks: [] });
+        const text = trimmed.replace(/^[-*]\s\[[xX]\]\s?/, '').trim();
+        if (text) extractedTasks.push({ text, done: true, subtasks: [] });
       } else if (trimmed.length > 0) {
         extractedNotes.push(line);
       }
     }
 
-    if (tasks === null) tasks = extractedTasks;
+    if (tasks === null) {
+      tasks = extractedTasks;
+    } else if (extractedTasks.length > 0) {
+      extractedTasks.forEach(et => {
+        if (et.text && !tasks.some(t => t && t.text && t.text.trim().toLowerCase() === et.text.toLowerCase())) {
+          tasks.push(et);
+        }
+      });
+    }
     if (notes === null) notes = extractedNotes.join('\n');
   }
 
   if (Array.isArray(tasks)) {
-    tasks = tasks.map(t => ({
-      text: t.text || '',
-      done: !!t.done,
-      notes: typeof t.notes === 'string' ? t.notes : '',
-      subtasks: Array.isArray(t.subtasks)
-        ? t.subtasks.map(s => ({
-          text: typeof s === 'string' ? s : (s.text || ''),
-          done: !!s.done
-        }))
-        : [],
-      importedFrom: t.importedFrom || null,
-      sourceTaskId: t.sourceTaskId || null
-    }));
+    tasks = tasks
+      .filter(t => t && typeof t.text === 'string' && t.text.trim().length > 0)
+      .map(t => ({
+        text: t.text.trim(),
+        done: !!t.done,
+        notes: typeof t.notes === 'string' ? t.notes : '',
+        subtasks: Array.isArray(t.subtasks)
+          ? t.subtasks
+            .filter(s => s && (typeof s === 'string' ? s.trim().length > 0 : (s.text && s.text.trim().length > 0)))
+            .map(s => ({
+              text: typeof s === 'string' ? s.trim() : (s.text || '').trim(),
+              done: !!s.done
+            }))
+          : [],
+        importedFrom: t.importedFrom || null,
+        sourceTaskId: t.sourceTaskId || null
+      }));
   } else {
     tasks = [];
   }
@@ -2017,13 +2124,20 @@ function saveDay(targetDateKey = null, targetData = null) {
 }
 
 function hasContent(data) {
+  if (!data || typeof data !== 'object') return false;
+  if (data.customLayout) {
+    try {
+      const tracks = getAllLayoutTracks(data.customLayout);
+      if (tracks && tracks.length > 0) return true;
+    } catch (e) { }
+  }
   for (const key of Object.keys(data)) {
-    if (key !== 'date' && key !== 'updatedAt') {
+    if (!['date', 'updatedAt', 'importedFrom', 'importedAt', 'customLayout'].includes(key)) {
       const b = data[key];
-      if (b) {
-        if (Array.isArray(b.tasks) && b.tasks.length > 0) return true;
-        if (b.notes && b.notes.trim().length > 0) return true;
-        if (b.content && b.content.trim().length > 0) return true;
+      if (b && typeof b === 'object') {
+        if (Array.isArray(b.tasks) && b.tasks.some(t => t && typeof t.text === 'string' && t.text.trim().length > 0)) return true;
+        if (b.notes && typeof b.notes === 'string' && b.notes.trim().length > 0) return true;
+        if (b.content && typeof b.content === 'string' && b.content.trim().length > 0) return true;
       }
     }
   }
@@ -2593,8 +2707,8 @@ function renderCurrentDay() {
   const syncBtn = document.getElementById('btn-quick-sync');
   const syncBtnLabel = document.getElementById('sync-btn-label');
   if (syncBtn) {
-    syncBtn.title = hasImport && activeSourceDate
-      ? `Sync with ${activeSourceDate} (Shortcut: S) — Updates unfinished tasks without altering today's custom tasks`
+    syncBtn.title = activeSourceDate
+      ? `Sync with ${activeSourceDate} (Shortcut: S) — Syncs unfinished tasks and notes seamlessly`
       : `Sync with previous day (Shortcut: S)`;
   }
   if (syncBtnLabel) {
@@ -2983,38 +3097,52 @@ function analyzeSourceDay(dayData) {
   const blockNotes = {};
   const blockTitles = {};
 
-  for (const k of getActiveBlockKeys()) {
-    const block = dayData[k];
-    if (block) {
-      if (block.title) {
-        blockTitles[k] = block.title;
-      }
-      if (block.notes && block.notes.trim().length > 0) {
-        notesCount++;
-        blockNotes[k] = block.notes.trim();
-      }
-      if (Array.isArray(block.tasks)) {
-        block.tasks.forEach(task => {
-          if (!task || !task.text || task.text.trim().length === 0) return;
-          totalTasks++;
-          if (isTaskDone(task)) {
-            completedTasksCount++;
-            finishedTasks.push({
-              blockKey: k,
-              blockTitle: block.title || getDefaultTitle(k),
-              text: task.text.trim()
-            });
-          } else {
-            unfinishedTasks.push({
-              blockKey: k,
-              blockTitle: block.title || getDefaultTitle(k),
-              text: task.text.trim(),
-              notes: task.notes || '',
-              subtasks: Array.isArray(task.subtasks) ? JSON.parse(JSON.stringify(task.subtasks)) : []
-            });
-          }
-        });
-      }
+  const keysToCheck = new Set(ALL_BLOCK_KEYS);
+  Object.keys(dayData).forEach(k => {
+    if (!['date', 'updatedAt', 'importedFrom', 'importedAt', 'customLayout'].includes(k)) {
+      keysToCheck.add(k);
+    }
+  });
+  if (dayData.customLayout) {
+    try {
+      const tracks = getAllLayoutTracks(dayData.customLayout);
+      tracks.forEach(t => { if (t && t.key) keysToCheck.add(t.key); });
+    } catch (e) { }
+  }
+
+  for (const k of keysToCheck) {
+    const rawBlock = dayData[k];
+    if (!rawBlock) continue;
+    const block = normalizeBlockData(rawBlock, rawBlock.title || getDefaultTitle(k));
+
+    if (block.title) {
+      blockTitles[k] = block.title;
+    }
+    if (block.notes && block.notes.trim().length > 0) {
+      notesCount++;
+      blockNotes[k] = block.notes.trim();
+    }
+    if (Array.isArray(block.tasks)) {
+      block.tasks.forEach(task => {
+        if (!task || !task.text || task.text.trim().length === 0) return;
+        totalTasks++;
+        if (isTaskDone(task)) {
+          completedTasksCount++;
+          finishedTasks.push({
+            blockKey: k,
+            blockTitle: block.title || getDefaultTitle(k),
+            text: task.text.trim()
+          });
+        } else {
+          unfinishedTasks.push({
+            blockKey: k,
+            blockTitle: block.title || getDefaultTitle(k),
+            text: task.text.trim(),
+            notes: task.notes || '',
+            subtasks: Array.isArray(task.subtasks) ? JSON.parse(JSON.stringify(task.subtasks)) : []
+          });
+        }
+      });
     }
   }
 
@@ -3060,21 +3188,35 @@ async function checkPendingCarryover(targetDateKey, forcePrompt = false) {
   const { dateKey: sourceDateKey, dayData: sourceData } = activeDayResult;
   const analysis = analyzeSourceDay(sourceData);
 
-  // Deduplicate against current target day's existing tasks
+  // Deduplicate against current target day's existing tasks across matching block or all blocks
   const pendingTasks = analysis.unfinishedTasks.filter(item => {
     const currentBlock = currentDayData[item.blockKey];
-    if (!currentBlock || !Array.isArray(currentBlock.tasks)) return true;
-    return !currentBlock.tasks.some(t => t.text && t.text.trim().toLowerCase() === item.text.toLowerCase());
+    if (currentBlock && Array.isArray(currentBlock.tasks)) {
+      if (currentBlock.tasks.some(t => t && t.text && t.text.trim().toLowerCase() === item.text.toLowerCase())) return false;
+    }
+    for (const curKey of Object.keys(currentDayData)) {
+      if (['date', 'updatedAt', 'importedFrom', 'importedAt', 'customLayout'].includes(curKey)) continue;
+      const b = currentDayData[curKey];
+      if (b && Array.isArray(b.tasks)) {
+        if (b.tasks.some(t => t && t.text && t.text.trim().toLowerCase() === item.text.toLowerCase())) {
+          return false;
+        }
+      }
+    }
+    return true;
   });
 
   // Check if any finished tasks from source day are lingering as active in today
   const tasksToClear = [];
   if (analysis.finishedTasks && Array.isArray(analysis.finishedTasks)) {
     analysis.finishedTasks.forEach(item => {
-      const curBlock = currentDayData[item.blockKey];
-      if (curBlock && Array.isArray(curBlock.tasks)) {
-        if (curBlock.tasks.some(t => t.text && t.text.trim().toLowerCase() === item.text.toLowerCase() && !t.done)) {
-          tasksToClear.push(item);
+      for (const curKey of Object.keys(currentDayData)) {
+        if (['date', 'updatedAt', 'importedFrom', 'importedAt', 'customLayout'].includes(curKey)) continue;
+        const curBlock = currentDayData[curKey];
+        if (curBlock && Array.isArray(curBlock.tasks)) {
+          if (curBlock.tasks.some(t => t && t.text && t.text.trim().toLowerCase() === item.text.toLowerCase() && !t.done)) {
+            tasksToClear.push(item);
+          }
         }
       }
     });
@@ -3209,8 +3351,6 @@ function handleUndoOrResetBlank() {
   isDirty = true;
   saveDay(targetDateKey, currentDayData);
   renderCurrentDay();
-  closeImportModal();
-  if (carryoverBanner) carryoverBanner.style.display = 'none';
   showToast("Day reset to blank. Auto-import disabled.", "Undo", handleUndoOrResetBlank, 6000);
 }
 
@@ -3227,15 +3367,17 @@ async function removeImport() {
 
   // Build task text set from source day to also catch any legacy untagged imports
   const sourceTaskSet = new Set();
+  let srcData = null;
   if (sourceDateKey) {
     try {
-      const srcData = await loadDay(sourceDateKey);
+      srcData = await loadDay(sourceDateKey);
       if (srcData) {
-        for (const k of getActiveBlockKeys()) {
+        const srcKeys = getAllBlockKeysBetween(srcData, currentDayData);
+        for (const k of srcKeys) {
           if (srcData[k] && Array.isArray(srcData[k].tasks)) {
             srcData[k].tasks.forEach(t => {
               if (t && typeof t.text === 'string' && t.text.trim()) {
-                sourceTaskSet.add(`${k}:::${t.text.trim().toLowerCase()}`);
+                sourceTaskSet.add(t.text.trim().toLowerCase());
               }
             });
           }
@@ -3246,15 +3388,16 @@ async function removeImport() {
     }
   }
 
-  for (const blockKey of getActiveBlockKeys()) {
+  const allKeys = getAllBlockKeysBetween(srcData, currentDayData);
+  for (const blockKey of allKeys) {
     const curBlock = currentDayData[blockKey];
     if (curBlock && Array.isArray(curBlock.tasks)) {
       const remaining = [];
       for (const t of curBlock.tasks) {
         if (!t || typeof t.text !== 'string' || !t.text.trim()) continue;
-        const key = `${blockKey}:::${t.text.trim().toLowerCase()}`;
+        const textKey = t.text.trim().toLowerCase();
         const isImported = (t.importedFrom && (t.importedFrom === sourceDateKey || !sourceDateKey)) ||
-          (sourceDateKey && sourceTaskSet.has(key));
+          (sourceDateKey && sourceTaskSet.has(textKey));
 
         if (isImported) {
           removedCount++;
@@ -3278,6 +3421,7 @@ async function removeImport() {
 
   isDirty = true;
   saveDay(targetDateKey, currentDayData);
+  syncWorkspaceLayoutForDate(targetDateKey, currentDayData);
   renderCurrentDay();
 
   if (carryoverBanner) carryoverBanner.style.display = 'none';
@@ -3300,22 +3444,21 @@ async function quickSync(preferredSourceDate = null, silent = false) {
   }
 
   try {
-    // 1. Determine source date: check linked date on day, or last imported source, or yesterday
-    let sourceDateKey = preferredSourceDate || currentDayData.importedFrom || safeStorage.getItem(`mrt_last_imported_source_${targetDateKey}`);
+    // 1. Determine source date
+    let sourceDateKey = preferredSourceDate;
 
     if (!sourceDateKey) {
-      const [y, m, d] = targetDateKey.split('-').map(Number);
-      const targetDateObj = new Date(y, m - 1, d);
-      const yestDateObj = new Date(targetDateObj);
-      yestDateObj.setDate(yestDateObj.getDate() - 1);
-      const yestKey = formatDateKey(yestDateObj);
-
-      const yestData = await loadDay(yestKey);
-      if (hasContent(yestData)) {
-        sourceDateKey = yestKey;
+      const latestActive = await findLatestActiveDayBefore(targetDateKey);
+      if (latestActive) {
+        sourceDateKey = latestActive.dateKey;
+      } else if (currentDayData.importedFrom && currentDayData.importedFrom < targetDateKey) {
+        sourceDateKey = currentDayData.importedFrom;
       } else {
-        const latestActive = await findLatestActiveDayBefore(targetDateKey);
-        sourceDateKey = latestActive ? latestActive.dateKey : yestKey;
+        const [y, m, d] = targetDateKey.split('-').map(Number);
+        const targetDateObj = new Date(y, m - 1, d);
+        const yestDateObj = new Date(targetDateObj);
+        yestDateObj.setDate(yestDateObj.getDate() - 1);
+        sourceDateKey = formatDateKey(yestDateObj);
       }
     }
 
@@ -3331,6 +3474,17 @@ async function quickSync(preferredSourceDate = null, silent = false) {
       return;
     }
 
+    // Inherit layout if target day has an empty layout (blank canvas) and source has customLayout
+    const curLayout = getLayoutForDate(targetDateKey, currentDayData);
+    const curRows = normalizeLayoutPageRows(curLayout);
+    const srcRows = sourceData.customLayout ? normalizeLayoutPageRows(sourceData.customLayout) : [];
+
+    if (curRows.length === 0 && srcRows.length > 0) {
+      currentDayData.customLayout = JSON.parse(JSON.stringify(sourceData.customLayout));
+      safeStorage.setItem(`mrt_layout_${targetDateKey}`, JSON.stringify(currentDayData.customLayout));
+      syncWorkspaceLayoutForDate(targetDateKey, currentDayData);
+    }
+
     // Store pre-sync backup snapshot so accidental sync can be undone
     safeStorage.setItem(`mrt_pre_import_${targetDateKey}`, JSON.stringify(currentDayData));
 
@@ -3338,24 +3492,36 @@ async function quickSync(preferredSourceDate = null, silent = false) {
     let clearedCount = 0;
     let addedCount = 0;
     let updatedCount = 0;
+    let inheritedNotesCount = 0;
     let preservedCustomCount = 0;
 
-    for (const blockKey of getActiveBlockKeys()) {
+    const allKeys = getAllBlockKeysBetween(sourceData, currentDayData);
+
+    for (const blockKey of allKeys) {
       if (!currentDayData[blockKey]) {
         currentDayData[blockKey] = getDefaultBlockData(getDefaultTitle(blockKey));
       }
       const curBlock = currentDayData[blockKey];
-      const srcBlock = sourceData[blockKey];
       if (!Array.isArray(curBlock.tasks)) curBlock.tasks = [];
 
-      if (!srcBlock || !Array.isArray(srcBlock.tasks)) {
+      const matchResult = findMatchingSourceBlock(sourceData, blockKey, curBlock);
+      if (!matchResult || !matchResult.block) {
         preservedCustomCount += curBlock.tasks.filter(t => t && typeof t.text === 'string' && t.text.trim().length > 0).length;
         continue;
       }
 
+      const { key: srcKey, block: srcRawBlock } = matchResult;
+      const srcBlock = normalizeBlockData(srcRawBlock, srcRawBlock.title || getDefaultTitle(srcKey));
+
+      // Inherit notes if today has none
+      if ((!curBlock.notes || !curBlock.notes.trim()) && srcBlock.notes && srcBlock.notes.trim()) {
+        curBlock.notes = srcBlock.notes.trim();
+        inheritedNotesCount++;
+      }
+
       // Check tasks on source
-      const srcFinished = srcBlock.tasks.filter(t => t && isTaskDone(t) && typeof t.text === 'string' && t.text.trim().length > 0);
-      const srcUnfinished = srcBlock.tasks.filter(t => t && !isTaskDone(t) && typeof t.text === 'string' && t.text.trim().length > 0);
+      const srcFinished = (srcBlock.tasks || []).filter(t => t && isTaskDone(t) && typeof t.text === 'string' && t.text.trim().length > 0);
+      const srcUnfinished = (srcBlock.tasks || []).filter(t => t && !isTaskDone(t) && typeof t.text === 'string' && t.text.trim().length > 0);
 
       // A. Finished tasks on source day: remove from today's pending tasks
       srcFinished.forEach(fTask => {
@@ -3386,18 +3552,14 @@ async function quickSync(preferredSourceDate = null, silent = false) {
           });
           addedCount++;
         } else {
-          // If task exists on today, sync any changes to its notes or subtasks from source day!
           let modified = false;
-          if (uTask.notes && existing.notes !== uTask.notes) {
+          if (uTask.notes && existing.notes !== uTask.notes && (!existing.notes || !existing.notes.trim())) {
             existing.notes = uTask.notes;
             modified = true;
           }
-          if (Array.isArray(uTask.subtasks)) {
-            const newSubsStr = JSON.stringify(uTask.subtasks);
-            if (JSON.stringify(existing.subtasks || []) !== newSubsStr) {
-              existing.subtasks = JSON.parse(newSubsStr);
-              modified = true;
-            }
+          if (Array.isArray(uTask.subtasks) && uTask.subtasks.length > 0 && (!Array.isArray(existing.subtasks) || existing.subtasks.length === 0)) {
+            existing.subtasks = JSON.parse(JSON.stringify(uTask.subtasks));
+            modified = true;
           }
           if (!existing.importedFrom) {
             existing.importedFrom = sourceDateKey;
@@ -3422,7 +3584,7 @@ async function quickSync(preferredSourceDate = null, silent = false) {
       // Count custom tasks created today (never existed in source block)
       curBlock.tasks.forEach(t => {
         if (!t || typeof t.text !== 'string' || !t.text.trim()) return;
-        const existsInSrc = srcBlock.tasks.some(st => st && typeof st.text === 'string' && st.text.trim().toLowerCase() === t.text.trim().toLowerCase());
+        const existsInSrc = (srcBlock.tasks || []).some(st => st && typeof st.text === 'string' && st.text.trim().toLowerCase() === t.text.trim().toLowerCase());
         if (!existsInSrc) {
           preservedCustomCount++;
         }
@@ -3441,6 +3603,8 @@ async function quickSync(preferredSourceDate = null, silent = false) {
     safeStorage.setItem(`mrt_imported_${targetDateKey}`, 'true');
     safeStorage.removeItem(`mrt_start_blank_${targetDateKey}`);
     saveDay(targetDateKey, currentDayData);
+
+    syncWorkspaceLayoutForDate(targetDateKey, currentDayData);
     renderCurrentDay();
 
     if (carryoverBanner) carryoverBanner.style.display = 'none';
@@ -3459,9 +3623,10 @@ async function quickSync(preferredSourceDate = null, silent = false) {
     if (clearedCount > 0) parts.push(`cleared ${clearedCount} completed`);
     if (addedCount > 0) parts.push(`+${addedCount} new task${addedCount > 1 ? 's' : ''}`);
     if (updatedCount > 0) parts.push(`${updatedCount} updated`);
+    if (inheritedNotesCount > 0) parts.push(`${inheritedNotesCount} note${inheritedNotesCount > 1 ? 's' : ''} inherited`);
     if (preservedCustomCount > 0) parts.push(`${preservedCustomCount} custom today task${preservedCustomCount > 1 ? 's' : ''} kept`);
 
-    if (clearedCount === 0 && addedCount === 0 && updatedCount === 0) {
+    if (clearedCount === 0 && addedCount === 0 && updatedCount === 0 && inheritedNotesCount === 0) {
       if (!silent) {
         if (preservedCustomCount > 0) {
           showToast(`In sync with ${label}. All ${preservedCustomCount} custom today tasks preserved. 👍`);
@@ -3663,10 +3828,10 @@ async function updateImportPreview(sourceDateKey) {
     html += `<div class="preview-group-header">Tasks to Roll Over (${unfinishedList.length}):</div>`;
     html += `<div class="preview-task-list">`;
     unfinishedList.forEach(item => {
-      const curBlock = currentDayData[item.blockKey];
-      const isInToday = curBlock && Array.isArray(curBlock.tasks) && curBlock.tasks.some(
-        t => t && typeof t.text === 'string' && t.text.trim().toLowerCase() === item.text.toLowerCase()
-      );
+      const isInToday = Object.values(currentDayData).some(b => {
+        if (!b || typeof b !== 'object' || !Array.isArray(b.tasks)) return false;
+        return b.tasks.some(t => t && typeof t.text === 'string' && t.text.trim().toLowerCase() === item.text.toLowerCase());
+      });
       const subInfo = item.subtasks.length > 0 ? ` <span class="preview-sub-badge">${item.subtasks.length} subtask${item.subtasks.length > 1 ? 's' : ''}</span>` : '';
       const notesInfo = item.notes ? ` <span class="preview-task-notes-badge" title="Has task notes">📝</span>` : '';
       const syncBadge = isInToday ? ` <span class="preview-status-badge in-today" title="Already in today's planner">In Today</span>` : '';
@@ -3708,6 +3873,18 @@ async function executeImport(sourceDateKey, options = { tasks: true, notes: true
     }
 
     const targetDateKey = formatDateKey(currentDate);
+
+    // Inherit layout if target day has an empty layout (blank canvas) and source has customLayout
+    const curLayout = getLayoutForDate(targetDateKey, currentDayData);
+    const curRows = normalizeLayoutPageRows(curLayout);
+    const srcRows = sourceData.customLayout ? normalizeLayoutPageRows(sourceData.customLayout) : [];
+
+    if (curRows.length === 0 && srcRows.length > 0) {
+      currentDayData.customLayout = JSON.parse(JSON.stringify(sourceData.customLayout));
+      safeStorage.setItem(`mrt_layout_${targetDateKey}`, JSON.stringify(currentDayData.customLayout));
+      syncWorkspaceLayoutForDate(targetDateKey, currentDayData);
+    }
+
     // Store backup snapshot before importing so user can redo/undo
     safeStorage.setItem(`mrt_pre_import_${targetDateKey}`, JSON.stringify(currentDayData));
 
@@ -3718,18 +3895,25 @@ async function executeImport(sourceDateKey, options = { tasks: true, notes: true
     let updatedTitlesCount = 0;
     let preservedCustomCount = 0;
 
-    for (const blockKey of getActiveBlockKeys()) {
+    const allKeys = getAllBlockKeysBetween(sourceData, currentDayData);
+
+    for (const blockKey of allKeys) {
       if (!currentDayData[blockKey]) {
         currentDayData[blockKey] = getDefaultBlockData(getDefaultTitle(blockKey));
       }
       const currentBlock = currentDayData[blockKey];
-      const sourceBlock = sourceData[blockKey];
-      if (!sourceBlock) continue;
+      if (!Array.isArray(currentBlock.tasks)) currentBlock.tasks = [];
+
+      const matchResult = findMatchingSourceBlock(sourceData, blockKey, currentBlock);
+      if (!matchResult || !matchResult.block) continue;
+
+      const { key: srcKey, block: srcRawBlock } = matchResult;
+      const sourceBlock = normalizeBlockData(srcRawBlock, srcRawBlock.title || getDefaultTitle(srcKey));
 
       // 1. Inherit Custom Block Titles
       if (options.titles && sourceBlock.title) {
         const defTitle = getDefaultTitle(blockKey);
-        if (sourceBlock.title !== defTitle && currentBlock.title === defTitle) {
+        if (sourceBlock.title !== defTitle && currentBlock.title === defTitle && !isGenericBlockTitle(sourceBlock.title)) {
           currentBlock.title = sourceBlock.title;
           updatedTitlesCount++;
         }
@@ -3750,14 +3934,10 @@ async function executeImport(sourceDateKey, options = { tasks: true, notes: true
 
       // 3. Iterative Task Rollover & Synchronization
       if (options.tasks && Array.isArray(sourceBlock.tasks)) {
-        if (!Array.isArray(currentBlock.tasks)) currentBlock.tasks = [];
-
         // A. Finished Tasks on Source Day:
-        // If a task is COMPLETED on source day, ensure it does NOT linger as an active/uncompleted task in today!
         const finishedOnSource = sourceBlock.tasks.filter(t => t && isTaskDone(t) && typeof t.text === 'string' && t.text.trim().length > 0);
         finishedOnSource.forEach(finishedTask => {
           const textKey = finishedTask.text.trim().toLowerCase();
-          // Look for any uncompleted instance of this finished task in today's planner
           const matchIdx = currentBlock.tasks.findIndex(
             t => t && typeof t.text === 'string' && t.text.trim().toLowerCase() === textKey && !t.done
           );
@@ -3776,7 +3956,6 @@ async function executeImport(sourceDateKey, options = { tasks: true, notes: true
           );
 
           if (!existingTask) {
-            // Brand new unfinished task: import it
             currentBlock.tasks.push({
               text: taskText,
               done: false,
@@ -3786,7 +3965,6 @@ async function executeImport(sourceDateKey, options = { tasks: true, notes: true
             });
             importedTasksCount++;
           } else if (!existingTask.done) {
-            // Task is already in today and still pending: sync subtasks & notes if today's are empty
             let modified = false;
             if ((!existingTask.notes || existingTask.notes.trim().length === 0) && srcTask.notes) {
               existingTask.notes = srcTask.notes;
@@ -3828,6 +4006,8 @@ async function executeImport(sourceDateKey, options = { tasks: true, notes: true
     safeStorage.removeItem(`mrt_start_blank_${targetDateKey}`);
     safeStorage.setItem(`mrt_carryover_dismissed_${targetDateKey}`, 'true');
     saveDay(targetDateKey, currentDayData);
+
+    syncWorkspaceLayoutForDate(targetDateKey, currentDayData);
     renderCurrentDay();
 
     // Hide banner if visible
