@@ -594,7 +594,11 @@ function saveAndApplyLayoutForToday(layout) {
 }
 
 function attachCanvasLayoutControls(currentLayout) {
-  // Ensure every section banner has + Row and + Column buttons
+  // If rendering custom layout, renderCustomWorkspace already creates clean banner controls
+  if (currentLayout && currentLayout.id !== 'default_polymath') {
+    return;
+  }
+  // Ensure default polymath section banners have + Column and + Row buttons
   document.querySelectorAll('.col-master-banner').forEach(banner => {
     let actions = banner.querySelector('.master-banner-actions');
     if (!actions) {
@@ -602,21 +606,21 @@ function attachCanvasLayoutControls(currentLayout) {
       actions.className = 'master-banner-actions';
       banner.appendChild(actions);
     }
-    if (!actions.querySelector('.btn-canvas-add-row')) {
-      const btnAddRow = document.createElement('button');
-      btnAddRow.type = 'button';
-      btnAddRow.className = 'btn-canvas-add-row';
-      btnAddRow.title = 'Add new row of columns to this phase';
-      btnAddRow.textContent = '+ Row';
-      actions.appendChild(btnAddRow);
-    }
     if (!actions.querySelector('.btn-canvas-add-col')) {
       const btnAdd = document.createElement('button');
       btnAdd.type = 'button';
-      btnAdd.className = 'btn-canvas-add-col';
-      btnAdd.title = 'Add new column to this phase';
+      btnAdd.className = 'btn-canvas-add-col btn-canvas-mini';
+      btnAdd.title = 'Add column to this section';
       btnAdd.textContent = '+ Column';
       actions.appendChild(btnAdd);
+    }
+    if (!actions.querySelector('.btn-canvas-add-row')) {
+      const btnAddRow = document.createElement('button');
+      btnAddRow.type = 'button';
+      btnAddRow.className = 'btn-canvas-add-row btn-canvas-mini';
+      btnAddRow.title = 'Add row to this section';
+      btnAddRow.textContent = '+ Row';
+      actions.appendChild(btnAddRow);
     }
   });
 
@@ -797,7 +801,7 @@ function handleCanvasAddColumn(sectionId, targetSubRowId, banner) {
   }
 }
 
-function handleCanvasAddSubRow(sectionId, banner) {
+function handleCanvasAddRow(sectionId, banner) {
   const dateKey = formatDateKey(currentDate);
   let activeLayout = JSON.parse(JSON.stringify(getLayoutForDate(dateKey, currentDayData)));
   const pageRows = normalizeLayoutPageRows(activeLayout);
@@ -834,8 +838,8 @@ function handleCanvasAddSubRow(sectionId, banner) {
     delete targetSec.tracks;
     const rIdx = targetSec.rows.length + 1;
     targetSec.rows.push({
-      id: `subrow_${Date.now()}`,
-      title: `Tier ${rIdx}`,
+      id: `row_${Date.now()}`,
+      title: `Row ${rIdx}`,
       tracks: [
         {
           key: `custom_${targetSec.id || 'sec'}_${Date.now()}`,
@@ -848,11 +852,16 @@ function handleCanvasAddSubRow(sectionId, banner) {
     activeLayout.pageRows = pageRows;
     delete activeLayout.phases;
     saveAndApplyLayoutForToday(activeLayout);
-    showToast(`Added sub-row to ${targetSec.title || 'Section'}!`);
+    showToast(`Added row to ${targetSec.title || 'Section'}!`);
   }
 }
 
-function handleCanvasDeleteSubRow(sectionId, subRowId) {
+// Alias for backwards compatibility
+function handleCanvasAddSubRow(sectionId, banner) {
+  return handleCanvasAddRow(sectionId, banner);
+}
+
+function handleCanvasDeleteRow(sectionId, subRowId) {
   const dateKey = formatDateKey(currentDate);
   let activeLayout = JSON.parse(JSON.stringify(getLayoutForDate(dateKey, currentDayData)));
   const pageRows = normalizeLayoutPageRows(activeLayout);
@@ -870,13 +879,16 @@ function handleCanvasDeleteSubRow(sectionId, subRowId) {
           activeLayout.pageRows = pageRows;
           delete activeLayout.phases;
           saveAndApplyLayoutForToday(activeLayout);
-          showToast("Sub-row removed from section");
+          showToast("Row removed from section");
           return;
         }
       }
     }
   }
 }
+
+// Alias for backwards compatibility
+const handleCanvasDeleteSubRow = handleCanvasDeleteRow;
 
 function handleCanvasDeleteColumn(blockKey) {
   const dateKey = formatDateKey(currentDate);
@@ -989,11 +1001,11 @@ document.addEventListener('click', (e) => {
   }
 
   // 4. Delete Page Row button
-  const delRowBtn = e.target.closest('.btn-row-del');
-  if (delRowBtn) {
+  const delPageRowBtn = e.target.closest('.btn-row-del');
+  if (delPageRowBtn) {
     e.preventDefault();
     e.stopPropagation();
-    const rowId = delRowBtn.getAttribute('data-row-id') || (delRowBtn.closest('.page-row-container') && delRowBtn.closest('.page-row-container').getAttribute('data-row-id'));
+    const rowId = delPageRowBtn.getAttribute('data-row-id') || (delPageRowBtn.closest('.page-row-container') && delPageRowBtn.closest('.page-row-container').getAttribute('data-row-id'));
     if (rowId) handleCanvasDeletePageRow(rowId);
     return;
   }
@@ -1009,28 +1021,28 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // 6. Add Sub-row / Tier button
-  const addSubRowBtn = e.target.closest('.btn-canvas-add-subrow, .btn-starter-add-subrow, .btn-canvas-add-row, .btn-starter-add-row');
-  if (addSubRowBtn) {
+  // 6. Add Row button inside section
+  const addRowBtn = e.target.closest('.btn-canvas-add-row, .btn-starter-add-row, .btn-canvas-add-subrow, .btn-starter-add-subrow');
+  if (addRowBtn) {
     e.preventDefault();
     e.stopPropagation();
-    const secEl = addSubRowBtn.closest('.phase-col-custom');
-    const secId = addSubRowBtn.getAttribute('data-section-id') || addSubRowBtn.getAttribute('data-phase-id') || (secEl && (secEl.getAttribute('data-section-id') || secEl.getAttribute('data-phase-id')));
-    const banner = addSubRowBtn.closest('.col-master-banner') || secEl;
-    handleCanvasAddSubRow(secId, banner);
+    const secEl = addRowBtn.closest('.phase-col-custom');
+    const secId = addRowBtn.getAttribute('data-section-id') || addRowBtn.getAttribute('data-phase-id') || (secEl && (secEl.getAttribute('data-section-id') || secEl.getAttribute('data-phase-id')));
+    const banner = addRowBtn.closest('.col-master-banner') || secEl;
+    handleCanvasAddRow(secId, banner);
     return;
   }
 
-  // 7. Delete Sub-row / Tier button
-  const delSubRowBtn = e.target.closest('.btn-canvas-del-subrow, .btn-canvas-del-row');
-  if (delSubRowBtn) {
+  // 7. Delete Row button inside section
+  const delSecRowBtn = e.target.closest('.btn-canvas-del-row, .btn-canvas-del-subrow');
+  if (delSecRowBtn) {
     e.preventDefault();
     e.stopPropagation();
-    const rowBlock = delSubRowBtn.closest('.phase-row-block');
-    const secEl = delSubRowBtn.closest('.phase-col-custom');
-    const secId = delSubRowBtn.getAttribute('data-section-id') || delSubRowBtn.getAttribute('data-phase-id') || (secEl && (secEl.getAttribute('data-section-id') || secEl.getAttribute('data-phase-id')));
-    const subRowId = delSubRowBtn.getAttribute('data-subrow-id') || delSubRowBtn.getAttribute('data-row-id') || (rowBlock && (rowBlock.getAttribute('data-subrow-id') || rowBlock.getAttribute('data-row-id')));
-    if (subRowId) handleCanvasDeleteSubRow(secId, subRowId);
+    const rowBlock = delSecRowBtn.closest('.phase-row-block');
+    const secEl = delSecRowBtn.closest('.phase-col-custom');
+    const secId = delSecRowBtn.getAttribute('data-section-id') || delSecRowBtn.getAttribute('data-phase-id') || (secEl && (secEl.getAttribute('data-section-id') || secEl.getAttribute('data-phase-id')));
+    const rowId = delSecRowBtn.getAttribute('data-subrow-id') || delSecRowBtn.getAttribute('data-row-id') || (rowBlock && (rowBlock.getAttribute('data-subrow-id') || rowBlock.getAttribute('data-row-id')));
+    if (rowId) handleCanvasDeleteRow(secId, rowId);
     return;
   }
 
@@ -1126,22 +1138,17 @@ function renderCustomWorkspace(layout, workspaceEl) {
             <span class="column-name">${escapeHtml(sec.title)}</span>
           </div>
           <div class="master-banner-actions">
-            <button type="button" class="btn-canvas-add-col btn-canvas-mini" data-section-id="${sec.id}" data-row-id="${rowId}" title="Add column card to ${escapeHtml(sec.title)}">+ Column</button>
-            <button type="button" class="btn-canvas-add-subrow btn-canvas-mini" data-section-id="${sec.id}" data-row-id="${rowId}" title="Add a sub-row to divide ${escapeHtml(sec.title)} into tiers">+ Sub-row</button>
+            <button type="button" class="btn-canvas-add-col btn-canvas-mini" data-section-id="${sec.id}" data-row-id="${rowId}" title="Add column to ${escapeHtml(sec.title)}">+ Column</button>
+            <button type="button" class="btn-canvas-add-row btn-canvas-mini" data-section-id="${sec.id}" data-row-id="${rowId}" title="Add row to ${escapeHtml(sec.title)}">+ Row</button>
             <button type="button" class="btn-canvas-del-section" data-section-id="${sec.id}" data-row-id="${rowId}" title="Delete this section">✕</button>
           </div>
         </div>
         <div class="phase-rows-container" style="display: flex; flex-direction: column; gap: 14px;">
           ${subRows.length === 0 ? `
             <div class="empty-section-starter" data-section-id="${sec.id}" data-row-id="${rowId}">
-              <div class="starter-header">
-                <span class="starter-level-tag">LEVEL 3</span>
-                <span class="starter-heading">Blank Section</span>
-              </div>
-              <p class="starter-desc">This section is ready. Add columns or sub-rows to organize your tasks:</p>
               <div class="starter-actions">
-                <button type="button" class="btn-canvas-action-btn btn-starter-add-col" data-section-id="${sec.id}" data-row-id="${rowId}">+ Add Column (Card)</button>
-                <button type="button" class="btn-canvas-action-btn btn-starter-add-subrow" data-section-id="${sec.id}" data-row-id="${rowId}">+ Add Sub-row</button>
+                <button type="button" class="btn-canvas-action-btn btn-starter-add-col" data-section-id="${sec.id}" data-row-id="${rowId}" title="Add a column to this section">+ Add Column</button>
+                <button type="button" class="btn-canvas-action-btn btn-starter-add-row" data-section-id="${sec.id}" data-row-id="${rowId}" title="Add a row to this section">+ Add Row</button>
               </div>
             </div>
           ` : subRows.map((sub, rIdx) => {
@@ -1156,10 +1163,10 @@ function renderCustomWorkspace(layout, workspaceEl) {
               <div class="phase-row-block" data-section-id="${sec.id}" data-subrow-id="${sub.id}">
                 ${(subRows.length > 1 || sub.title) ? `
                   <div class="sub-split-header-clean" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-                    <span class="sub-split-tag tag-${color}">${escapeHtml(sub.title || ('Tier ' + (rIdx + 1)))}</span>
+                    <span class="sub-split-tag tag-${color}">${escapeHtml(sub.title || ('Row ' + (rIdx + 1)))}</span>
                     <div class="row-canvas-actions">
-                      <button type="button" class="btn-canvas-add-col-to-subrow btn-canvas-mini" data-section-id="${sec.id}" data-subrow-id="${sub.id}" title="Add column to this tier">+ Column</button>
-                      <button type="button" class="btn-canvas-del-subrow btn-canvas-mini" data-section-id="${sec.id}" data-subrow-id="${sub.id}" title="Delete this tier">✕ Sub-row</button>
+                      <button type="button" class="btn-canvas-add-col-to-subrow btn-canvas-mini" data-section-id="${sec.id}" data-subrow-id="${sub.id}" title="Add column to this row">+ Column</button>
+                      <button type="button" class="btn-canvas-del-row btn-canvas-mini" data-section-id="${sec.id}" data-subrow-id="${sub.id}" title="Delete this row">✕ Row</button>
                     </div>
                   </div>
                 ` : ''}
