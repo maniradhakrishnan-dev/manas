@@ -5360,53 +5360,128 @@ body[data-phase="health"] .health-col-card {
   margin-top: 6px;
 }
 
-.btn-toggle-orientation {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 4px;
-  color: var(--accent-cyan);
-  font-family: var(--font-main);
-  font-size: 10px;
-  font-weight: 700;
-  padding: 2px 7px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  line-height: 1.2;
+.page-row-container {
+  width: 100%;
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.btn-toggle-orientation:hover {
-  background: rgba(56, 189, 248, 0.2);
+.page-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+}
+
+.page-row-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.page-row-tag {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--accent-cyan);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.page-row-count-badge {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.page-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-row-action {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: var(--text-main);
+  font-family: var(--font-main);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-row-action:hover {
+  background: rgba(56, 189, 248, 0.18);
   border-color: var(--accent-cyan);
   color: #fff;
   transform: translateY(-1px);
 }
 
-.phase-orientation-btn {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 6px;
-  color: var(--accent-cyan);
-  font-family: var(--font-main);
-  font-size: 11px;
-  font-weight: 700;
-  padding: 4px 10px;
-  cursor: pointer;
-  transition: all 0.14s ease;
+.btn-row-action.btn-row-del:hover {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: #ef4444;
+  color: #ef4444;
 }
 
-.phase-orientation-btn:hover {
-  background: rgba(56, 189, 248, 0.18);
-  border-color: var(--accent-cyan);
+.page-row-sections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  width: 100%;
+  align-items: stretch;
 }
 
-.phase-orientation-btn.is-horiz {
-  color: var(--accent-violet);
-  border-color: rgba(168, 85, 247, 0.35);
+.phase-col-custom {
+  flex: 1 1 320px;
+  min-width: 280px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.phase-orientation-btn.is-horiz:hover {
-  background: rgba(168, 85, 247, 0.2);
-  border-color: var(--accent-violet);
+/* Equal card spreading inside sections (Option 1) */
+.section-cards-grid-1 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  width: 100%;
+}
+
+.section-cards-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+}
+
+.section-cards-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+}
+
+.section-cards-grid-4 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+}
+
+.section-cards-grid-multi {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  width: 100%;
 }
 
 .btn-canvas-action-btn {
@@ -5489,26 +5564,25 @@ body[data-phase="health"] .health-col-card {
   color: #64748b;
 }
 
-[data-theme="paper"] .btn-toggle-orientation {
+[data-theme="paper"] .page-row-header {
   background: #f5eedf;
   border-color: #d8cebd;
+}
+
+[data-theme="paper"] .page-row-tag {
   color: #0284c7;
 }
 
-[data-theme="paper"] .btn-toggle-orientation:hover {
-  background: #e0f2fe;
-  color: #0369a1;
-  border-color: #38bdf8;
+[data-theme="paper"] .btn-row-action {
+  background: #fff;
+  border-color: #d1c7b7;
+  color: #1e293b;
 }
 
-[data-theme="paper"] .phase-orientation-btn {
-  background: #f5eedf;
-  border-color: #d8cebd;
-  color: #0369a1;
-}
-
-[data-theme="paper"] .phase-orientation-btn.is-horiz {
-  color: #7c3aed;
+[data-theme="paper"] .btn-row-action:hover {
+  background: #f1ebd9;
+  border-color: #0284c7;
+  color: #0284c7;
 }
 
 [data-theme="paper"] .btn-canvas-action-btn {

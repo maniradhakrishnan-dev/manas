@@ -74,6 +74,111 @@ const PRESETS = {
     id: "default_polymath",
     name: "Polymath Golden Routine (Default)",
     description: "4-9 Foundation (5 tracks) + 9-6 Work + 6-11 Evening + Health",
+    pageRows: [
+      {
+        id: "prow_top",
+        title: "MORNING & DAYTIME (04:00 — 18:00)",
+        sections: [
+          {
+            id: "phase_learning",
+            title: "Foundation & Learning",
+            timeRange: "04:00 — 09:00",
+            colorClass: "amber",
+            rows: [
+              {
+                id: "row_learning_part1",
+                title: "PART 1 — DEPTH",
+                tracks: [
+                  { key: "part1_quad1", title: "CS & SWE", placeholder: "Data structures, algorithms, system design..." },
+                  { key: "part1_quad2", title: "Core AI", placeholder: "Math, transformers, LLM architectures..." },
+                  { key: "part1_quad3", title: "Applications", placeholder: "Web apps, backends, products..." },
+                  { key: "part1_quad4", title: "RSWE", placeholder: "Reliability, observability, metrics..." }
+                ]
+              },
+              {
+                id: "row_learning_part2",
+                title: "PART 2 — BREADTH",
+                tracks: [
+                  { key: "part2", title: "Breadth", placeholder: "Adjacent disciplines, cross-domain knowledge..." }
+                ]
+              }
+            ]
+          },
+          {
+            id: "phase_productive",
+            title: "Work & Execution",
+            timeRange: "09:00 — 18:00",
+            colorClass: "violet",
+            rows: [
+              {
+                id: "row_work_productive",
+                title: "09:00 — 14:00 · PRODUCTIVE",
+                tracks: [
+                  { key: "productive", title: "Productive (Get Things Done)", placeholder: "High impact work, core deliverables..." }
+                ]
+              },
+              {
+                id: "row_work_admin",
+                title: "14:00 — 18:00 · ADMIN",
+                tracks: [
+                  { key: "admin", title: "Admin & Operations", placeholder: "Logistics, operations, emails..." }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        id: "prow_evening",
+        title: "EVENING PROJECTS (18:00 — 23:00)",
+        sections: [
+          {
+            id: "phase_evening",
+            title: "Creative Evening",
+            timeRange: "18:00 — 23:00",
+            colorClass: "emerald",
+            rows: [
+              {
+                id: "row_evening_projects",
+                title: "",
+                tracks: [
+                  { key: "evening_huro", title: "Huro", placeholder: "Huro development & creative..." },
+                  { key: "evening_kana", title: "Kana", placeholder: "Kana clothing & store..." },
+                  { key: "evening_bana", title: "Bana", placeholder: "Bana projects..." },
+                  { key: "evening_curio", title: "Curio", placeholder: "Curio research..." },
+                  { key: "evening_survivi", title: "Survivo", placeholder: "Survivo survival tools..." },
+                  { key: "evening_random", title: "Random", placeholder: "Spontaneous thoughts & tests..." }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        id: "prow_health",
+        title: "HEALTH & WELLBEING (05:00 — 06:00)",
+        sections: [
+          {
+            id: "phase_health",
+            title: "Diet & Exercise",
+            timeRange: "05:00 — 06:00",
+            colorClass: "emerald",
+            rows: [
+              {
+                id: "row_health_habits",
+                title: "",
+                tracks: [
+                  { key: "health_workout", title: "Workout (5-6 AM)", placeholder: "Push/Pull/Legs, Cardio..." },
+                  { key: "health_diet", title: "Diet & Meals", placeholder: "Nutrition, macro targets, meal timing..." },
+                  { key: "health_habits", title: "Hydration & Supplements", placeholder: "Water, vitamins, minerals, creatine..." },
+                  { key: "health_recovery", title: "Body & Recovery", placeholder: "Mobility, stretching, sleep prep..." }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
     phases: [
       {
         id: "phase_learning",
@@ -170,7 +275,8 @@ const PRESETS = {
   blank_canvas: {
     id: "blank_canvas",
     name: "Blank Canvas",
-    description: "100% clean slate. Build your own sections, rows, and columns from scratch",
+    description: "100% clean slate. Build your own page rows, sections, and columns from scratch",
+    pageRows: [],
     phases: []
   }
 };
@@ -187,10 +293,12 @@ function saveUserTemplate(name, layout) {
   if (!name || !name.trim()) return null;
   const templates = getUserTemplates();
   const tplId = `template_${Date.now()}`;
+  const pageRows = normalizeLayoutPageRows(layout);
   const newTpl = {
     id: tplId,
     name: name.trim(),
-    description: `Custom layout with ${(layout.phases || []).length} sections`,
+    description: `Custom layout with ${pageRows.length} page row(s)`,
+    pageRows: JSON.parse(JSON.stringify(pageRows)),
     phases: JSON.parse(JSON.stringify(layout.phases || []))
   };
   templates.push(newTpl);
@@ -237,14 +345,11 @@ function renderLevel1TopBarHTML(activeLayout) {
     <div class="workspace-level1-bar" id="workspace-level1-bar">
       <div class="level1-brand-group">
         <span class="level1-badge">LEVEL 1</span>
-        <span class="level1-title">Add Sections:</span>
+        <span class="level1-title">Page Layout:</span>
       </div>
       <div class="level1-actions">
-        <button type="button" class="btn-level1-action btn-add-vert" id="btn-top-add-vertical" title="Add a full-height vertical column section">
-          <span class="btn-level1-icon">↕</span> + Column Section (Vertical)
-        </button>
-        <button type="button" class="btn-level1-action btn-add-horiz" id="btn-top-add-horizontal" title="Add a full-width horizontal row section">
-          <span class="btn-level1-icon">↔</span> + Row Section (Horizontal)
+        <button type="button" class="btn-level1-action btn-add-page-row" id="btn-top-add-page-row" title="Add a new horizontal page row to organize sections">
+          <span class="btn-level1-icon">＋</span> + Add Page Row
         </button>
       </div>
       <div class="level1-divider"></div>
@@ -286,14 +391,16 @@ function getActiveBlockKeys() {
 
 // Layout helper functions: scoped per-date
 function getLayoutForDate(dateKey, dayData) {
-  if (dayData && dayData.customLayout && Array.isArray(dayData.customLayout.phases)) {
-    return dayData.customLayout;
+  if (dayData && dayData.customLayout) {
+    if (Array.isArray(dayData.customLayout.pageRows) || Array.isArray(dayData.customLayout.phases)) {
+      return dayData.customLayout;
+    }
   }
   const cached = safeStorage.getItem(`mrt_layout_${dateKey}`);
   if (cached) {
     try {
       const parsed = JSON.parse(cached);
-      if (parsed && Array.isArray(parsed.phases)) {
+      if (parsed && (Array.isArray(parsed.pageRows) || Array.isArray(parsed.phases))) {
         return parsed;
       }
     } catch (e) { }
@@ -306,22 +413,112 @@ function getActiveLayout() {
   return getLayoutForDate(dateKey, currentDayData);
 }
 
-// Helper: normalize rows inside a phase for multi-row support
-function getPhaseRows(phase) {
-  if (!phase) return [];
-  if (Array.isArray(phase.rows) && phase.rows.length > 0) {
-    return phase.rows;
+// Normalize any layout into a clean list of page rows (Layer 1 -> Layer 2 -> Layer 3)
+function normalizeLayoutPageRows(layout) {
+  if (!layout) return [];
+  if (Array.isArray(layout.pageRows)) {
+    return layout.pageRows;
   }
-  if (Array.isArray(phase.tracks)) {
+  // Backwards compatibility with legacy layout.phases:
+  if (Array.isArray(layout.phases)) {
+    const pageRows = [];
+    let currentVertSections = [];
+
+    layout.phases.forEach((p, idx) => {
+      const isHoriz = (p.orientation === 'horizontal');
+      const sec = {
+        id: p.id || `sec_${idx}`,
+        title: p.title || `Section ${idx + 1}`,
+        timeRange: p.timeRange || '',
+        colorClass: p.colorClass || 'cyan',
+        rows: getSectionSubRows(p)
+      };
+
+      if (isHoriz) {
+        if (currentVertSections.length > 0) {
+          pageRows.push({
+            id: `prow_${pageRows.length + 1}`,
+            title: `PAGE ROW ${pageRows.length + 1}`,
+            sections: currentVertSections
+          });
+          currentVertSections = [];
+        }
+        pageRows.push({
+          id: `prow_${pageRows.length + 1}`,
+          title: p.title ? p.title.toUpperCase() : `PAGE ROW ${pageRows.length + 1}`,
+          sections: [sec]
+        });
+      } else {
+        currentVertSections.push(sec);
+      }
+    });
+
+    if (currentVertSections.length > 0) {
+      pageRows.push({
+        id: `prow_${pageRows.length + 1}`,
+        title: `PAGE ROW ${pageRows.length + 1}`,
+        sections: currentVertSections
+      });
+    }
+
+    return pageRows;
+  }
+
+  return [];
+}
+
+// Normalize sub-rows (tiers) inside a section
+function getSectionSubRows(section) {
+  if (!section) return [];
+  if (Array.isArray(section.rows) && section.rows.length > 0) {
+    return section.rows;
+  }
+  if (Array.isArray(section.tracks)) {
     return [
       {
-        id: `row_${phase.id || 'default'}_1`,
+        id: `row_${section.id || 'sec'}_1`,
         title: "",
-        tracks: phase.tracks
+        tracks: section.tracks
       }
     ];
   }
   return [];
+}
+
+// Legacy alias for getSectionSubRows to avoid breaking any callers
+function getPhaseRows(phase) {
+  return getSectionSubRows(phase);
+}
+
+// Get all column cards/tracks across any layout structure
+function getAllLayoutTracks(layout) {
+  const tracks = [];
+  if (!layout) return tracks;
+  const pageRows = normalizeLayoutPageRows(layout);
+  if (pageRows.length > 0) {
+    pageRows.forEach(row => {
+      (row.sections || []).forEach(sec => {
+        const subRows = getSectionSubRows(sec);
+        subRows.forEach(sub => {
+          (sub.tracks || []).forEach(t => {
+            if (t && t.key) tracks.push(t);
+          });
+        });
+      });
+    });
+    return tracks;
+  }
+  if (Array.isArray(layout.phases)) {
+    layout.phases.forEach(p => {
+      const subRows = getSectionSubRows(p);
+      subRows.forEach(sub => {
+        (sub.tracks || []).forEach(t => {
+          if (t && t.key) tracks.push(t);
+        });
+      });
+    });
+  }
+  return tracks;
 }
 
 function syncLevel1Bar(layout) {
@@ -437,114 +634,259 @@ function attachCanvasLayoutControls(currentLayout) {
   });
 }
 
-function handleCanvasAddRow(banner, explicitPhaseId) {
+function handleCanvasAddPageRow() {
   const dateKey = formatDateKey(currentDate);
   let activeLayout = JSON.parse(JSON.stringify(getLayoutForDate(dateKey, currentDayData)));
+  const pageRows = normalizeLayoutPageRows(activeLayout);
+  const rowNum = pageRows.length + 1;
+  const newRowId = `prow_${Date.now()}`;
+  pageRows.push({
+    id: newRowId,
+    title: `PAGE ROW ${rowNum}`,
+    sections: [
+      {
+        id: `sec_${Date.now()}`,
+        title: `Section 1`,
+        timeRange: "Custom Hours",
+        colorClass: "cyan",
+        rows: []
+      }
+    ]
+  });
+  activeLayout.id = 'custom';
+  activeLayout.pageRows = pageRows;
+  delete activeLayout.phases;
+  saveAndApplyLayoutForToday(activeLayout);
+  showToast(`Added Page Row ${rowNum}!`);
+}
 
-  let phaseId = explicitPhaseId || (banner ? (banner.getAttribute('data-phase-id') || (banner.closest('.phase-col-custom') && banner.closest('.phase-col-custom').getAttribute('data-phase-id'))) : null);
-
-  let targetPhase = null;
-  if (phaseId && activeLayout.phases) {
-    targetPhase = activeLayout.phases.find(p => p.id === phaseId);
+function handleCanvasDeletePageRow(rowId) {
+  const dateKey = formatDateKey(currentDate);
+  let activeLayout = JSON.parse(JSON.stringify(getLayoutForDate(dateKey, currentDayData)));
+  const pageRows = normalizeLayoutPageRows(activeLayout);
+  const idx = pageRows.findIndex(r => r.id === rowId);
+  if (idx !== -1) {
+    pageRows.splice(idx, 1);
+    activeLayout.id = 'custom';
+    activeLayout.pageRows = pageRows;
+    delete activeLayout.phases;
+    saveAndApplyLayoutForToday(activeLayout);
+    showToast("Page row removed");
   }
-  if (!targetPhase && activeLayout.phases && activeLayout.phases.length > 0) {
-    if (banner && (banner.closest('#phase-col-learning') || banner.classList.contains('banner-learning-master'))) {
-      targetPhase = activeLayout.phases.find(p => p.id === 'phase_learning') || activeLayout.phases[0];
-    } else if (banner && (banner.closest('#phase-col-productive') || banner.classList.contains('banner-work-master'))) {
-      targetPhase = activeLayout.phases.find(p => p.id === 'phase_productive') || activeLayout.phases[1] || activeLayout.phases[0];
-    } else if (banner && (banner.closest('#phase-row-evening') || banner.classList.contains('banner-evening-master'))) {
-      targetPhase = activeLayout.phases.find(p => p.id === 'phase_evening') || activeLayout.phases[2] || activeLayout.phases[0];
-    } else if (banner && (banner.closest('.health-section') || banner.classList.contains('banner-health-master'))) {
-      targetPhase = activeLayout.phases.find(p => p.id === 'phase_health') || activeLayout.phases[3] || activeLayout.phases[0];
-    } else {
-      targetPhase = activeLayout.phases[0];
+}
+
+function handleCanvasAddSectionToRow(rowId) {
+  const dateKey = formatDateKey(currentDate);
+  let activeLayout = JSON.parse(JSON.stringify(getLayoutForDate(dateKey, currentDayData)));
+  const pageRows = normalizeLayoutPageRows(activeLayout);
+  let targetRow = pageRows.find(r => r.id === rowId);
+  if (!targetRow && pageRows.length > 0) {
+    targetRow = pageRows[pageRows.length - 1];
+  }
+  if (!targetRow) {
+    handleCanvasAddPageRow();
+    return;
+  }
+  if (!Array.isArray(targetRow.sections)) targetRow.sections = [];
+  const sNum = targetRow.sections.length + 1;
+  const colors = ['cyan', 'violet', 'amber', 'emerald'];
+  const nextColor = colors[(sNum - 1) % colors.length];
+  targetRow.sections.push({
+    id: `sec_${Date.now()}`,
+    title: `Section ${sNum}`,
+    timeRange: "Custom Hours",
+    colorClass: nextColor,
+    rows: []
+  });
+  activeLayout.id = 'custom';
+  activeLayout.pageRows = pageRows;
+  delete activeLayout.phases;
+  saveAndApplyLayoutForToday(activeLayout);
+  showToast(`Added side-by-side section (${sNum} columns in row)!`);
+}
+
+function handleCanvasDeleteSection(sectionId) {
+  const dateKey = formatDateKey(currentDate);
+  let activeLayout = JSON.parse(JSON.stringify(getLayoutForDate(dateKey, currentDayData)));
+  const pageRows = normalizeLayoutPageRows(activeLayout);
+  let found = false;
+  let title = "Section";
+  for (const prow of pageRows) {
+    if (Array.isArray(prow.sections)) {
+      const idx = prow.sections.findIndex(s => s.id === sectionId);
+      if (idx !== -1) {
+        title = prow.sections[idx].title || "Section";
+        prow.sections.splice(idx, 1);
+        found = true;
+        break;
+      }
+    }
+  }
+  if (found) {
+    activeLayout.id = 'custom';
+    activeLayout.pageRows = pageRows;
+    delete activeLayout.phases;
+    saveAndApplyLayoutForToday(activeLayout);
+    showToast(`Removed section "${title}"`);
+  }
+}
+
+function handleCanvasAddColumn(sectionId, targetSubRowId, banner) {
+  const dateKey = formatDateKey(currentDate);
+  let activeLayout = JSON.parse(JSON.stringify(getLayoutForDate(dateKey, currentDayData)));
+  const pageRows = normalizeLayoutPageRows(activeLayout);
+
+  let targetSec = null;
+  if (sectionId) {
+    for (const prow of pageRows) {
+      targetSec = (prow.sections || []).find(s => s.id === sectionId);
+      if (targetSec) break;
     }
   }
 
-  if (targetPhase) {
-    targetPhase.rows = getPhaseRows(targetPhase);
-    delete targetPhase.tracks;
-    const rIdx = targetPhase.rows.length + 1;
-    targetPhase.rows.push({
-      id: `row_${Date.now()}`,
-      title: `Row ${rIdx}`,
+  // Fallback if triggered from default workspace banner
+  if (!targetSec && banner) {
+    let phaseKey = null;
+    if (banner.closest('#phase-col-learning') || banner.classList.contains('banner-learning-master')) phaseKey = 'phase_learning';
+    else if (banner.closest('#phase-col-productive') || banner.classList.contains('banner-work-master')) phaseKey = 'phase_productive';
+    else if (banner.closest('#phase-row-evening') || banner.classList.contains('banner-evening-master')) phaseKey = 'phase_evening';
+    else if (banner.closest('.health-section') || banner.classList.contains('banner-health-master')) phaseKey = 'phase_health';
+
+    if (phaseKey) {
+      for (const prow of pageRows) {
+        targetSec = (prow.sections || []).find(s => s.id === phaseKey);
+        if (targetSec) break;
+      }
+    }
+  }
+
+  if (!targetSec && pageRows.length > 0 && pageRows[0].sections && pageRows[0].sections.length > 0) {
+    targetSec = pageRows[0].sections[0];
+  }
+
+  if (targetSec) {
+    targetSec.rows = getSectionSubRows(targetSec);
+    delete targetSec.tracks;
+
+    let targetSubRow = null;
+    if (targetSubRowId) {
+      targetSubRow = targetSec.rows.find(r => r.id === targetSubRowId);
+    }
+    if (!targetSubRow) {
+      if (targetSec.rows.length === 0) {
+        targetSubRow = { id: `subrow_${Date.now()}`, title: "", tracks: [] };
+        targetSec.rows.push(targetSubRow);
+      } else {
+        targetSubRow = targetSec.rows[targetSec.rows.length - 1];
+      }
+    }
+
+    if (!Array.isArray(targetSubRow.tracks)) targetSubRow.tracks = [];
+    const newKey = `custom_${Date.now()}`;
+    targetSubRow.tracks.push({
+      key: newKey,
+      title: `Column ${targetSubRow.tracks.length + 1}`,
+      placeholder: "Tasks, milestones, notes..."
+    });
+
+    activeLayout.id = 'custom';
+    activeLayout.pageRows = pageRows;
+    delete activeLayout.phases;
+    saveAndApplyLayoutForToday(activeLayout);
+    showToast(`Added column to ${targetSec.title || 'Section'}!`);
+  }
+}
+
+function handleCanvasAddSubRow(sectionId, banner) {
+  const dateKey = formatDateKey(currentDate);
+  let activeLayout = JSON.parse(JSON.stringify(getLayoutForDate(dateKey, currentDayData)));
+  const pageRows = normalizeLayoutPageRows(activeLayout);
+
+  let targetSec = null;
+  if (sectionId) {
+    for (const prow of pageRows) {
+      targetSec = (prow.sections || []).find(s => s.id === sectionId);
+      if (targetSec) break;
+    }
+  }
+
+  if (!targetSec && banner) {
+    let phaseKey = null;
+    if (banner.closest('#phase-col-learning') || banner.classList.contains('banner-learning-master')) phaseKey = 'phase_learning';
+    else if (banner.closest('#phase-col-productive') || banner.classList.contains('banner-work-master')) phaseKey = 'phase_productive';
+    else if (banner.closest('#phase-row-evening') || banner.classList.contains('banner-evening-master')) phaseKey = 'phase_evening';
+    else if (banner.closest('.health-section') || banner.classList.contains('banner-health-master')) phaseKey = 'phase_health';
+
+    if (phaseKey) {
+      for (const prow of pageRows) {
+        targetSec = (prow.sections || []).find(s => s.id === phaseKey);
+        if (targetSec) break;
+      }
+    }
+  }
+
+  if (!targetSec && pageRows.length > 0 && pageRows[0].sections && pageRows[0].sections.length > 0) {
+    targetSec = pageRows[0].sections[0];
+  }
+
+  if (targetSec) {
+    targetSec.rows = getSectionSubRows(targetSec);
+    delete targetSec.tracks;
+    const rIdx = targetSec.rows.length + 1;
+    targetSec.rows.push({
+      id: `subrow_${Date.now()}`,
+      title: `Tier ${rIdx}`,
       tracks: [
         {
-          key: `custom_${targetPhase.id || 'phase'}_${Date.now()}`,
+          key: `custom_${targetSec.id || 'sec'}_${Date.now()}`,
           title: "New Column",
           placeholder: "Tasks, notes..."
         }
       ]
     });
     activeLayout.id = 'custom';
+    activeLayout.pageRows = pageRows;
+    delete activeLayout.phases;
     saveAndApplyLayoutForToday(activeLayout);
-    showToast(`Added row to ${targetPhase.title || 'Phase'}!`);
+    showToast(`Added sub-row to ${targetSec.title || 'Section'}!`);
   }
 }
 
-function handleCanvasAddColumn(banner, targetRowId, explicitPhaseId) {
+function handleCanvasDeleteSubRow(sectionId, subRowId) {
   const dateKey = formatDateKey(currentDate);
   let activeLayout = JSON.parse(JSON.stringify(getLayoutForDate(dateKey, currentDayData)));
+  const pageRows = normalizeLayoutPageRows(activeLayout);
 
-  let phaseId = explicitPhaseId || (banner ? (banner.getAttribute('data-phase-id') || (banner.closest('.phase-col-custom') && banner.closest('.phase-col-custom').getAttribute('data-phase-id'))) : null);
-
-  let targetPhase = null;
-  if (phaseId && activeLayout.phases) {
-    targetPhase = activeLayout.phases.find(p => p.id === phaseId);
-  }
-  if (!targetPhase && activeLayout.phases && activeLayout.phases.length > 0) {
-    if (banner && (banner.closest('#phase-col-learning') || banner.classList.contains('banner-learning-master'))) {
-      targetPhase = activeLayout.phases.find(p => p.id === 'phase_learning') || activeLayout.phases[0];
-    } else if (banner && (banner.closest('#phase-col-productive') || banner.classList.contains('banner-work-master'))) {
-      targetPhase = activeLayout.phases.find(p => p.id === 'phase_productive') || activeLayout.phases[1] || activeLayout.phases[0];
-    } else if (banner && (banner.closest('#phase-row-evening') || banner.classList.contains('banner-evening-master'))) {
-      targetPhase = activeLayout.phases.find(p => p.id === 'phase_evening') || activeLayout.phases[2] || activeLayout.phases[0];
-    } else if (banner && (banner.closest('.health-section') || banner.classList.contains('banner-health-master'))) {
-      targetPhase = activeLayout.phases.find(p => p.id === 'phase_health') || activeLayout.phases[3] || activeLayout.phases[0];
-    } else {
-      targetPhase = activeLayout.phases[0];
-    }
-  }
-
-  if (targetPhase) {
-    targetPhase.rows = getPhaseRows(targetPhase);
-    delete targetPhase.tracks;
-
-    let targetRow = null;
-    if (targetRowId) {
-      targetRow = targetPhase.rows.find(r => r.id === targetRowId);
-    }
-    if (!targetRow) {
-      if (targetPhase.rows.length === 0) {
-        targetRow = { id: `row_${Date.now()}`, title: "", tracks: [] };
-        targetPhase.rows.push(targetRow);
-      } else {
-        targetRow = targetPhase.rows[targetPhase.rows.length - 1];
+  for (const prow of pageRows) {
+    for (const sec of (prow.sections || [])) {
+      if (sec.id === sectionId || !sectionId) {
+        const rows = getSectionSubRows(sec);
+        const idx = rows.findIndex(r => r.id === subRowId);
+        if (idx !== -1) {
+          rows.splice(idx, 1);
+          sec.rows = rows;
+          delete sec.tracks;
+          activeLayout.id = 'custom';
+          activeLayout.pageRows = pageRows;
+          delete activeLayout.phases;
+          saveAndApplyLayoutForToday(activeLayout);
+          showToast("Sub-row removed from section");
+          return;
+        }
       }
     }
-
-    if (!Array.isArray(targetRow.tracks)) targetRow.tracks = [];
-    const newKey = `custom_${Date.now()}`;
-    targetRow.tracks.push({
-      key: newKey,
-      title: `Column ${targetRow.tracks.length + 1}`,
-      placeholder: "Tasks, milestones, notes..."
-    });
-
-    activeLayout.id = 'custom';
-    saveAndApplyLayoutForToday(activeLayout);
-    showToast(`Added column to ${targetPhase.title || 'Phase'}!`);
   }
 }
 
 function handleCanvasDeleteColumn(blockKey) {
   const dateKey = formatDateKey(currentDate);
   let activeLayout = JSON.parse(JSON.stringify(getLayoutForDate(dateKey, currentDayData)));
-
+  const pageRows = normalizeLayoutPageRows(activeLayout);
   let removed = false;
-  if (activeLayout.phases) {
-    for (const phase of activeLayout.phases) {
-      const rows = getPhaseRows(phase);
+
+  for (const prow of pageRows) {
+    for (const sec of (prow.sections || [])) {
+      const rows = getSectionSubRows(sec);
       for (const row of rows) {
         if (Array.isArray(row.tracks)) {
           const idx = row.tracks.findIndex(t => t.key === blockKey);
@@ -556,86 +898,20 @@ function handleCanvasDeleteColumn(blockKey) {
         }
       }
       if (removed) {
-        phase.rows = rows;
-        delete phase.tracks;
+        sec.rows = rows;
+        delete sec.tracks;
         break;
       }
     }
+    if (removed) break;
   }
 
   if (removed) {
     activeLayout.id = 'custom';
+    activeLayout.pageRows = pageRows;
+    delete activeLayout.phases;
     saveAndApplyLayoutForToday(activeLayout);
     showToast("Column removed from today's layout");
-  }
-}
-
-function handleCanvasDeleteRow(phaseId, rowId) {
-  const dateKey = formatDateKey(currentDate);
-  let activeLayout = JSON.parse(JSON.stringify(getLayoutForDate(dateKey, currentDayData)));
-  if (!activeLayout.phases) return;
-
-  const targetPhase = activeLayout.phases.find(p => p.id === phaseId);
-  if (targetPhase) {
-    const rows = getPhaseRows(targetPhase);
-    const rIdx = rows.findIndex(r => r.id === rowId);
-    if (rIdx !== -1) {
-      rows.splice(rIdx, 1);
-      targetPhase.rows = rows;
-      delete targetPhase.tracks;
-      activeLayout.id = 'custom';
-      saveAndApplyLayoutForToday(activeLayout);
-      showToast("Row removed from section");
-    }
-  }
-}
-
-function handleCanvasDeleteSection(phaseId) {
-  const dateKey = formatDateKey(currentDate);
-  let activeLayout = JSON.parse(JSON.stringify(getLayoutForDate(dateKey, currentDayData)));
-  if (!activeLayout.phases) return;
-
-  const idx = activeLayout.phases.findIndex(p => p.id === phaseId);
-  if (idx !== -1) {
-    const title = activeLayout.phases[idx].title || "Section";
-    activeLayout.phases.splice(idx, 1);
-    activeLayout.id = 'custom';
-    saveAndApplyLayoutForToday(activeLayout);
-    showToast(`Removed section "${title}"`);
-  }
-}
-
-function handleCanvasAddSection(orientation = 'vertical') {
-  const dateKey = formatDateKey(currentDate);
-  let activeLayout = JSON.parse(JSON.stringify(getLayoutForDate(dateKey, currentDayData)));
-  if (!Array.isArray(activeLayout.phases)) activeLayout.phases = [];
-  const pIdx = activeLayout.phases.length + 1;
-  const isHoriz = (orientation === 'horizontal');
-  activeLayout.phases.push({
-    id: `phase_custom_${Date.now()}`,
-    title: isHoriz ? `Row Section ${pIdx}` : `Column Section ${pIdx}`,
-    timeRange: "Custom Hours",
-    orientation: isHoriz ? 'horizontal' : 'vertical',
-    colorClass: pIdx % 2 === 0 ? "violet" : "cyan",
-    rows: [] // Starts 100% blank without any dummy tracks or columns!
-  });
-  activeLayout.id = 'custom';
-  saveAndApplyLayoutForToday(activeLayout);
-  showToast(`Added blank ${isHoriz ? 'Horizontal Row' : 'Vertical Column'} Section!`);
-}
-
-function handleCanvasToggleOrientation(phaseId) {
-  const dateKey = formatDateKey(currentDate);
-  let activeLayout = JSON.parse(JSON.stringify(getLayoutForDate(dateKey, currentDayData)));
-  if (!activeLayout.phases) return;
-
-  const targetPhase = activeLayout.phases.find(p => p.id === phaseId);
-  if (targetPhase) {
-    const nextOrient = (targetPhase.orientation === 'horizontal') ? 'vertical' : 'horizontal';
-    targetPhase.orientation = nextOrient;
-    activeLayout.id = 'custom';
-    saveAndApplyLayoutForToday(activeLayout);
-    showToast(`Switched "${targetPhase.title || 'Section'}" to ${nextOrient === 'horizontal' ? 'Horizontal Row' : 'Vertical Column'}`);
   }
 }
 
@@ -670,6 +946,7 @@ document.addEventListener('change', (e) => {
           id: match.id,
           name: match.name,
           description: match.description,
+          pageRows: JSON.parse(JSON.stringify(match.pageRows || normalizeLayoutPageRows(match))),
           phases: JSON.parse(JSON.stringify(match.phases || []))
         };
         saveAndApplyLayoutForToday(tplLayout);
@@ -692,78 +969,82 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // 2. Add row button (master banner, row block, or blank section starter)
-  const addRowBtn = e.target.closest('.btn-canvas-add-row, .btn-starter-add-row');
-  if (addRowBtn) {
+  // 2. Add Page Row buttons (Level 1 Top bar or blank canvas welcome)
+  const addPageRowBtn = e.target.closest('#btn-top-add-page-row, #btn-blank-canvas-add-row, .btn-add-page-row');
+  if (addPageRowBtn) {
     e.preventDefault();
     e.stopPropagation();
-    const banner = addRowBtn.closest('.col-master-banner') || addRowBtn.closest('.phase-col-custom');
-    handleCanvasAddRow(banner, addRowBtn.getAttribute('data-phase-id'));
+    handleCanvasAddPageRow();
     return;
   }
 
-  // 3. Add column button (master banner, row block, or blank section starter)
-  const addColBtn = e.target.closest('.btn-canvas-add-col, .btn-canvas-add-col-to-row, .btn-starter-add-col');
-  if (addColBtn) {
+  // 3. Add Section to Page Row (+ Add Section (Column))
+  const addSecBtn = e.target.closest('.btn-row-add-sec');
+  if (addSecBtn) {
     e.preventDefault();
     e.stopPropagation();
-    const banner = addColBtn.closest('.col-master-banner') || addColBtn.closest('.phase-col-custom');
-    const targetRowId = addColBtn.getAttribute('data-row-id') ||
-                        (addColBtn.closest('.phase-row-block') && addColBtn.closest('.phase-row-block').getAttribute('data-row-id'));
-    handleCanvasAddColumn(banner, targetRowId, addColBtn.getAttribute('data-phase-id'));
+    const rowId = addSecBtn.getAttribute('data-row-id') || (addSecBtn.closest('.page-row-container') && addSecBtn.closest('.page-row-container').getAttribute('data-row-id'));
+    handleCanvasAddSectionToRow(rowId);
     return;
   }
 
-  // 4. Toggle Orientation button (↕ Column / ↔ Row)
-  const toggleOrientBtn = e.target.closest('.btn-toggle-orientation');
-  if (toggleOrientBtn) {
-    e.preventDefault();
-    e.stopPropagation();
-    const phaseCol = toggleOrientBtn.closest('.phase-col-custom');
-    const phaseId = toggleOrientBtn.getAttribute('data-phase-id') || (phaseCol && phaseCol.getAttribute('data-phase-id'));
-    if (phaseId) handleCanvasToggleOrientation(phaseId);
-    return;
-  }
-
-  // 5. Delete row button
-  const delRowBtn = e.target.closest('.btn-canvas-del-row');
+  // 4. Delete Page Row button
+  const delRowBtn = e.target.closest('.btn-row-del');
   if (delRowBtn) {
     e.preventDefault();
     e.stopPropagation();
-    const rowBlock = delRowBtn.closest('.phase-row-block');
-    const phaseCol = delRowBtn.closest('.phase-col-custom');
-    const phaseId = delRowBtn.getAttribute('data-phase-id') || (phaseCol && phaseCol.getAttribute('data-phase-id'));
-    const rowId = delRowBtn.getAttribute('data-row-id') || (rowBlock && rowBlock.getAttribute('data-row-id'));
-    if (phaseId && rowId) handleCanvasDeleteRow(phaseId, rowId);
+    const rowId = delRowBtn.getAttribute('data-row-id') || (delRowBtn.closest('.page-row-container') && delRowBtn.closest('.page-row-container').getAttribute('data-row-id'));
+    if (rowId) handleCanvasDeletePageRow(rowId);
     return;
   }
 
-  // 6. Delete section button
+  // 5. Delete Section button
   const delSecBtn = e.target.closest('.btn-canvas-del-section');
   if (delSecBtn) {
     e.preventDefault();
     e.stopPropagation();
-    const phaseCol = delSecBtn.closest('.phase-col-custom');
-    const phaseId = delSecBtn.getAttribute('data-phase-id') || (phaseCol && phaseCol.getAttribute('data-phase-id'));
-    if (phaseId) handleCanvasDeleteSection(phaseId);
+    const secEl = delSecBtn.closest('.phase-col-custom');
+    const secId = delSecBtn.getAttribute('data-section-id') || delSecBtn.getAttribute('data-phase-id') || (secEl && (secEl.getAttribute('data-section-id') || secEl.getAttribute('data-phase-id')));
+    if (secId) handleCanvasDeleteSection(secId);
     return;
   }
 
-  // 7. Add Vertical Section buttons (Level 1 Top bar, blank canvas, or bottom bar)
-  const addVertBtn = e.target.closest('#btn-top-add-vertical, #btn-canvas-bottom-add-vertical, #btn-blank-canvas-add-vertical, .btn-add-vertical-section');
-  if (addVertBtn) {
+  // 6. Add Sub-row / Tier button
+  const addSubRowBtn = e.target.closest('.btn-canvas-add-subrow, .btn-starter-add-subrow, .btn-canvas-add-row, .btn-starter-add-row');
+  if (addSubRowBtn) {
     e.preventDefault();
     e.stopPropagation();
-    handleCanvasAddSection('vertical');
+    const secEl = addSubRowBtn.closest('.phase-col-custom');
+    const secId = addSubRowBtn.getAttribute('data-section-id') || addSubRowBtn.getAttribute('data-phase-id') || (secEl && (secEl.getAttribute('data-section-id') || secEl.getAttribute('data-phase-id')));
+    const banner = addSubRowBtn.closest('.col-master-banner') || secEl;
+    handleCanvasAddSubRow(secId, banner);
     return;
   }
 
-  // 8. Add Horizontal Section buttons (Level 1 Top bar, blank canvas, or bottom bar)
-  const addHorizBtn = e.target.closest('#btn-top-add-horizontal, #btn-canvas-bottom-add-horizontal, #btn-blank-canvas-add-horizontal, .btn-add-horizontal-section');
-  if (addHorizBtn) {
+  // 7. Delete Sub-row / Tier button
+  const delSubRowBtn = e.target.closest('.btn-canvas-del-subrow, .btn-canvas-del-row');
+  if (delSubRowBtn) {
     e.preventDefault();
     e.stopPropagation();
-    handleCanvasAddSection('horizontal');
+    const rowBlock = delSubRowBtn.closest('.phase-row-block');
+    const secEl = delSubRowBtn.closest('.phase-col-custom');
+    const secId = delSubRowBtn.getAttribute('data-section-id') || delSubRowBtn.getAttribute('data-phase-id') || (secEl && (secEl.getAttribute('data-section-id') || secEl.getAttribute('data-phase-id')));
+    const subRowId = delSubRowBtn.getAttribute('data-subrow-id') || delSubRowBtn.getAttribute('data-row-id') || (rowBlock && (rowBlock.getAttribute('data-subrow-id') || rowBlock.getAttribute('data-row-id')));
+    if (subRowId) handleCanvasDeleteSubRow(secId, subRowId);
+    return;
+  }
+
+  // 8. Add Column button (master banner, sub-row, or starter)
+  const addColBtn = e.target.closest('.btn-canvas-add-col, .btn-canvas-add-col-to-subrow, .btn-canvas-add-col-to-row, .btn-starter-add-col');
+  if (addColBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    const secEl = addColBtn.closest('.phase-col-custom');
+    const secId = addColBtn.getAttribute('data-section-id') || addColBtn.getAttribute('data-phase-id') || (secEl && (secEl.getAttribute('data-section-id') || secEl.getAttribute('data-phase-id')));
+    const subRowId = addColBtn.getAttribute('data-subrow-id') || addColBtn.getAttribute('data-row-id') ||
+                     (addColBtn.closest('.phase-row-block') && (addColBtn.closest('.phase-row-block').getAttribute('data-subrow-id') || addColBtn.closest('.phase-row-block').getAttribute('data-row-id')));
+    const banner = addColBtn.closest('.col-master-banner') || secEl;
+    handleCanvasAddColumn(secId, subRowId, banner);
     return;
   }
 
@@ -776,7 +1057,7 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // 10. Restore Polymath Routine (Level 1 Top bar, bottom bar, or blank canvas)
+  // 10. Restore Polymath Routine
   const restorePolyBtn = e.target.closest('#btn-top-reset-polymath, #btn-canvas-bottom-restore-polymath, #btn-blank-canvas-restore-polymath');
   if (restorePolyBtn) {
     e.preventDefault();
@@ -807,15 +1088,20 @@ function renderCustomWorkspace(layout, workspaceEl) {
     </div>
   `;
 
-  const phases = layout.phases || [];
+  const pageRows = normalizeLayoutPageRows(layout);
 
-  // If 100% full blank canvas (0 phases), render welcoming blank state
-  if (phases.length === 0) {
+  // If 100% full blank canvas (0 page rows), render welcoming blank state
+  if (pageRows.length === 0) {
     workspaceEl.innerHTML = bannerHTML + renderLevel1TopBarHTML(layout) + `
       <div class="blank-canvas-welcome">
         <div class="blank-canvas-icon">✦</div>
         <h3>Blank Canvas for ${escapeHtml(formatDateDisplay(currentDate))}</h3>
-        <p>Use the <strong>LEVEL 1</strong> buttons at the top to add your first Column Section or Row Section.</p>
+        <p>Your daily planner is completely blank. Start by adding your first Page Row across the day.</p>
+        <div style="margin-top: 14px;">
+          <button type="button" class="btn-level1-action btn-add-page-row" id="btn-blank-canvas-add-row" style="display: inline-flex; font-size: 13px; padding: 8px 18px;">
+            <span class="btn-level1-icon">＋</span> + Add First Page Row
+          </button>
+        </div>
       </div>
     `;
 
@@ -829,76 +1115,57 @@ function renderCustomWorkspace(layout, workspaceEl) {
     return;
   }
 
-  function renderPhaseCol(p, isHoriz) {
-    const color = p.colorClass || 'cyan';
-    const rows = getPhaseRows(p);
-    const colStyle = isHoriz
-      ? 'width: 100%; display: flex; flex-direction: column; gap: 12px;'
-      : 'flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 12px;';
-
+  function renderSectionHTML(sec, rowId, sIdx) {
+    const color = sec.colorClass || 'cyan';
+    const subRows = getSectionSubRows(sec);
     return `
-      <div class="planner-col phase-col-custom ${isHoriz ? 'phase-horizontal' : 'phase-vertical'}" data-phase-id="${p.id}" style="${colStyle}">
+      <div class="planner-col phase-col-custom" data-section-id="${sec.id}" data-row-id="${rowId}">
         <div class="col-master-banner banner-${color}-master">
           <div class="master-banner-left">
-            <span class="column-time-pill pill-${color}">${escapeHtml(p.timeRange || '')}</span>
-            <span class="column-name">${escapeHtml(p.title)}</span>
+            <span class="column-time-pill pill-${color}">${escapeHtml(sec.timeRange || '')}</span>
+            <span class="column-name">${escapeHtml(sec.title)}</span>
           </div>
           <div class="master-banner-actions">
-            <button type="button" class="btn-canvas-add-row btn-canvas-mini" data-phase-id="${p.id}" title="Add new row of columns to ${escapeHtml(p.title)}">+ Row</button>
-            <button type="button" class="btn-canvas-add-col btn-canvas-mini" data-phase-id="${p.id}" title="Add new column to ${escapeHtml(p.title)}">+ Column</button>
-            <button type="button" class="btn-canvas-del-section" data-phase-id="${p.id}" title="Delete entire section">✕</button>
+            <button type="button" class="btn-canvas-add-col btn-canvas-mini" data-section-id="${sec.id}" data-row-id="${rowId}" title="Add column card to ${escapeHtml(sec.title)}">+ Column</button>
+            <button type="button" class="btn-canvas-add-subrow btn-canvas-mini" data-section-id="${sec.id}" data-row-id="${rowId}" title="Add a sub-row to divide ${escapeHtml(sec.title)} into tiers">+ Sub-row</button>
+            <button type="button" class="btn-canvas-del-section" data-section-id="${sec.id}" data-row-id="${rowId}" title="Delete this section">✕</button>
           </div>
         </div>
         <div class="phase-rows-container" style="display: flex; flex-direction: column; gap: 14px;">
-          ${rows.length === 0 ? `
-            <div class="empty-section-starter" data-phase-id="${p.id}">
+          ${subRows.length === 0 ? `
+            <div class="empty-section-starter" data-section-id="${sec.id}" data-row-id="${rowId}">
               <div class="starter-header">
-                <span class="starter-level-tag">LEVEL 2</span>
+                <span class="starter-level-tag">LEVEL 3</span>
                 <span class="starter-heading">Blank Section</span>
               </div>
-              <p class="starter-desc">This section starts blank. Add columns or rows to organize your tasks:</p>
+              <p class="starter-desc">This section is ready. Add columns or sub-rows to organize your tasks:</p>
               <div class="starter-actions">
-                <button type="button" class="btn-canvas-action-btn btn-starter-add-col" data-phase-id="${p.id}" title="Add a column card to start typing tasks">+ Add Column (Card)</button>
-                <button type="button" class="btn-canvas-action-btn btn-starter-add-row" data-phase-id="${p.id}" title="Add a row to group multiple columns">+ Add Row</button>
+                <button type="button" class="btn-canvas-action-btn btn-starter-add-col" data-section-id="${sec.id}" data-row-id="${rowId}">+ Add Column (Card)</button>
+                <button type="button" class="btn-canvas-action-btn btn-starter-add-subrow" data-section-id="${sec.id}" data-row-id="${rowId}">+ Add Sub-row</button>
               </div>
             </div>
-          ` : rows.map((row, rIdx) => {
-            const trackCount = (row.tracks || []).length;
-            let gridClass = 'cards-grid-dynamic';
-            let gridStyle = '';
-            if (isHoriz) {
-              gridClass = 'cards-grid-horizontal';
-              gridStyle = 'display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 360px)); gap: 14px; width: 100%;';
-            } else {
-              if (trackCount === 4) {
-                gridClass = 'quadrants-grid';
-                gridStyle = 'display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%;';
-              } else if (trackCount === 2) {
-                gridClass = 'two-col-grid';
-                gridStyle = 'display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%;';
-              } else if (trackCount === 1) {
-                gridClass = 'single-card-grid';
-                gridStyle = 'display: grid; grid-template-columns: 1fr; gap: 10px; width: 100%;';
-              } else {
-                gridClass = 'cards-grid-dynamic';
-                gridStyle = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; width: 100%;';
-              }
-            }
+          ` : subRows.map((sub, rIdx) => {
+            const trackCount = (sub.tracks || []).length;
+            let gridClass = 'section-cards-grid-multi';
+            if (trackCount === 1) gridClass = 'section-cards-grid-1';
+            else if (trackCount === 2) gridClass = 'section-cards-grid-2';
+            else if (trackCount === 3) gridClass = 'section-cards-grid-3';
+            else if (trackCount === 4) gridClass = 'section-cards-grid-4';
 
             return `
-              <div class="phase-row-block" data-row-id="${row.id}">
-                ${(rows.length > 1 || row.title) ? `
+              <div class="phase-row-block" data-section-id="${sec.id}" data-subrow-id="${sub.id}">
+                ${(subRows.length > 1 || sub.title) ? `
                   <div class="sub-split-header-clean" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-                    <span class="sub-split-tag tag-${color}">${escapeHtml(row.title || ('Row ' + (rIdx + 1)))}</span>
+                    <span class="sub-split-tag tag-${color}">${escapeHtml(sub.title || ('Tier ' + (rIdx + 1)))}</span>
                     <div class="row-canvas-actions">
-                      <button type="button" class="btn-canvas-add-col-to-row btn-canvas-mini" data-phase-id="${p.id}" data-row-id="${row.id}" title="Add column to this row">+ Column</button>
-                      <button type="button" class="btn-canvas-del-row btn-canvas-mini" data-phase-id="${p.id}" data-row-id="${row.id}" title="Delete this row">✕ Row</button>
+                      <button type="button" class="btn-canvas-add-col-to-subrow btn-canvas-mini" data-section-id="${sec.id}" data-subrow-id="${sub.id}" title="Add column to this tier">+ Column</button>
+                      <button type="button" class="btn-canvas-del-subrow btn-canvas-mini" data-section-id="${sec.id}" data-subrow-id="${sub.id}" title="Delete this tier">✕ Sub-row</button>
                     </div>
                   </div>
                 ` : ''}
-                <div class="${gridClass}" data-row-id="${row.id}" style="${gridStyle}">
-                  ${(row.tracks || []).map((t, tIdx) => `
-                    <div class="cool-card dynamic-col-card" data-block="${t.key || ('custom_' + p.id + '_' + tIdx)}">
+                <div class="${gridClass}" data-subrow-id="${sub.id}">
+                  ${(sub.tracks || []).map((t, tIdx) => `
+                    <div class="cool-card dynamic-col-card" data-block="${t.key || ('custom_' + sec.id + '_' + tIdx)}">
                       <div class="card-bar">
                         <div class="card-bar-left">
                           <span class="track-indicator dot-${color}"></span>
@@ -916,12 +1183,12 @@ function renderCustomWorkspace(layout, workspaceEl) {
                       </div>
                     </div>
                   `).join('')}
-                  ${(!row.tracks || row.tracks.length === 0) ? `
-                    <div class="empty-row-hint">No columns in this row. <button type="button" class="btn-canvas-add-col" data-phase-id="${p.id}" data-row-id="${row.id}">+ Column</button></div>
+                  ${(!sub.tracks || sub.tracks.length === 0) ? `
+                    <div class="empty-row-hint">No columns in this tier. <button type="button" class="btn-canvas-add-col-to-subrow" data-section-id="${sec.id}" data-subrow-id="${sub.id}">+ Column</button></div>
                   ` : ''}
                 </div>
               </div>
-              ${(rIdx < rows.length - 1) ? `<div class="clean-split-rule"></div>` : ''}
+              ${(rIdx < subRows.length - 1) ? `<div class="clean-split-rule"></div>` : ''}
             `;
           }).join('')}
         </div>
@@ -929,43 +1196,33 @@ function renderCustomWorkspace(layout, workspaceEl) {
     `;
   }
 
-  // Partition phases into orientation groups
-  const groups = [];
-  let currentVertGroup = [];
-
-  phases.forEach((p) => {
-    const isHoriz = (p.orientation === 'horizontal');
-    if (isHoriz) {
-      if (currentVertGroup.length > 0) {
-        groups.push({ type: 'vertical-row', phases: currentVertGroup });
-        currentVertGroup = [];
-      }
-      groups.push({ type: 'horizontal-row', phase: p });
-    } else {
-      currentVertGroup.push(p);
-    }
-  });
-  if (currentVertGroup.length > 0) {
-    groups.push({ type: 'vertical-row', phases: currentVertGroup });
-  }
-
-  const groupsHTML = groups.map((g) => {
-    if (g.type === 'vertical-row') {
-      return `
-        <section class="planner-row planner-row-vertical" style="display: flex; gap: 20px; align-items: stretch; width: 100%; margin-bottom: 24px;">
-          ${g.phases.map(p => renderPhaseCol(p, false)).join('')}
-        </section>
-      `;
-    } else {
-      return `
-        <section class="planner-row-horizontal" style="width: 100%; display: flex; flex-direction: column; gap: 14px; margin-bottom: 24px;">
-          ${renderPhaseCol(g.phase, true)}
-        </section>
-      `;
-    }
+  const rowsHTML = pageRows.map((prow, rIdx) => {
+    const sections = prow.sections || [];
+    return `
+      <div class="page-row-container" data-row-id="${prow.id}">
+        <div class="page-row-header">
+          <div class="page-row-header-left">
+            <span class="page-row-tag">${escapeHtml(prow.title || ('PAGE ROW ' + (rIdx + 1)))}</span>
+            <span class="page-row-count-badge">${sections.length} ${sections.length === 1 ? 'section' : 'sections'}</span>
+          </div>
+          <div class="page-row-actions">
+            <button type="button" class="btn-row-action btn-row-add-sec" data-row-id="${prow.id}" title="Split this row by adding another side-by-side section">+ Add Section (Column)</button>
+            <button type="button" class="btn-row-action btn-row-del" data-row-id="${prow.id}" title="Delete this entire page row">✕ Row</button>
+          </div>
+        </div>
+        <div class="page-row-sections">
+          ${sections.length === 0 ? `
+            <div class="empty-section-starter" style="width: 100%;">
+              <p class="starter-desc">This row is empty. Click below to add a section:</p>
+              <button type="button" class="btn-canvas-action-btn btn-row-add-sec" data-row-id="${prow.id}">+ Add Section (Column)</button>
+            </div>
+          ` : sections.map((sec, sIdx) => renderSectionHTML(sec, prow.id, sIdx)).join('')}
+        </div>
+      </div>
+    `;
   }).join('');
 
-  workspaceEl.innerHTML = bannerHTML + renderLevel1TopBarHTML(layout) + groupsHTML;
+  workspaceEl.innerHTML = bannerHTML + renderLevel1TopBarHTML(layout) + rowsHTML;
 
   // Re-bind carryover banner buttons
   const bApply = document.getElementById('btn-carryover-apply');
@@ -982,7 +1239,18 @@ function openCustomizeModal() {
   if (!modal) return;
   const dateKey = formatDateKey(currentDate);
   currentEditingLayout = JSON.parse(JSON.stringify(getLayoutForDate(dateKey, currentDayData)));
-  if (!Array.isArray(currentEditingLayout.phases)) currentEditingLayout.phases = [];
+  if (!Array.isArray(currentEditingLayout.phases) || currentEditingLayout.phases.length === 0) {
+    if (Array.isArray(currentEditingLayout.pageRows)) {
+      currentEditingLayout.phases = [];
+      currentEditingLayout.pageRows.forEach(prow => {
+        (prow.sections || []).forEach(sec => {
+          currentEditingLayout.phases.push(sec);
+        });
+      });
+    } else {
+      currentEditingLayout.phases = [];
+    }
+  }
   const dateDisp = document.getElementById('customize-date-display');
   if (dateDisp) dateDisp.textContent = formatDateDisplay(currentDate);
   renderPresetCards();
@@ -1392,15 +1660,12 @@ function getDefaultTitle(blockKey) {
     return domInput.value.trim();
   }
 
-  // Check active layout presets / phases
+  // Check active layout tracks
   try {
     const layout = getActiveLayout();
-    if (layout && Array.isArray(layout.phases)) {
-      for (const p of layout.phases) {
-        for (const t of (p.tracks || [])) {
-          if (t.key === blockKey && t.title) return t.title;
-        }
-      }
+    const tracks = getAllLayoutTracks(layout);
+    for (const t of tracks) {
+      if (t.key === blockKey && t.title) return t.title;
     }
   } catch (e) { }
 
@@ -1432,15 +1697,12 @@ function getDefaultDayData(dateKey) {
     });
   } else {
     data.customLayout = layout;
-    if (Array.isArray(layout.phases)) {
-      layout.phases.forEach(p => {
-        (p.tracks || []).forEach(t => {
-          if (t.key) {
-            data[t.key] = getDefaultBlockData(t.title || getDefaultTitle(t.key));
-          }
-        });
-      });
-    }
+    const tracks = getAllLayoutTracks(layout);
+    tracks.forEach(t => {
+      if (t.key) {
+        data[t.key] = getDefaultBlockData(t.title || getDefaultTitle(t.key));
+      }
+    });
   }
 
   return data;
@@ -3647,10 +3909,14 @@ function getPhaseForBlock(blockKey) {
   }
   try {
     const layout = getActiveLayout();
-    if (layout && Array.isArray(layout.phases)) {
-      for (const p of layout.phases) {
-        if ((p.tracks || []).some(t => t.key === blockKey)) {
-          return `${p.title}${p.timeRange ? ' (' + p.timeRange + ')' : ''}`;
+    const pageRows = normalizeLayoutPageRows(layout);
+    for (const prow of pageRows) {
+      for (const sec of (prow.sections || [])) {
+        const subRows = getSectionSubRows(sec);
+        for (const sub of subRows) {
+          if ((sub.tracks || []).some(t => t.key === blockKey)) {
+            return `${sec.title}${sec.timeRange ? ' (' + sec.timeRange + ')' : ''}`;
+          }
         }
       }
     }
@@ -4017,12 +4283,20 @@ if (btnExport) {
     let md = `# MRT Daily Planner — ${formatDateDisplay(currentDate)}\n\n`;
 
     const activeLayout = getActiveLayout();
-    if (activeLayout && activeLayout.id !== 'default_polymath' && Array.isArray(activeLayout.phases)) {
-      activeLayout.phases.forEach(phase => {
-        md += `## ${phase.title}${phase.timeRange ? ' (' + phase.timeRange + ')' : ''}\n\n`;
-        (phase.tracks || []).forEach(track => {
-          const b = currentDayData[track.key];
-          md += `### ${b?.title || track.title}\n${b?.content || ''}\n\n`;
+    if (activeLayout && activeLayout.id !== 'default_polymath') {
+      const pageRows = normalizeLayoutPageRows(activeLayout);
+      pageRows.forEach((prow, rIdx) => {
+        md += `## ${prow.title || ('PAGE ROW ' + (rIdx + 1))}\n\n`;
+        (prow.sections || []).forEach(sec => {
+          md += `### ${sec.title}${sec.timeRange ? ' (' + sec.timeRange + ')' : ''}\n\n`;
+          const subRows = getSectionSubRows(sec);
+          subRows.forEach(sub => {
+            if (sub.title) md += `#### ${sub.title}\n\n`;
+            (sub.tracks || []).forEach(track => {
+              const b = currentDayData[track.key];
+              md += `##### ${b?.title || track.title}\n${b?.content || ''}\n\n`;
+            });
+          });
         });
       });
     } else {
