@@ -5505,8 +5505,8 @@ body[data-section-focus] .planner-col.phase-col-custom.section-focused {
 }
 
 .phase-col-custom {
-  flex: 1 0 420px;
-  min-width: 420px;
+  flex: 1 0 380px;
+  min-width: 380px;
   max-width: 100%;
   flex-shrink: 0;
   display: flex;
@@ -5519,7 +5519,7 @@ body[data-section-focus] .planner-col.phase-col-custom.section-focused {
 .phase-col-custom:only-child {
   flex: 1 1 100%;
   width: 100%;
-  min-width: 420px;
+  min-width: 380px;
 }
 
 /* Horizontal scrollable columns row inside section */
@@ -5539,10 +5539,8 @@ body[data-section-focus] .planner-col.phase-col-custom.section-focused {
 }
 
 .section-cards-scroll-row .dynamic-col-card {
-  flex: 0 0 350px;
-  min-width: 350px;
-  width: 350px;
-  max-width: 500px;
+  flex: 1 0 300px;
+  min-width: 300px;
   height: 250px;
   min-height: 250px;
   max-height: 250px;
@@ -5557,7 +5555,7 @@ body[data-section-focus] .planner-col.phase-col-custom.section-focused {
   flex: 1 1 100%;
   width: 100%;
   max-width: 100%;
-  min-width: 350px;
+  min-width: 300px;
 }
 
 /* Slim modern scrollbars for horizontal canvas rows */
