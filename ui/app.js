@@ -331,6 +331,181 @@ function getAllLayoutTracks(layout) {
   return tracks;
 }
 
+function getAllLayoutSections(layout) {
+  const sections = [];
+  if (!layout) return sections;
+  const pageRows = normalizeLayoutPageRows(layout);
+  if (pageRows.length > 0) {
+    pageRows.forEach(row => {
+      (row.sections || []).forEach(sec => {
+        if (sec && sec.id) sections.push(sec);
+      });
+    });
+    return sections;
+  }
+  if (Array.isArray(layout.phases)) {
+    layout.phases.forEach(p => {
+      if (p && p.id) sections.push(p);
+    });
+  }
+  return sections;
+}
+
+let currentSectionFocus = safeStorage.getItem('mrt_section_focus') || 'all';
+
+function renderPhaseRibbon(layout) {
+  const ribbon = document.getElementById('phase-ribbon');
+  if (!ribbon) return;
+
+  const sections = getAllLayoutSections(layout);
+  if (sections.length === 0) {
+    ribbon.innerHTML = `
+      <button type="button" class="phase-tab-btn active" data-section-id="all">
+        <span class="phase-pill-key">0</span>
+        <span class="phase-title">All Sections</span>
+      </button>
+    `;
+    return;
+  }
+
+  const isAllActive = !currentSectionFocus || currentSectionFocus === 'all';
+
+  let html = `
+    <button type="button" class="phase-tab-btn ${isAllActive ? 'active' : ''}" data-section-id="all" title="View all sections (Key: 0)">
+      <span class="phase-pill-key">0</span>
+      <span class="phase-title">All Sections</span>
+      <span class="phase-count-badge">(${sections.length})</span>
+    </button>
+  `;
+
+  sections.forEach((sec, idx) => {
+    const keyNumber = idx + 1;
+    const keyShortcut = keyNumber <= 9 ? `${keyNumber}` : '';
+    const color = sec.colorClass || 'cyan';
+    const isAct = currentSectionFocus === sec.id;
+    const timeDisplay = (sec.timeRange && sec.timeRange.trim() && sec.timeRange !== 'Custom Hours')
+      ? `<span class="phase-time pill-${color}">${escapeHtml(sec.timeRange)}</span>`
+      : '';
+
+    html += `
+      <button type="button" class="phase-tab-btn ${isAct ? 'active' : ''}" data-section-id="${sec.id}" data-color="${color}" title="${escapeHtml(sec.title || ('Section ' + (idx + 1)))}${keyShortcut ? ` (Key: ${keyShortcut})` : ''}">
+        ${keyShortcut ? `<span class="phase-pill-key">${keyShortcut}</span>` : ''}
+        <span class="track-indicator dot-${color}"></span>
+        <span class="phase-title" data-ribbon-sec-id="${sec.id}">${escapeHtml(sec.title || ('Section ' + (idx + 1)))}</span>
+        ${timeDisplay}
+      </button>
+    `;
+  });
+
+  ribbon.innerHTML = html;
+}
+
+function setSectionFocus(secId, notify = true) {
+  currentSectionFocus = secId;
+  safeStorage.setItem('mrt_section_focus', secId);
+
+  // Update Ribbon buttons active state
+  const ribbonBtns = document.querySelectorAll('#phase-ribbon .phase-tab-btn');
+  ribbonBtns.forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-section-id') === secId);
+  });
+
+  if (!secId || secId === 'all') {
+    document.body.removeAttribute('data-section-focus');
+    document.querySelectorAll('.planner-col.phase-col-custom').forEach(el => {
+      el.classList.remove('section-spotlight', 'section-focused');
+    });
+    if (notify) showToast("All Sections Overview");
+  } else {
+    document.body.setAttribute('data-section-focus', secId);
+
+    const allCustomCols = document.querySelectorAll('.planner-col.phase-col-custom');
+    let targetEl = null;
+    allCustomCols.forEach(el => {
+      const match = el.getAttribute('data-section-id') === secId;
+      el.classList.toggle('section-focused', match);
+      if (match) targetEl = el;
+    });
+
+    if (targetEl) {
+      targetEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      targetEl.classList.remove('section-spotlight');
+      void targetEl.offsetWidth;
+      targetEl.classList.add('section-spotlight');
+
+      const secTitleInput = targetEl.querySelector('.section-title-input');
+      const title = secTitleInput ? secTitleInput.value : 'Section';
+      if (notify) showToast(`Focusing: ${title}`);
+    }
+  }
+}
+
+function updateSectionInLayout(secId, updates) {
+  const dateKey = formatDateKey(currentDate);
+  let activeLayout = getLayoutForDate(dateKey, currentDayData);
+  if (!activeLayout) return;
+
+  const pageRows = normalizeLayoutPageRows(activeLayout);
+  let found = false;
+
+  for (const prow of pageRows) {
+    for (const sec of (prow.sections || [])) {
+      if (sec.id === secId) {
+        Object.assign(sec, updates);
+        found = true;
+        break;
+      }
+    }
+    if (found) break;
+  }
+
+  if (found) {
+    activeLayout.id = 'custom';
+    activeLayout.pageRows = pageRows;
+    delete activeLayout.phases;
+    if (!currentDayData) currentDayData = getDefaultDayData(dateKey);
+    currentDayData.customLayout = activeLayout;
+    safeStorage.setItem(`mrt_layout_${dateKey}`, JSON.stringify(activeLayout));
+    isDirty = true;
+  }
+}
+
+function updateTrackTitleInLayout(blockKey, newTitle) {
+  const dateKey = formatDateKey(currentDate);
+  let activeLayout = getLayoutForDate(dateKey, currentDayData);
+  if (!activeLayout) return;
+
+  const pageRows = normalizeLayoutPageRows(activeLayout);
+  let found = false;
+
+  for (const prow of pageRows) {
+    for (const sec of (prow.sections || [])) {
+      for (const sub of getSectionSubRows(sec)) {
+        for (const tr of (sub.tracks || [])) {
+          if (tr.key === blockKey) {
+            tr.title = newTitle;
+            found = true;
+            break;
+          }
+        }
+        if (found) break;
+      }
+      if (found) break;
+    }
+    if (found) break;
+  }
+
+  if (found) {
+    activeLayout.id = 'custom';
+    activeLayout.pageRows = pageRows;
+    delete activeLayout.phases;
+    if (!currentDayData) currentDayData = getDefaultDayData(dateKey);
+    currentDayData.customLayout = activeLayout;
+    safeStorage.setItem(`mrt_layout_${dateKey}`, JSON.stringify(activeLayout));
+    isDirty = true;
+  }
+}
+
 function syncLevel1Bar(layout) {
   const bar = document.getElementById('workspace-level1-bar');
   if (!bar) return;
@@ -374,6 +549,8 @@ function syncWorkspaceLayoutForDate(dateKey, dayData) {
   renderCustomWorkspace(layout, workspaceEl);
 
   syncLevel1Bar(layout);
+  renderPhaseRibbon(layout);
+  setSectionFocus(currentSectionFocus || 'all', false);
   bindCardEvents();
 }
 
@@ -847,6 +1024,72 @@ document.addEventListener('click', (e) => {
     showToast("Cleared to Blank Canvas");
     return;
   }
+
+  // 11. Dynamic Phase Ribbon Tab Click (Section Selection / Navigation)
+  const ribbonBtn = e.target.closest('#phase-ribbon .phase-tab-btn');
+  if (ribbonBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    const secId = ribbonBtn.getAttribute('data-section-id');
+    if (!secId || secId === 'all') {
+      setSectionFocus('all');
+    } else {
+      if (currentSectionFocus === secId) {
+        setSectionFocus('all');
+      } else {
+        setSectionFocus(secId);
+      }
+    }
+    return;
+  }
+});
+
+// Delegated input listener for real-time section title and time updates
+document.addEventListener('input', (e) => {
+  const titleInput = e.target.closest('.section-title-input');
+  if (titleInput) {
+    const secId = titleInput.getAttribute('data-section-id');
+    const newTitle = titleInput.value;
+    updateSectionInLayout(secId, { title: newTitle });
+
+    // Live update ribbon tab in real-time without destroying focus
+    const ribbonTitle = document.querySelector(`.phase-title[data-ribbon-sec-id="${secId}"]`);
+    if (ribbonTitle) {
+      ribbonTitle.textContent = newTitle.trim() || 'Untitled Section';
+    }
+    const ribbonBtn = document.querySelector(`.phase-tab-btn[data-section-id="${secId}"]`);
+    if (ribbonBtn) {
+      ribbonBtn.setAttribute('title', newTitle.trim() || 'Untitled Section');
+    }
+    triggerAutoSave();
+    return;
+  }
+
+  const timeInput = e.target.closest('.section-time-input');
+  if (timeInput) {
+    const secId = timeInput.getAttribute('data-section-id');
+    const newTime = timeInput.value;
+    updateSectionInLayout(secId, { timeRange: newTime });
+
+    // Live update ribbon time pill in real-time
+    const ribbonBtn = document.querySelector(`.phase-tab-btn[data-section-id="${secId}"]`);
+    if (ribbonBtn) {
+      let timePill = ribbonBtn.querySelector('.phase-time');
+      if (newTime.trim()) {
+        if (!timePill) {
+          timePill = document.createElement('span');
+          timePill.className = `phase-time pill-${ribbonBtn.dataset.color || 'cyan'}`;
+          ribbonBtn.appendChild(timePill);
+        }
+        timePill.textContent = newTime.trim();
+        timePill.style.display = '';
+      } else if (timePill) {
+        timePill.style.display = 'none';
+      }
+    }
+    triggerAutoSave();
+    return;
+  }
 });
 
 function renderCustomWorkspace(layout, workspaceEl) {
@@ -903,14 +1146,13 @@ function renderCustomWorkspace(layout, workspaceEl) {
       <div class="planner-col phase-col-custom" data-section-id="${sec.id}" data-row-id="${rowId}">
         <div class="col-master-banner banner-${color}-master">
           <div class="master-banner-left">
-            ${(sec.timeRange && sec.timeRange.trim() && sec.timeRange !== 'Custom Hours') ? `
-              <span class="column-time-pill pill-${color}">${escapeHtml(sec.timeRange)}</span>
-            ` : ''}
-            <span class="column-name">${escapeHtml(sec.title)}</span>
+            <span class="track-indicator dot-${color}"></span>
+            <input type="text" class="section-title-input" data-section-id="${sec.id}" value="${escapeHtml(sec.title || '')}" placeholder="Section ${sIdx + 1}..." spellcheck="false" title="Click to rename this section" />
+            <input type="text" class="section-time-input pill-${color}" data-section-id="${sec.id}" value="${escapeHtml((sec.timeRange && sec.timeRange !== 'Custom Hours') ? sec.timeRange : '')}" placeholder="Hours (optional)..." spellcheck="false" title="Section time range or hours (optional)" />
           </div>
           <div class="master-banner-actions">
-            <button type="button" class="btn-canvas-add-col btn-canvas-mini" data-section-id="${sec.id}" data-row-id="${rowId}" title="Add column to ${escapeHtml(sec.title)}">+ Column</button>
-            <button type="button" class="btn-canvas-add-row btn-canvas-mini" data-section-id="${sec.id}" data-row-id="${rowId}" title="Add row to ${escapeHtml(sec.title)}">+ Row</button>
+            <button type="button" class="btn-canvas-add-col btn-canvas-mini" data-section-id="${sec.id}" data-row-id="${rowId}" title="Add column to this section">+ Column</button>
+            <button type="button" class="btn-canvas-add-row btn-canvas-mini" data-section-id="${sec.id}" data-row-id="${rowId}" title="Add row to this section">+ Row</button>
             <button type="button" class="btn-canvas-del-section" data-section-id="${sec.id}" data-row-id="${rowId}" title="Delete this section">✕</button>
           </div>
         </div>
@@ -1007,7 +1249,7 @@ function renderCustomWorkspace(layout, workspaceEl) {
 }
 
 function initHorizontalMouseWheelScroll() {
-  document.querySelectorAll('.section-cards-scroll-row, .page-row-sections').forEach(scrollContainer => {
+  document.querySelectorAll('.section-cards-scroll-row, .page-row-sections, .day-timeline-ribbon').forEach(scrollContainer => {
     if (scrollContainer._hasWheelListener) return;
     scrollContainer._hasWheelListener = true;
 
@@ -2536,6 +2778,7 @@ function bindCardEvents() {
       titleInput.addEventListener('input', () => {
         if (!currentDayData[blockKey]) currentDayData[blockKey] = getDefaultBlockData(getDefaultTitle(blockKey));
         currentDayData[blockKey].title = titleInput.value;
+        updateTrackTitleInLayout(blockKey, titleInput.value);
         triggerAutoSave();
       });
     }
@@ -3613,30 +3856,11 @@ async function executeImport(sourceDateKey, options = { tasks: true, notes: true
 
 
 // ==========================================================================
-// Phase Isolation Controller (Anti-Task-Switching View)
+// Dynamic Section Focus & Compatibility Controller
 // ==========================================================================
 
 function setPhase(phase, notify = true) {
-  currentPhase = phase;
-  document.body.setAttribute('data-phase', phase);
-  safeStorage.setItem('mrt_phase', phase);
-
-  // Update Ribbon buttons
-  const ribbonBtns = document.querySelectorAll('.phase-tab-btn');
-  ribbonBtns.forEach(btn => {
-    btn.classList.toggle('active', btn.getAttribute('data-phase') === phase);
-  });
-
-  if (notify) {
-    const phaseLabels = {
-      all: 'All Phases: Full Day Overview (13 Tracks)',
-      learning: 'Phase 4-9: Foundation & Learning (CS, AI, Apps, RSWE, Breadth)',
-      productive: 'Phase 9-6: Productive & Admin (Deep Execution & Ops)',
-      evening: 'Phase 6-11: Creative Evening (Huro, Kana, Bana, Curio, Survivo, Random)',
-      health: 'Phase 5-6: Diet & Exercise (Workout, Meals, Supplements & Recovery)'
-    };
-    showToast(phaseLabels[phase] || phase);
-  }
+  setSectionFocus(phase, notify);
 }
 
 // ==========================================================================
@@ -4019,17 +4243,27 @@ function launchNextDeepWorkTask() {
     return;
   }
 
-  // 3. Fallback to active phase blocks
+  // 3. Fallback to candidate blocks from active section or all sections in layout
   let candidateKeys = [];
-  if (currentPhase === 'learning') {
-    candidateKeys = ['part1_quad1', 'part1_quad2', 'part1_quad3', 'part1_quad4', 'part2'];
-  } else if (currentPhase === 'productive') {
-    candidateKeys = ['productive', 'admin'];
-  } else if (currentPhase === 'evening') {
-    candidateKeys = ['evening_huro', 'evening_kana', 'evening_bana', 'evening_curio', 'evening_survivi', 'evening_random'];
-  } else if (currentPhase === 'health') {
-    candidateKeys = ['health_workout', 'health_diet', 'health_habits', 'health_recovery'];
-  } else {
+  try {
+    const dateKey = formatDateKey(currentDate);
+    const activeLayout = getLayoutForDate(dateKey, currentDayData);
+    if (currentSectionFocus && currentSectionFocus !== 'all') {
+      const sections = getAllLayoutSections(activeLayout);
+      const focusedSec = sections.find(s => s.id === currentSectionFocus);
+      if (focusedSec) {
+        for (const sub of getSectionSubRows(focusedSec)) {
+          for (const tr of (sub.tracks || [])) {
+            if (tr.key) candidateKeys.push(tr.key);
+          }
+        }
+      }
+    }
+    if (candidateKeys.length === 0) {
+      const allTracks = getAllLayoutTracks(activeLayout);
+      candidateKeys = allTracks.map(t => t.key).filter(Boolean);
+    }
+  } catch (e) {
     candidateKeys = ['part1_quad1', 'part1_quad2', 'part1_quad3', 'part1_quad4', 'part2', 'productive', 'admin'];
   }
 
@@ -4399,14 +4633,7 @@ if (customizeLayoutModal) {
   });
 }
 
-// Phase Ribbon Interactive Buttons
-const ribbonBtns = document.querySelectorAll('.phase-tab-btn');
-ribbonBtns.forEach(btn => {
-  btn.addEventListener('click', () => {
-    const phase = btn.getAttribute('data-phase');
-    if (phase) setPhase(phase);
-  });
-});
+// Phase ribbon clicks are dynamically handled by delegated listener above
 
 // Lock-In Deep Work Focus Controls
 if (btnDeepWorkFocus) {
@@ -4645,21 +4872,18 @@ window.addEventListener('keydown', (e) => {
   } else if (e.key === 't' || e.key === 'T') {
     e.preventDefault();
     if (btnToday) btnToday.click();
-  } else if (e.key === '1') {
-    e.preventDefault();
-    setPhase('learning');
-  } else if (e.key === '2') {
-    e.preventDefault();
-    setPhase('productive');
-  } else if (e.key === '3') {
-    e.preventDefault();
-    setPhase('evening');
-  } else if (e.key === '4') {
-    e.preventDefault();
-    setPhase('health');
   } else if (e.key === '0') {
     e.preventDefault();
-    setPhase('all');
+    setSectionFocus('all');
+  } else if (['1', '2', '3', '4', '5', '6', '7', '8', '9'].includes(e.key)) {
+    const keyNum = parseInt(e.key, 10);
+    const dateKey = formatDateKey(currentDate);
+    const layout = getLayoutForDate(dateKey, currentDayData);
+    const sections = getAllLayoutSections(layout);
+    if (sections[keyNum - 1]) {
+      e.preventDefault();
+      setSectionFocus(sections[keyNum - 1].id);
+    }
   } else if (e.key === 'f' || e.key === 'F') {
     e.preventDefault();
     launchNextDeepWorkTask();
@@ -4746,8 +4970,8 @@ function init() {
   syncWorkspaceLayoutForDate(dateKey, currentDayData);
   renderCurrentDay();
 
-  // Apply Phase Isolation
-  setPhase(currentPhase, false);
+  // Apply Dynamic Section Focus
+  setSectionFocus(currentSectionFocus || 'all', false);
 
   // Check pending carryover for today
   checkPendingCarryover(dateKey);

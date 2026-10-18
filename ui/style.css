@@ -703,173 +703,151 @@ body {
   display: none;
 }
 
-/* --------------------------------------------------------------------------
-   PHASE 1: 04:00 — 09:00 FOUNDATION & LEARNING ALONE
-   Only 4-9 column appears. 9-6, fold divider, and 6-11 are 100% hidden.
-   -------------------------------------------------------------------------- */
-body[data-phase="learning"] #phase-col-productive,
-body[data-phase="learning"] #phase-fold-divider,
-body[data-phase="learning"] #phase-row-evening {
-  display: none !important;
+/* Dynamic Section Focus & Inline Header Edit Styles */
+.section-title-input {
+  font-family: var(--font-main);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text-main);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 3px 7px;
+  min-width: 100px;
+  max-width: 260px;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-body[data-phase="learning"] #planner-row-top {
-  display: block !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  margin: 0 !important;
+.section-title-input:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.18);
 }
 
-body[data-phase="learning"] #phase-col-learning {
-  display: flex !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  min-height: calc(100vh - 170px) !important;
-  flex: 1 !important;
+.section-title-input:focus {
+  outline: none;
+  background: rgba(0, 0, 0, 0.45);
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
 }
 
-body[data-phase="learning"] #phase-col-learning .quadrants-grid .cool-card {
-  min-height: 240px;
+.section-time-input {
+  font-family: var(--font-code);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 2px 9px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-dim);
+  max-width: 140px;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-body[data-phase="learning"] #phase-col-learning .breadth-card {
-  min-height: 180px;
+.section-time-input:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.09);
 }
 
-/* --------------------------------------------------------------------------
-   PHASE 2: 09:00 — 18:00 PRODUCTIVE & ADMIN ALONE
-   Only 9-6 column appears. 4-9, fold divider, and 6-11 are 100% hidden.
-   -------------------------------------------------------------------------- */
-body[data-phase="productive"] #phase-col-learning,
-body[data-phase="productive"] #phase-fold-divider,
-body[data-phase="productive"] #phase-row-evening {
-  display: none !important;
+.section-time-input:focus {
+  outline: none;
+  background: rgba(0, 0, 0, 0.45);
+  border-color: var(--accent-cyan);
+  color: var(--text-main);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
 }
 
-body[data-phase="productive"] #planner-row-top {
-  display: block !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  margin: 0 !important;
+[data-theme="paper"] .section-title-input {
+  color: #111111;
 }
 
-body[data-phase="productive"] #phase-col-productive {
-  display: grid !important;
-  grid-template-columns: 1.35fr 1fr !important;
-  grid-template-rows: auto 1fr !important;
-  gap: 14px !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  min-height: calc(100vh - 170px) !important;
-  flex: 1 !important;
+[data-theme="paper"] .section-title-input:hover {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.15);
 }
 
-body[data-phase="productive"] #phase-col-productive .col-master-banner {
-  grid-column: 1 / -1 !important;
+[data-theme="paper"] .section-title-input:focus {
+  background: #ffffff;
+  border-color: #0f172a;
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.15);
 }
 
-body[data-phase="productive"] #phase-col-productive .clean-split-rule {
-  display: none !important;
+[data-theme="paper"] .section-time-input {
+  background: #ffffff;
+  border-color: #d8d4c8;
+  color: #4b4843;
 }
 
-body[data-phase="productive"] #phase-col-productive .productive-section {
-  display: flex !important;
-  flex-direction: column !important;
-  height: 100% !important;
+[data-theme="paper"] .section-time-input:focus {
+  background: #ffffff;
+  border-color: #0f172a;
+  color: #111111;
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.15);
 }
 
-body[data-phase="productive"] #phase-col-productive .admin-section {
-  display: flex !important;
-  flex-direction: column !important;
-  height: 100% !important;
+/* Phase Ribbon Dynamic Scrollbar & Section Count Badge */
+.day-timeline-ribbon {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  scroll-behavior: smooth;
 }
 
-body[data-phase="productive"] #phase-col-productive .productive-card,
-body[data-phase="productive"] #phase-col-productive .admin-card {
-  flex: 1 !important;
-  height: 100% !important;
-  min-height: 480px !important;
+.day-timeline-ribbon::-webkit-scrollbar {
+  height: 4px;
 }
 
-/* --------------------------------------------------------------------------
-   PHASE 3: 18:00 — 23:00 CREATIVE EVENING ALONE
-   Only 6-11 section appears. Row 1 (4-9 and 9-6) and fold divider are 100% hidden.
-   -------------------------------------------------------------------------- */
-body[data-phase="evening"] #planner-row-top,
-body[data-phase="evening"] #phase-fold-divider {
-  display: none !important;
+.day-timeline-ribbon::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-body[data-phase="evening"] #phase-row-evening {
-  display: flex !important;
-  flex-direction: column !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  min-height: calc(100vh - 170px) !important;
-  flex: 1 !important;
+.day-timeline-ribbon::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
 }
 
-body[data-phase="evening"] #banner-evening-master {
-  display: flex !important;
-  margin-bottom: 12px !important;
+.day-timeline-ribbon::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
-body[data-phase="evening"] #phase-row-evening .evening-grid {
-  display: grid !important;
-  grid-template-columns: repeat(3, 1fr) !important;
-  gap: 12px !important;
-  flex: 1 !important;
+.phase-count-badge {
+  font-size: 10px;
+  opacity: 0.6;
+  margin-left: 2px;
 }
 
-body[data-phase="evening"] #phase-row-evening .evening-col-card {
-  min-height: 250px !important;
-  flex: 1 !important;
+/* Dynamic Section Focus / Spotlight in Workspace */
+body[data-section-focus] .planner-col.phase-col-custom {
+  opacity: 0.35;
+  filter: grayscale(0.3);
+  transition: opacity 0.25s ease, filter 0.25s ease, box-shadow 0.25s ease;
 }
 
-/* --------------------------------------------------------------------------
-   PHASE 4: 05:00 — 06:00 DIET & EXERCISE ALONE (Dedicated Health Headquarters)
-   Only Diet & Exercise appears. Row 1, Row 2, and fold divider are 100% hidden.
-   -------------------------------------------------------------------------- */
-#phase-section-health {
-  display: none;
+body[data-section-focus] .planner-col.phase-col-custom.section-focused {
+  opacity: 1;
+  filter: none;
+  box-shadow: 0 0 0 2px var(--accent-cyan), 0 8px 30px rgba(0, 0, 0, 0.4);
+  z-index: 2;
 }
 
-body:not([data-phase="health"]) #phase-section-health {
-  display: none !important;
+[data-theme="paper"] body[data-section-focus] .planner-col.phase-col-custom.section-focused {
+  box-shadow: 0 0 0 2px #0f172a, 0 8px 25px rgba(0, 0, 0, 0.12);
 }
 
-body[data-phase="health"] #planner-row-top,
-body[data-phase="health"] #phase-fold-divider,
-body[data-phase="health"] #phase-row-evening {
-  display: none !important;
+@keyframes sectionSpotlightPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.7), 0 0 20px rgba(56, 189, 248, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.9), 0 0 35px rgba(56, 189, 248, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 0 2px var(--accent-cyan), 0 8px 30px rgba(0, 0, 0, 0.4);
+  }
 }
 
-body[data-phase="health"] #phase-section-health {
-  display: flex !important;
-  flex-direction: column !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  min-height: calc(100vh - 170px) !important;
-  flex: 1 !important;
-  gap: 12px;
-}
-
-body[data-phase="health"] #banner-health-master {
-  display: flex !important;
-}
-
-body[data-phase="health"] .health-grid {
-  display: grid !important;
-  grid-template-columns: repeat(2, 1fr) !important;
-  gap: 14px !important;
-  flex: 1 !important;
-}
-
-body[data-phase="health"] .health-col-card {
-  min-height: 290px !important;
-  flex: 1 !important;
-  display: flex !important;
-  flex-direction: column !important;
+.planner-col.phase-col-custom.section-spotlight {
+  animation: sectionSpotlightPulse 0.6s ease-out;
 }
 
 [data-theme="paper"] .column-time-pill {
