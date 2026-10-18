@@ -447,12 +447,6 @@ function handleCanvasAddSectionToRow(rowId) {
   }
   if (!Array.isArray(targetRow.sections)) targetRow.sections = [];
 
-  const MAX_SECTIONS_PER_PAGE_ROW = 3;
-  if (targetRow.sections.length >= MAX_SECTIONS_PER_PAGE_ROW) {
-    showToast(`Maximum ${MAX_SECTIONS_PER_PAGE_ROW} sections side-by-side in a row. Add another page row below!`);
-    return;
-  }
-
   const sNum = targetRow.sections.length + 1;
   const colors = ['cyan', 'violet', 'amber', 'emerald'];
   const nextColor = colors[(sNum - 1) % colors.length];
@@ -467,7 +461,7 @@ function handleCanvasAddSectionToRow(rowId) {
   activeLayout.pageRows = pageRows;
   delete activeLayout.phases;
   saveAndApplyLayoutForToday(activeLayout);
-  showToast(`Added side-by-side section (${sNum} of ${MAX_SECTIONS_PER_PAGE_ROW})!`);
+  showToast(`Added side-by-side section (${sNum})!`);
 }
 
 function handleCanvasDeleteSection(sectionId) {
@@ -548,7 +542,7 @@ function handleCanvasAddColumn(sectionId, targetSubRowId, banner) {
 
     if (!Array.isArray(targetSubRow.tracks)) targetSubRow.tracks = [];
 
-    const MAX_COLS_PER_ROW = 6;
+    const MAX_COLS_PER_ROW = 16;
     if (targetSubRow.tracks.length >= MAX_COLS_PER_ROW) {
       showToast(`Maximum ${MAX_COLS_PER_ROW} columns reached for this row.`);
       return;
@@ -565,7 +559,7 @@ function handleCanvasAddColumn(sectionId, targetSubRowId, banner) {
     activeLayout.pageRows = pageRows;
     delete activeLayout.phases;
     saveAndApplyLayoutForToday(activeLayout);
-    showToast(`Added column (${targetSubRow.tracks.length} of ${MAX_COLS_PER_ROW}) to ${targetSec.title || 'Section'}!`);
+    showToast(`Added column (${targetSubRow.tracks.length}) to ${targetSec.title || 'Section'}!`);
   }
 }
 
@@ -1032,8 +1026,13 @@ function initHorizontalMouseWheelScroll() {
       }
 
       if (scrollContainer.scrollWidth > scrollContainer.clientWidth) {
-        e.preventDefault();
-        scrollContainer.scrollLeft += e.deltaY;
+        const canScrollRight = e.deltaY > 0 && (scrollContainer.scrollLeft + scrollContainer.clientWidth < scrollContainer.scrollWidth - 1);
+        const canScrollLeft = e.deltaY < 0 && (scrollContainer.scrollLeft > 1);
+        if (canScrollRight || canScrollLeft) {
+          e.preventDefault();
+          e.stopPropagation();
+          scrollContainer.scrollLeft += e.deltaY;
+        }
       }
     }, { passive: false });
   });
