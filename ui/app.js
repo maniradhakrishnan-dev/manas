@@ -130,18 +130,8 @@ const PRESETS = {
   blank_canvas: {
     id: "blank_canvas",
     name: "Blank / Custom Canvas",
-    description: "Clean slate. Create your own sections, columns, and workflows",
-    phases: [
-      {
-        id: "phase_custom_1",
-        title: "Daily Focus",
-        timeRange: "All Day",
-        colorClass: "cyan",
-        tracks: [
-          { key: "custom_col_1", title: "Focus Track 1", placeholder: "Tasks, milestones, notes..." }
-        ]
-      }
-    ]
+    description: "100% clean slate. Build your own sections, rows, and columns",
+    phases: []
   }
 };
 
@@ -171,14 +161,14 @@ function getActiveBlockKeys() {
 
 // Layout helper functions: scoped per-date
 function getLayoutForDate(dateKey, dayData) {
-  if (dayData && dayData.customLayout && Array.isArray(dayData.customLayout.phases) && dayData.customLayout.phases.length > 0) {
+  if (dayData && dayData.customLayout && Array.isArray(dayData.customLayout.phases)) {
     return dayData.customLayout;
   }
   const cached = safeStorage.getItem(`mrt_layout_${dateKey}`);
   if (cached) {
     try {
       const parsed = JSON.parse(cached);
-      if (parsed && Array.isArray(parsed.phases) && parsed.phases.length > 0) {
+      if (parsed && Array.isArray(parsed.phases)) {
         return parsed;
       }
     } catch (e) { }
@@ -189,6 +179,24 @@ function getLayoutForDate(dateKey, dayData) {
 function getActiveLayout() {
   const dateKey = formatDateKey(currentDate);
   return getLayoutForDate(dateKey, currentDayData);
+}
+
+// Helper: normalize rows inside a phase for multi-row support
+function getPhaseRows(phase) {
+  if (!phase) return [];
+  if (Array.isArray(phase.rows) && phase.rows.length > 0) {
+    return phase.rows;
+  }
+  if (Array.isArray(phase.tracks)) {
+    return [
+      {
+        id: `row_${phase.id || 'default'}_1`,
+        title: "",
+        tracks: phase.tracks
+      }
+    ];
+  }
+  return [];
 }
 
 function syncWorkspaceLayoutForDate(dateKey, dayData) {
@@ -204,7 +212,7 @@ function syncWorkspaceLayoutForDate(dateKey, dayData) {
     renderCustomWorkspace(layout, workspaceEl);
   }
 
-  // Attach dynamic + Column and ✕ Delete Column controls on canvas
+  // Attach dynamic + Row, + Column and ✕ Delete Column controls on canvas
   attachCanvasLayoutControls(layout);
   bindCardEvents();
 }
@@ -226,7 +234,7 @@ function saveAndApplyLayoutForToday(layout) {
 }
 
 function attachCanvasLayoutControls(currentLayout) {
-  // 1. Add + Column button to every section banner
+  // Ensure every section banner has + Row and + Column buttons
   document.querySelectorAll('.col-master-banner').forEach(banner => {
     let actions = banner.querySelector('.master-banner-actions');
     if (!actions) {
@@ -234,21 +242,25 @@ function attachCanvasLayoutControls(currentLayout) {
       actions.className = 'master-banner-actions';
       banner.appendChild(actions);
     }
+    if (!actions.querySelector('.btn-canvas-add-row')) {
+      const btnAddRow = document.createElement('button');
+      btnAddRow.type = 'button';
+      btnAddRow.className = 'btn-canvas-add-row';
+      btnAddRow.title = 'Add new row of columns to this phase';
+      btnAddRow.textContent = '+ Row';
+      actions.appendChild(btnAddRow);
+    }
     if (!actions.querySelector('.btn-canvas-add-col')) {
       const btnAdd = document.createElement('button');
       btnAdd.type = 'button';
       btnAdd.className = 'btn-canvas-add-col';
       btnAdd.title = 'Add new column to this phase';
       btnAdd.textContent = '+ Column';
-      btnAdd.addEventListener('click', (e) => {
-        e.stopPropagation();
-        handleCanvasAddColumn(banner);
-      });
       actions.appendChild(btnAdd);
     }
   });
 
-  // 2. Add ✕ remove button to each card header
+  // Ensure every card header has a ✕ remove button (unrestricted deletion down to 0)
   document.querySelectorAll('.cool-card, .block-card').forEach(card => {
     const barRight = card.querySelector('.card-bar-right');
     if (barRight && !barRight.querySelector('.btn-canvas-del-col')) {
@@ -257,36 +269,29 @@ function attachCanvasLayoutControls(currentLayout) {
       btnDel.className = 'btn-canvas-del-col';
       btnDel.title = "Delete this column from today's layout";
       btnDel.textContent = '✕';
-      btnDel.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const blockKey = card.getAttribute('data-block');
-        if (blockKey) handleCanvasDeleteColumn(blockKey);
-      });
       barRight.appendChild(btnDel);
     }
   });
 }
 
-function handleCanvasAddColumn(banner) {
+function handleCanvasAddRow(banner, explicitPhaseId) {
   const dateKey = formatDateKey(currentDate);
   let activeLayout = JSON.parse(JSON.stringify(getLayoutForDate(dateKey, currentDayData)));
 
-  // Identify phase
-  const customCol = banner.closest('.phase-col-custom');
-  const phaseId = customCol ? customCol.getAttribute('data-phase-id') : null;
+  let phaseId = explicitPhaseId || (banner ? (banner.getAttribute('data-phase-id') || (banner.closest('.phase-col-custom') && banner.closest('.phase-col-custom').getAttribute('data-phase-id'))) : null);
 
   let targetPhase = null;
   if (phaseId && activeLayout.phases) {
     targetPhase = activeLayout.phases.find(p => p.id === phaseId);
   }
   if (!targetPhase && activeLayout.phases && activeLayout.phases.length > 0) {
-    if (banner.closest('#phase-col-learning') || banner.classList.contains('banner-learning-master')) {
+    if (banner && (banner.closest('#phase-col-learning') || banner.classList.contains('banner-learning-master'))) {
       targetPhase = activeLayout.phases.find(p => p.id === 'phase_learning') || activeLayout.phases[0];
-    } else if (banner.closest('#phase-col-productive') || banner.classList.contains('banner-work-master')) {
+    } else if (banner && (banner.closest('#phase-col-productive') || banner.classList.contains('banner-work-master'))) {
       targetPhase = activeLayout.phases.find(p => p.id === 'phase_productive') || activeLayout.phases[1] || activeLayout.phases[0];
-    } else if (banner.closest('#phase-row-evening') || banner.classList.contains('banner-evening-master')) {
+    } else if (banner && (banner.closest('#phase-row-evening') || banner.classList.contains('banner-evening-master'))) {
       targetPhase = activeLayout.phases.find(p => p.id === 'phase_evening') || activeLayout.phases[2] || activeLayout.phases[0];
-    } else if (banner.closest('.health-section') || banner.classList.contains('banner-health-master')) {
+    } else if (banner && (banner.closest('.health-section') || banner.classList.contains('banner-health-master'))) {
       targetPhase = activeLayout.phases.find(p => p.id === 'phase_health') || activeLayout.phases[3] || activeLayout.phases[0];
     } else {
       targetPhase = activeLayout.phases[0];
@@ -294,16 +299,78 @@ function handleCanvasAddColumn(banner) {
   }
 
   if (targetPhase) {
-    if (!Array.isArray(targetPhase.tracks)) targetPhase.tracks = [];
-    const newKey = `custom_${Date.now()}`;
-    targetPhase.tracks.push({
-      key: newKey,
-      title: `Column ${targetPhase.tracks.length + 1}`,
-      placeholder: "Tasks, milestones, notes..."
+    targetPhase.rows = getPhaseRows(targetPhase);
+    delete targetPhase.tracks;
+    const rIdx = targetPhase.rows.length + 1;
+    targetPhase.rows.push({
+      id: `row_${Date.now()}`,
+      title: `Row ${rIdx}`,
+      tracks: [
+        {
+          key: `custom_${targetPhase.id || 'phase'}_${Date.now()}`,
+          title: "New Column",
+          placeholder: "Tasks, notes..."
+        }
+      ]
     });
     activeLayout.id = 'custom';
     saveAndApplyLayoutForToday(activeLayout);
-    showToast(`Added column to ${targetPhase.title}!`);
+    showToast(`Added row to ${targetPhase.title || 'Phase'}!`);
+  }
+}
+
+function handleCanvasAddColumn(banner, targetRowId, explicitPhaseId) {
+  const dateKey = formatDateKey(currentDate);
+  let activeLayout = JSON.parse(JSON.stringify(getLayoutForDate(dateKey, currentDayData)));
+
+  let phaseId = explicitPhaseId || (banner ? (banner.getAttribute('data-phase-id') || (banner.closest('.phase-col-custom') && banner.closest('.phase-col-custom').getAttribute('data-phase-id'))) : null);
+
+  let targetPhase = null;
+  if (phaseId && activeLayout.phases) {
+    targetPhase = activeLayout.phases.find(p => p.id === phaseId);
+  }
+  if (!targetPhase && activeLayout.phases && activeLayout.phases.length > 0) {
+    if (banner && (banner.closest('#phase-col-learning') || banner.classList.contains('banner-learning-master'))) {
+      targetPhase = activeLayout.phases.find(p => p.id === 'phase_learning') || activeLayout.phases[0];
+    } else if (banner && (banner.closest('#phase-col-productive') || banner.classList.contains('banner-work-master'))) {
+      targetPhase = activeLayout.phases.find(p => p.id === 'phase_productive') || activeLayout.phases[1] || activeLayout.phases[0];
+    } else if (banner && (banner.closest('#phase-row-evening') || banner.classList.contains('banner-evening-master'))) {
+      targetPhase = activeLayout.phases.find(p => p.id === 'phase_evening') || activeLayout.phases[2] || activeLayout.phases[0];
+    } else if (banner && (banner.closest('.health-section') || banner.classList.contains('banner-health-master'))) {
+      targetPhase = activeLayout.phases.find(p => p.id === 'phase_health') || activeLayout.phases[3] || activeLayout.phases[0];
+    } else {
+      targetPhase = activeLayout.phases[0];
+    }
+  }
+
+  if (targetPhase) {
+    targetPhase.rows = getPhaseRows(targetPhase);
+    delete targetPhase.tracks;
+
+    let targetRow = null;
+    if (targetRowId) {
+      targetRow = targetPhase.rows.find(r => r.id === targetRowId);
+    }
+    if (!targetRow) {
+      if (targetPhase.rows.length === 0) {
+        targetRow = { id: `row_${Date.now()}`, title: "", tracks: [] };
+        targetPhase.rows.push(targetRow);
+      } else {
+        targetRow = targetPhase.rows[targetPhase.rows.length - 1];
+      }
+    }
+
+    if (!Array.isArray(targetRow.tracks)) targetRow.tracks = [];
+    const newKey = `custom_${Date.now()}`;
+    targetRow.tracks.push({
+      key: newKey,
+      title: `Column ${targetRow.tracks.length + 1}`,
+      placeholder: "Tasks, milestones, notes..."
+    });
+
+    activeLayout.id = 'custom';
+    saveAndApplyLayoutForToday(activeLayout);
+    showToast(`Added column to ${targetPhase.title || 'Phase'}!`);
   }
 }
 
@@ -314,13 +381,21 @@ function handleCanvasDeleteColumn(blockKey) {
   let removed = false;
   if (activeLayout.phases) {
     for (const phase of activeLayout.phases) {
-      if (Array.isArray(phase.tracks)) {
-        const idx = phase.tracks.findIndex(t => t.key === blockKey);
-        if (idx !== -1) {
-          phase.tracks.splice(idx, 1);
-          removed = true;
-          break;
+      const rows = getPhaseRows(phase);
+      for (const row of rows) {
+        if (Array.isArray(row.tracks)) {
+          const idx = row.tracks.findIndex(t => t.key === blockKey);
+          if (idx !== -1) {
+            row.tracks.splice(idx, 1);
+            removed = true;
+            break;
+          }
         }
+      }
+      if (removed) {
+        phase.rows = rows;
+        delete phase.tracks;
+        break;
       }
     }
   }
@@ -331,6 +406,144 @@ function handleCanvasDeleteColumn(blockKey) {
     showToast("Column removed from today's layout");
   }
 }
+
+function handleCanvasDeleteRow(phaseId, rowId) {
+  const dateKey = formatDateKey(currentDate);
+  let activeLayout = JSON.parse(JSON.stringify(getLayoutForDate(dateKey, currentDayData)));
+  if (!activeLayout.phases) return;
+
+  const targetPhase = activeLayout.phases.find(p => p.id === phaseId);
+  if (targetPhase) {
+    const rows = getPhaseRows(targetPhase);
+    const rIdx = rows.findIndex(r => r.id === rowId);
+    if (rIdx !== -1) {
+      rows.splice(rIdx, 1);
+      targetPhase.rows = rows;
+      delete targetPhase.tracks;
+      activeLayout.id = 'custom';
+      saveAndApplyLayoutForToday(activeLayout);
+      showToast("Row removed from section");
+    }
+  }
+}
+
+function handleCanvasDeleteSection(phaseId) {
+  const dateKey = formatDateKey(currentDate);
+  let activeLayout = JSON.parse(JSON.stringify(getLayoutForDate(dateKey, currentDayData)));
+  if (!activeLayout.phases) return;
+
+  const idx = activeLayout.phases.findIndex(p => p.id === phaseId);
+  if (idx !== -1) {
+    const title = activeLayout.phases[idx].title || "Section";
+    activeLayout.phases.splice(idx, 1);
+    activeLayout.id = 'custom';
+    saveAndApplyLayoutForToday(activeLayout);
+    showToast(`Removed section "${title}"`);
+  }
+}
+
+function handleCanvasAddSection() {
+  const dateKey = formatDateKey(currentDate);
+  let activeLayout = JSON.parse(JSON.stringify(getLayoutForDate(dateKey, currentDayData)));
+  if (!Array.isArray(activeLayout.phases)) activeLayout.phases = [];
+  const pIdx = activeLayout.phases.length + 1;
+  activeLayout.phases.push({
+    id: `phase_custom_${Date.now()}`,
+    title: `Section ${pIdx}`,
+    timeRange: "Custom Hours",
+    colorClass: pIdx % 2 === 0 ? "violet" : "cyan",
+    rows: [
+      {
+        id: `row_${Date.now()}`,
+        title: "",
+        tracks: [
+          { key: `custom_${Date.now()}`, title: "Focus Track 1", placeholder: "Tasks, milestones, notes..." }
+        ]
+      }
+    ]
+  });
+  activeLayout.id = 'custom';
+  saveAndApplyLayoutForToday(activeLayout);
+  showToast(`Added Section ${pIdx}!`);
+}
+
+// Global delegated click listener for canvas layout modifications
+document.addEventListener('click', (e) => {
+  // 1. Delete column button
+  const delColBtn = e.target.closest('.btn-canvas-del-col');
+  if (delColBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    const card = delColBtn.closest('.cool-card, .block-card');
+    const trackKey = delColBtn.getAttribute('data-track-key') || (card && card.getAttribute('data-block'));
+    if (trackKey) handleCanvasDeleteColumn(trackKey);
+    return;
+  }
+
+  // 2. Add row button
+  const addRowBtn = e.target.closest('.btn-canvas-add-row');
+  if (addRowBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    const banner = addRowBtn.closest('.col-master-banner') || addRowBtn.closest('.phase-col-custom');
+    handleCanvasAddRow(banner, addRowBtn.getAttribute('data-phase-id'));
+    return;
+  }
+
+  // 3. Add column button
+  const addColBtn = e.target.closest('.btn-canvas-add-col, .btn-canvas-add-col-to-row');
+  if (addColBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    const banner = addColBtn.closest('.col-master-banner') || addColBtn.closest('.phase-col-custom');
+    const targetRowId = addColBtn.getAttribute('data-row-id') ||
+                        (addColBtn.closest('.phase-row-block') && addColBtn.closest('.phase-row-block').getAttribute('data-row-id'));
+    handleCanvasAddColumn(banner, targetRowId, addColBtn.getAttribute('data-phase-id'));
+    return;
+  }
+
+  // 4. Delete row button
+  const delRowBtn = e.target.closest('.btn-canvas-del-row');
+  if (delRowBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    const rowBlock = delRowBtn.closest('.phase-row-block');
+    const phaseCol = delRowBtn.closest('.phase-col-custom');
+    const phaseId = delRowBtn.getAttribute('data-phase-id') || (phaseCol && phaseCol.getAttribute('data-phase-id'));
+    const rowId = delRowBtn.getAttribute('data-row-id') || (rowBlock && rowBlock.getAttribute('data-row-id'));
+    if (phaseId && rowId) handleCanvasDeleteRow(phaseId, rowId);
+    return;
+  }
+
+  // 5. Delete section button
+  const delSecBtn = e.target.closest('.btn-canvas-del-section');
+  if (delSecBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    const phaseCol = delSecBtn.closest('.phase-col-custom');
+    const phaseId = delSecBtn.getAttribute('data-phase-id') || (phaseCol && phaseCol.getAttribute('data-phase-id'));
+    if (phaseId) handleCanvasDeleteSection(phaseId);
+    return;
+  }
+
+  // 6. Bottom toolbar buttons
+  const addSecBtn = e.target.closest('#btn-canvas-bottom-add-section');
+  if (addSecBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    handleCanvasAddSection();
+    return;
+  }
+
+  const restorePolyBtn = e.target.closest('#btn-canvas-bottom-restore-polymath');
+  if (restorePolyBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    saveAndApplyLayoutForToday(PRESETS.default_polymath);
+    showToast("Restored Polymath Golden Routine");
+    return;
+  }
+});
 
 function renderCustomWorkspace(layout, workspaceEl) {
   const bannerHTML = `
@@ -353,13 +566,53 @@ function renderCustomWorkspace(layout, workspaceEl) {
   `;
 
   const phases = layout.phases || [];
+
+  // If 100% full blank canvas (0 phases), render welcoming blank state
+  if (phases.length === 0) {
+    workspaceEl.innerHTML = bannerHTML + `
+      <div class="blank-canvas-welcome">
+        <div class="blank-canvas-icon">✦</div>
+        <h3>100% Blank Canvas for ${escapeHtml(formatDateDisplay(currentDate))}</h3>
+        <p>No columns or sections exist yet. Build your custom layout for today from scratch, or restore a routine:</p>
+        <div class="blank-canvas-actions">
+          <button type="button" class="btn-canvas-welcome-add-section" id="btn-blank-canvas-add-section">+ Add Section / Phase</button>
+          <button type="button" class="btn-canvas-welcome-preset" id="btn-blank-canvas-restore-polymath">↺ Load Polymath Golden Routine</button>
+        </div>
+      </div>
+    `;
+
+    const btnAddSec = document.getElementById('btn-blank-canvas-add-section');
+    if (btnAddSec) {
+      btnAddSec.addEventListener('click', () => {
+        handleCanvasAddSection();
+      });
+    }
+
+    const btnRest = document.getElementById('btn-blank-canvas-restore-polymath');
+    if (btnRest) {
+      btnRest.addEventListener('click', () => {
+        saveAndApplyLayoutForToday(PRESETS.default_polymath);
+        showToast("Restored Polymath Golden Routine");
+      });
+    }
+
+    // Re-bind carryover banner buttons
+    const bApply = document.getElementById('btn-carryover-apply');
+    if (bApply) bApply.addEventListener('click', applyPendingCarryover);
+    const bChoose = document.getElementById('btn-carryover-choose');
+    if (bChoose) bChoose.addEventListener('click', () => openImportModal(currentPendingCarryoverSourceDate));
+    const bDismiss = document.getElementById('btn-carryover-dismiss');
+    if (bDismiss) bDismiss.addEventListener('click', dismissCarryover);
+    return;
+  }
+
   const half = Math.ceil(phases.length / 2);
   const topPhases = phases.slice(0, half);
   const bottomPhases = phases.slice(half);
 
   function renderPhaseCol(p, pIdx) {
     const color = p.colorClass || 'cyan';
-    const tracks = p.tracks || [];
+    const rows = getPhaseRows(p);
     return `
       <div class="planner-col phase-col-custom" data-phase-id="${p.id}" style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 12px;">
         <div class="col-master-banner banner-${color}-master">
@@ -368,28 +621,55 @@ function renderCustomWorkspace(layout, workspaceEl) {
             <span class="column-name">${escapeHtml(p.title)}</span>
           </div>
           <div class="master-banner-actions">
+            <button type="button" class="btn-canvas-add-row" data-phase-id="${p.id}" title="Add new row of columns to ${escapeHtml(p.title)}">+ Row</button>
             <button type="button" class="btn-canvas-add-col" data-phase-id="${p.id}" title="Add new column to ${escapeHtml(p.title)}">+ Column</button>
+            <button type="button" class="btn-canvas-del-section" data-phase-id="${p.id}" title="Delete entire section">✕</button>
           </div>
         </div>
-        <div class="cards-grid-dynamic">
-          ${tracks.map((t, tIdx) => `
-            <div class="cool-card dynamic-col-card" data-block="${t.key || ('custom_' + p.id + '_' + tIdx)}">
-              <div class="card-bar">
-                <div class="card-bar-left">
-                  <span class="track-indicator dot-${color}"></span>
-                  <input type="text" class="card-title-input" value="${escapeHtml(t.title)}" placeholder="${escapeHtml(t.title)}" spellcheck="false" title="Click to rename this column" />
+        <div class="phase-rows-container" style="display: flex; flex-direction: column; gap: 14px;">
+          ${rows.length === 0 ? `
+            <div class="empty-row-hint" style="padding: 16px; border: 1px dashed var(--border-glass); border-radius: 8px; justify-content: center;">
+              No rows or columns in this section.
+              <button type="button" class="btn-canvas-add-row" data-phase-id="${p.id}">+ Add Row</button>
+              <button type="button" class="btn-canvas-add-col" data-phase-id="${p.id}">+ Add Column</button>
+            </div>
+          ` : rows.map((row, rIdx) => `
+            <div class="phase-row-block" data-row-id="${row.id}">
+              ${(rows.length > 1 || row.title) ? `
+                <div class="sub-split-header-clean" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                  <span class="sub-split-tag tag-${color}">${escapeHtml(row.title || ('Row ' + (rIdx + 1)))}</span>
+                  <div class="row-canvas-actions">
+                    <button type="button" class="btn-canvas-add-col-to-row btn-canvas-mini" data-phase-id="${p.id}" data-row-id="${row.id}" title="Add column to this row">+ Column</button>
+                    <button type="button" class="btn-canvas-del-row btn-canvas-mini" data-phase-id="${p.id}" data-row-id="${row.id}" title="Delete this row">✕ Row</button>
+                  </div>
                 </div>
-                <div class="card-bar-right">
-                  <span class="card-checklist-stat"></span>
-                  <button class="btn-check-insert" title="Insert Checkbox">☐</button>
-                  <button class="btn-bullet-insert" title="Insert Bullet">•</button>
-                  <button type="button" class="btn-canvas-del-col" data-track-key="${t.key}" title="Delete this column from today">✕</button>
-                </div>
-              </div>
-              <div class="card-editor-area">
-                <textarea class="card-text-editor" placeholder="${escapeHtml(t.placeholder || 'Tasks and notes...')}"></textarea>
+              ` : ''}
+              <div class="cards-grid-dynamic" data-row-id="${row.id}">
+                ${(row.tracks || []).map((t, tIdx) => `
+                  <div class="cool-card dynamic-col-card" data-block="${t.key || ('custom_' + p.id + '_' + tIdx)}">
+                    <div class="card-bar">
+                      <div class="card-bar-left">
+                        <span class="track-indicator dot-${color}"></span>
+                        <input type="text" class="card-title-input" value="${escapeHtml(t.title)}" placeholder="${escapeHtml(t.title)}" spellcheck="false" title="Click to rename this column" />
+                      </div>
+                      <div class="card-bar-right">
+                        <span class="card-checklist-stat"></span>
+                        <button class="btn-check-insert" title="Insert Checkbox">☐</button>
+                        <button class="btn-bullet-insert" title="Insert Bullet">•</button>
+                        <button type="button" class="btn-canvas-del-col" data-track-key="${t.key}" title="Delete this column from today">✕</button>
+                      </div>
+                    </div>
+                    <div class="card-editor-area">
+                      <textarea class="card-text-editor" placeholder="${escapeHtml(t.placeholder || 'Tasks and notes...')}"></textarea>
+                    </div>
+                  </div>
+                `).join('')}
+                ${(!row.tracks || row.tracks.length === 0) ? `
+                  <div class="empty-row-hint">No columns in this row. <button type="button" class="btn-canvas-add-col" data-phase-id="${p.id}" data-row-id="${row.id}">+ Column</button></div>
+                ` : ''}
               </div>
             </div>
+            ${(rIdx < rows.length - 1) ? `<div class="clean-split-rule"></div>` : ''}
           `).join('')}
         </div>
       </div>
@@ -420,7 +700,14 @@ function renderCustomWorkspace(layout, workspaceEl) {
     </section>
   ` : '';
 
-  workspaceEl.innerHTML = bannerHTML + topRowHTML + dividerHTML + bottomRowHTML;
+  const bottomToolbarHTML = `
+    <div class="custom-workspace-bottom-bar" style="display: flex; justify-content: center; gap: 12px; margin-top: 24px; padding-bottom: 20px;">
+      <button type="button" class="btn-canvas-welcome-add-section" id="btn-canvas-bottom-add-section">+ Add Section / Phase</button>
+      <button type="button" class="btn-canvas-welcome-preset" id="btn-canvas-bottom-restore-polymath">↺ Load Polymath Golden Routine</button>
+    </div>
+  `;
+
+  workspaceEl.innerHTML = bannerHTML + topRowHTML + dividerHTML + bottomRowHTML + bottomToolbarHTML;
 
   // Re-bind carryover banner buttons
   const bApply = document.getElementById('btn-carryover-apply');
@@ -431,11 +718,13 @@ function renderCustomWorkspace(layout, workspaceEl) {
   if (bDismiss) bDismiss.addEventListener('click', dismissCarryover);
 }
 
+
 function openCustomizeModal() {
   const modal = document.getElementById('customize-layout-modal');
   if (!modal) return;
   const dateKey = formatDateKey(currentDate);
   currentEditingLayout = JSON.parse(JSON.stringify(getLayoutForDate(dateKey, currentDayData)));
+  if (!Array.isArray(currentEditingLayout.phases)) currentEditingLayout.phases = [];
   const dateDisp = document.getElementById('customize-date-display');
   if (dateDisp) dateDisp.textContent = formatDateDisplay(currentDate);
   renderPresetCards();
@@ -455,7 +744,7 @@ function renderPresetCards() {
 
   const presetList = [
     { id: 'default_polymath', icon: '🌟', name: "Polymath Golden Routine (Default)", desc: "4-9 Foundation (5 tracks) + 9-6 Work + 6-11 Evening + Health" },
-    { id: 'blank_canvas', icon: '📄', name: "Blank / Custom Canvas", desc: "Clean slate. Create your own columns, sections, and workflows" }
+    { id: 'blank_canvas', icon: '📄', name: "Blank / Custom Canvas", desc: "100% clean slate. Build your own sections, rows, and columns" }
   ];
 
   presetList.forEach(p => {
@@ -487,6 +776,15 @@ function renderPhaseCustomizer() {
   container.innerHTML = '';
 
   const phases = currentEditingLayout.phases || [];
+  if (phases.length === 0) {
+    container.innerHTML = `
+      <div class="empty-row-hint" style="padding: 16px; justify-content: center; font-size: 13px;">
+        ✦ Blank Canvas: No sections or columns currently exist for this day. Click "+ Add New Phase / Section" below to build your layout!
+      </div>
+    `;
+    return;
+  }
+
   phases.forEach((phase, phaseIdx) => {
     const box = document.createElement('div');
     box.className = 'phase-customizer-box';
@@ -497,7 +795,7 @@ function renderPhaseCustomizer() {
     header.innerHTML = `
       <input type="text" class="phase-customizer-title-input" value="${escapeHtml(phase.title || '')}" placeholder="Phase Title (e.g. Morning Focus)" />
       <input type="text" class="phase-customizer-time-input" value="${escapeHtml(phase.timeRange || '')}" placeholder="Time (09:00 — 18:00)" />
-      ${(phases.length > 1) ? `<button type="button" class="phase-delete-btn" title="Delete this section">🗑 Delete Section</button>` : ''}
+      <button type="button" class="phase-delete-btn" title="Delete this section">🗑 Delete Section</button>
     `;
 
     const titleInput = header.querySelector('.phase-customizer-title-input');
@@ -522,64 +820,140 @@ function renderPhaseCustomizer() {
     }
     box.appendChild(header);
 
-    // Tracks list
-    const trackList = document.createElement('div');
-    trackList.className = 'track-edit-list';
+    // Rows container inside this phase
+    const rows = getPhaseRows(phase);
+    phase.rows = rows;
+    delete phase.tracks;
 
-    (phase.tracks || []).forEach((track, trackIdx) => {
-      const row = document.createElement('div');
-      row.className = 'track-edit-row';
-      row.innerHTML = `
-        <span class="track-indicator dot-${phase.colorClass || 'cyan'}"></span>
-        <input type="text" class="track-edit-input" value="${escapeHtml(track.title || '')}" placeholder="Column Title" />
-        <input type="text" class="track-edit-sub-input" value="${escapeHtml(track.placeholder || '')}" placeholder="Subtitle / details hint..." />
-        ${(phase.tracks.length > 1) ? `<button type="button" class="track-edit-del-btn" title="Remove Column">✕</button>` : ''}
+    const rowsContainer = document.createElement('div');
+    rowsContainer.className = 'phase-rows-edit-container';
+    rowsContainer.style.display = 'flex';
+    rowsContainer.style.flexDirection = 'column';
+    rowsContainer.style.gap = '10px';
+
+    rows.forEach((row, rowIdx) => {
+      const rowBox = document.createElement('div');
+      rowBox.className = 'row-customizer-box';
+
+      // Row Header
+      const rHeader = document.createElement('div');
+      rHeader.className = 'row-customizer-header';
+      rHeader.innerHTML = `
+        <span style="font-size: 11px; font-weight: 800; color: var(--accent-cyan); text-transform: uppercase;">Row ${rowIdx + 1}:</span>
+        <input type="text" class="row-customizer-title-input" value="${escapeHtml(row.title || '')}" placeholder="Row Header / Tag (Optional, e.g. Part 1 — Depth, Afternoon Batch)" />
+        <button type="button" class="row-delete-btn" title="Delete this Row">✕ Delete Row</button>
       `;
 
-      const tInput = row.querySelector('.track-edit-input');
-      tInput.addEventListener('input', () => {
-        track.title = tInput.value;
+      const rTitleInput = rHeader.querySelector('.row-customizer-title-input');
+      rTitleInput.addEventListener('input', () => {
+        row.title = rTitleInput.value;
         currentEditingLayout.id = 'custom';
         renderPresetCards();
       });
-      const sInput = row.querySelector('.track-edit-sub-input');
-      sInput.addEventListener('input', () => {
-        track.placeholder = sInput.value;
+
+      const rDelBtn = rHeader.querySelector('.row-delete-btn');
+      rDelBtn.addEventListener('click', () => {
+        rows.splice(rowIdx, 1);
         currentEditingLayout.id = 'custom';
+        renderPresetCards();
+        renderPhaseCustomizer();
       });
 
-      const delBtn = row.querySelector('.track-edit-del-btn');
-      if (delBtn) {
+      rowBox.appendChild(rHeader);
+
+      // Track List in Row
+      const trackList = document.createElement('div');
+      trackList.className = 'track-edit-list';
+
+      if (!Array.isArray(row.tracks)) row.tracks = [];
+      row.tracks.forEach((track, trackIdx) => {
+        const trRow = document.createElement('div');
+        trRow.className = 'track-edit-row';
+        trRow.innerHTML = `
+          <span class="track-indicator dot-${phase.colorClass || 'cyan'}"></span>
+          <input type="text" class="track-edit-input" value="${escapeHtml(track.title || '')}" placeholder="Column Title" />
+          <input type="text" class="track-edit-sub-input" value="${escapeHtml(track.placeholder || '')}" placeholder="Subtitle / details hint..." />
+          <button type="button" class="track-edit-del-btn" title="Remove Column">✕</button>
+        `;
+
+        const tInput = trRow.querySelector('.track-edit-input');
+        tInput.addEventListener('input', () => {
+          track.title = tInput.value;
+          currentEditingLayout.id = 'custom';
+          renderPresetCards();
+        });
+        const sInput = trRow.querySelector('.track-edit-sub-input');
+        sInput.addEventListener('input', () => {
+          track.placeholder = sInput.value;
+          currentEditingLayout.id = 'custom';
+        });
+
+        const delBtn = trRow.querySelector('.track-edit-del-btn');
         delBtn.addEventListener('click', () => {
-          phase.tracks.splice(trackIdx, 1);
+          row.tracks.splice(trackIdx, 1);
           currentEditingLayout.id = 'custom';
           renderPresetCards();
           renderPhaseCustomizer();
         });
+
+        trackList.appendChild(trRow);
+      });
+
+      if (row.tracks.length === 0) {
+        const emptyHint = document.createElement('div');
+        emptyHint.className = 'empty-row-hint';
+        emptyHint.textContent = "No columns in this row yet. Click below to add a column.";
+        trackList.appendChild(emptyHint);
       }
 
-      trackList.appendChild(row);
-    });
-    box.appendChild(trackList);
+      rowBox.appendChild(trackList);
 
-    // Add track button
-    const addBtn = document.createElement('button');
-    addBtn.type = 'button';
-    addBtn.className = 'btn-add-track-col';
-    addBtn.innerHTML = `<span>+</span> <span>Add Column to ${escapeHtml(phase.title || 'Phase')}</span>`;
-    addBtn.addEventListener('click', () => {
-      if (!Array.isArray(phase.tracks)) phase.tracks = [];
-      const newKey = `custom_${phase.id || 'phase'}_${Date.now()}`;
-      phase.tracks.push({
-        key: newKey,
-        title: `Column ${phase.tracks.length + 1}`,
-        placeholder: "Tasks, research, notes..."
+      // Add Column Button to Row
+      const addColBtn = document.createElement('button');
+      addColBtn.type = 'button';
+      addColBtn.className = 'btn-add-track-col';
+      addColBtn.innerHTML = `<span>+</span> <span>Add Column to Row ${rowIdx + 1}</span>`;
+      addColBtn.addEventListener('click', () => {
+        const newKey = `custom_${phase.id || 'phase'}_${Date.now()}`;
+        row.tracks.push({
+          key: newKey,
+          title: `Column ${row.tracks.length + 1}`,
+          placeholder: "Tasks, milestones, notes..."
+        });
+        currentEditingLayout.id = 'custom';
+        renderPresetCards();
+        renderPhaseCustomizer();
+      });
+      rowBox.appendChild(addColBtn);
+
+      rowsContainer.appendChild(rowBox);
+    });
+
+    box.appendChild(rowsContainer);
+
+    // Add Row to Section Button
+    const addRowBtn = document.createElement('button');
+    addRowBtn.type = 'button';
+    addRowBtn.className = 'btn-add-row-to-phase';
+    addRowBtn.innerHTML = `<span>+</span> <span>Add Row to ${escapeHtml(phase.title || 'Phase')}</span>`;
+    addRowBtn.addEventListener('click', () => {
+      const rIdx = rows.length + 1;
+      rows.push({
+        id: `row_${Date.now()}`,
+        title: `Row ${rIdx}`,
+        tracks: [
+          {
+            key: `custom_${phase.id || 'phase'}_${Date.now()}`,
+            title: "New Column",
+            placeholder: "Tasks, notes..."
+          }
+        ]
       });
       currentEditingLayout.id = 'custom';
       renderPresetCards();
       renderPhaseCustomizer();
     });
-    box.appendChild(addBtn);
+    box.appendChild(addRowBtn);
 
     container.appendChild(box);
   });
@@ -3649,8 +4023,14 @@ if (btnAddNewPhase) {
       title: `Section ${pIdx}`,
       timeRange: "Custom Hours",
       colorClass: pIdx % 2 === 0 ? "violet" : "cyan",
-      tracks: [
-        { key: `custom_${Date.now()}`, title: "Focus Track 1", placeholder: "Tasks, milestones, notes..." }
+      rows: [
+        {
+          id: `row_${Date.now()}`,
+          title: "",
+          tracks: [
+            { key: `custom_${Date.now()}`, title: "Focus Track 1", placeholder: "Tasks, milestones, notes..." }
+          ]
+        }
       ]
     });
     currentEditingLayout.id = 'custom';
