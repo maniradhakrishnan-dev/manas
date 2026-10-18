@@ -167,124 +167,6 @@ const PRESETS = {
     ]
   },
 
-  deep_work_sprint: {
-    id: "deep_work_sprint",
-    name: "Deep Work Sprint",
-    description: "Morning Deep Focus + Afternoon Execution + Evening Wrap-up",
-    phases: [
-      {
-        id: "phase_sprint_morning",
-        title: "Morning Deep Focus",
-        timeRange: "08:30 — 12:30",
-        colorClass: "amber",
-        orientation: "vertical",
-        rows: [
-          {
-            id: "row_sprint_core",
-            title: "DEEP FOCUS (NO DISTRACTIONS)",
-            tracks: [
-              { key: "sprint_arch", title: "Architecture & Logic", placeholder: "Core problem solving, algorithms..." },
-              { key: "sprint_code", title: "Implementation", placeholder: "Coding, tests, features..." }
-            ]
-          }
-        ]
-      },
-      {
-        id: "phase_sprint_afternoon",
-        title: "Execution & Collaboration",
-        timeRange: "13:30 — 17:30",
-        colorClass: "violet",
-        orientation: "vertical",
-        rows: [
-          {
-            id: "row_sprint_reviews",
-            title: "EXECUTION & OPS",
-            tracks: [
-              { key: "sprint_reviews", title: "PRs & Code Reviews", placeholder: "Unblock teammates, code reviews..." },
-              { key: "sprint_deploy", title: "Testing & Deployments", placeholder: "CI/CD, deployments, bug fixes..." }
-            ]
-          }
-        ]
-      },
-      {
-        id: "phase_sprint_evening",
-        title: "Daily Wrap-up & Retrospective",
-        timeRange: "17:30 — 19:00",
-        colorClass: "cyan",
-        orientation: "horizontal",
-        rows: [
-          {
-            id: "row_sprint_wrap",
-            title: "",
-            tracks: [
-              { key: "sprint_retro", title: "Retrospective & Wins", placeholder: "Key achievements, lessons, blockers..." },
-              { key: "sprint_tomorrow", title: "Top 3 for Tomorrow", placeholder: "Top priorities for next morning..." }
-            ]
-          }
-        ]
-      }
-    ]
-  },
-
-  weekend_flow: {
-    id: "weekend_flow",
-    name: "Weekend & Reflection",
-    description: "Morning Outdoors + Creative Tinkering + Rest",
-    phases: [
-      {
-        id: "phase_wk_morning",
-        title: "Morning Outdoors & Health",
-        timeRange: "07:00 — 11:00",
-        colorClass: "emerald",
-        orientation: "horizontal",
-        rows: [
-          {
-            id: "row_wk_morning",
-            title: "",
-            tracks: [
-              { key: "wk_fitness", title: "Outdoor Run & Workout", placeholder: "Trails, gym, sunlight, mobility..." },
-              { key: "wk_reading", title: "Deep Reading & Books", placeholder: "Non-fiction, philosophy, papers..." }
-            ]
-          }
-        ]
-      },
-      {
-        id: "phase_wk_creative",
-        title: "Creative Tinkering & Projects",
-        timeRange: "12:00 — 17:00",
-        colorClass: "amber",
-        orientation: "horizontal",
-        rows: [
-          {
-            id: "row_wk_creative",
-            title: "",
-            tracks: [
-              { key: "wk_project", title: "Personal Hardware / Code Hack", placeholder: "Creative side projects, exploratory coding..." },
-              { key: "wk_writing", title: "Essays & Reflection", placeholder: "Journaling, long-term vision, thoughts..." }
-            ]
-          }
-        ]
-      },
-      {
-        id: "phase_wk_evening",
-        title: "Family, Social & Recovery",
-        timeRange: "17:00 — 22:00",
-        colorClass: "violet",
-        orientation: "horizontal",
-        rows: [
-          {
-            id: "row_wk_evening",
-            title: "",
-            tracks: [
-              { key: "wk_family", title: "Family & Social Connection", placeholder: "Dinner, conversations, relaxing..." },
-              { key: "wk_recharge", title: "Weekly Planning & Recharge", placeholder: "Prep for upcoming week, sleep early..." }
-            ]
-          }
-        ]
-      }
-    ]
-  },
-
   blank_canvas: {
     id: "blank_canvas",
     name: "Blank Canvas",
@@ -328,8 +210,6 @@ function renderLevel1TopBarHTML(activeLayout) {
 
   const standardOptions = [
     { id: 'default_polymath', label: "🌟 Polymath Golden Routine (Default)" },
-    { id: 'deep_work_sprint', label: "🚀 Deep Work Sprint" },
-    { id: 'weekend_flow', label: "🏖️ Weekend & Reflection" },
     { id: 'blank_canvas', label: "📄 Blank Canvas" }
   ];
 
@@ -454,8 +334,6 @@ function syncLevel1Bar(layout) {
 
   const standardOptions = [
     { id: 'default_polymath', label: "🌟 Polymath Golden Routine (Default)" },
-    { id: 'deep_work_sprint', label: "🚀 Deep Work Sprint" },
-    { id: 'weekend_flow', label: "🏖️ Weekend & Reflection" },
     { id: 'blank_canvas', label: "📄 Blank Canvas" }
   ];
 
@@ -936,13 +814,8 @@ function renderCustomWorkspace(layout, workspaceEl) {
     workspaceEl.innerHTML = bannerHTML + renderLevel1TopBarHTML(layout) + `
       <div class="blank-canvas-welcome">
         <div class="blank-canvas-icon">✦</div>
-        <h3>100% Blank Canvas for ${escapeHtml(formatDateDisplay(currentDate))}</h3>
-        <p>No columns or sections exist yet. Build your custom layout for today from scratch, or switch routines above:</p>
-        <div class="blank-canvas-actions">
-          <button type="button" class="btn-canvas-action-btn btn-canvas-welcome-add-vertical" id="btn-blank-canvas-add-vertical">+ Add Vertical Section (Column)</button>
-          <button type="button" class="btn-canvas-action-btn btn-canvas-welcome-add-horizontal" id="btn-blank-canvas-add-horizontal">+ Add Horizontal Section (Row)</button>
-          <button type="button" class="btn-canvas-welcome-preset" id="btn-blank-canvas-restore-polymath">↺ Load Polymath Golden Routine</button>
-        </div>
+        <h3>Blank Canvas for ${escapeHtml(formatDateDisplay(currentDate))}</h3>
+        <p>Use the <strong>LEVEL 1</strong> buttons at the top to add your first Column Section or Row Section.</p>
       </div>
     `;
 
@@ -971,9 +844,6 @@ function renderCustomWorkspace(layout, workspaceEl) {
             <span class="column-name">${escapeHtml(p.title)}</span>
           </div>
           <div class="master-banner-actions">
-            <button type="button" class="btn-toggle-orientation btn-canvas-mini" data-phase-id="${p.id}" title="Toggle between Vertical Column and Horizontal Row">
-              ${isHoriz ? '↔ Horizontal Row' : '↕ Vertical Column'}
-            </button>
             <button type="button" class="btn-canvas-add-row btn-canvas-mini" data-phase-id="${p.id}" title="Add new row of columns to ${escapeHtml(p.title)}">+ Row</button>
             <button type="button" class="btn-canvas-add-col btn-canvas-mini" data-phase-id="${p.id}" title="Add new column to ${escapeHtml(p.title)}">+ Column</button>
             <button type="button" class="btn-canvas-del-section" data-phase-id="${p.id}" title="Delete entire section">✕</button>
@@ -1095,15 +965,7 @@ function renderCustomWorkspace(layout, workspaceEl) {
     }
   }).join('');
 
-  const bottomToolbarHTML = `
-    <div class="custom-workspace-bottom-bar" style="display: flex; justify-content: center; gap: 12px; margin-top: 24px; padding-bottom: 20px;">
-      <button type="button" class="btn-canvas-action-btn" id="btn-canvas-bottom-add-vertical">+ Add Vertical Section (Column)</button>
-      <button type="button" class="btn-canvas-action-btn" id="btn-canvas-bottom-add-horizontal">+ Add Horizontal Section (Row)</button>
-      <button type="button" class="btn-canvas-welcome-preset" id="btn-canvas-bottom-restore-polymath">↺ Load Polymath Golden Routine</button>
-    </div>
-  `;
-
-  workspaceEl.innerHTML = bannerHTML + renderLevel1TopBarHTML(layout) + groupsHTML + bottomToolbarHTML;
+  workspaceEl.innerHTML = bannerHTML + renderLevel1TopBarHTML(layout) + groupsHTML;
 
   // Re-bind carryover banner buttons
   const bApply = document.getElementById('btn-carryover-apply');
@@ -1140,8 +1002,6 @@ function renderPresetCards() {
 
   const presetList = [
     { id: 'default_polymath', icon: '🌟', name: "Polymath Golden Routine (Default)", desc: "4-9 Foundation (5 tracks) + 9-6 Work + 6-11 Evening + Health" },
-    { id: 'deep_work_sprint', icon: '🚀', name: "Deep Work Sprint", desc: "Morning Deep Focus + Afternoon Execution + Evening Wrap-up" },
-    { id: 'weekend_flow', icon: '🏖️', name: "Weekend & Reflection", desc: "Morning Rejuvenation + Creative Tinkering + Rest" },
     { id: 'blank_canvas', icon: '📄', name: "Blank Canvas", desc: "100% clean slate. Build custom sections, rows, and columns" }
   ];
 
