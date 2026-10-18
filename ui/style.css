@@ -838,9 +838,11 @@ body[data-section-focus] .planner-col.phase-col-custom.section-focused {
   0% {
     box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.7), 0 0 20px rgba(56, 189, 248, 0.4);
   }
+
   50% {
     box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.9), 0 0 35px rgba(56, 189, 248, 0.5);
   }
+
   100% {
     box-shadow: 0 0 0 2px var(--accent-cyan), 0 8px 30px rgba(0, 0, 0, 0.4);
   }
@@ -1596,6 +1598,7 @@ body[data-section-focus] .planner-col.phase-col-custom.section-focused {
 .block-card:not([data-active-tab="notes"]) .btn-bullet-insert {
   display: none !important;
 }
+
 .cool-card[data-active-tab="notes"] .btn-check-insert,
 .block-card[data-active-tab="notes"] .btn-check-insert {
   display: none !important;
@@ -1718,10 +1721,12 @@ body[data-section-focus] .planner-col.phase-col-custom.section-focused {
   .tab-label {
     display: none;
   }
+
   .card-bar {
     padding: 4px 6px;
     gap: 2px;
   }
+
   .card-title-input {
     font-size: 11px;
   }
