@@ -73,7 +73,7 @@ const PRESETS = {
   default_polymath: {
     id: "default_polymath",
     name: "Polymath Golden Routine (Default)",
-    description: "4-9 Foundation (4 quads) + 9-6 + 6-11 + Health",
+    description: "4-9 Foundation (5 tracks) + 9-6 Work + 6-11 Evening + Health",
     phases: [
       {
         id: "phase_learning",
@@ -127,125 +127,18 @@ const PRESETS = {
     ]
   },
 
-  freelancer_builder: {
-    id: "freelancer_builder",
-    name: "Freelancer & Builder",
-    description: "Client Deliverables, Own Products, Growth, Invoicing & Reset",
+  blank_canvas: {
+    id: "blank_canvas",
+    name: "Blank / Custom Canvas",
+    description: "Clean slate. Create your own sections, columns, and workflows",
     phases: [
       {
-        id: "free_client",
-        title: "Deep Client Deliverables",
-        timeRange: "08:00 — 12:00",
-        colorClass: "amber",
-        tracks: [
-          { key: "free_client_core", title: "Main Client Project", placeholder: "Core feature deliverables, pull requests..." },
-          { key: "free_client_qa", title: "Secondary Client / QA", placeholder: "Fixes, staging deployments, client reviews..." }
-        ]
-      },
-      {
-        id: "free_product",
-        title: "Own Products & Growth",
-        timeRange: "13:00 — 17:00",
-        colorClass: "violet",
-        tracks: [
-          { key: "free_saas_build", title: "Product Dev & Features", placeholder: "SaaS architecture, user onboarding, database..." },
-          { key: "free_marketing", title: "Marketing & Lead Gen", placeholder: "Content, Twitter/X, outreach, demos..." }
-        ]
-      },
-      {
-        id: "free_ops",
-        title: "Operations & Admin",
-        timeRange: "17:00 — 20:00",
+        id: "phase_custom_1",
+        title: "Daily Focus",
+        timeRange: "All Day",
         colorClass: "cyan",
         tracks: [
-          { key: "free_invoicing", title: "Invoicing & Client Comms", placeholder: "Slack, emails, proposals, bookkeeping..." },
-          { key: "free_learning", title: "Skill Upgrades & Reading", placeholder: "New frameworks, books, tech exploration..." }
-        ]
-      },
-      {
-        id: "free_health",
-        title: "Health & Wind Down",
-        timeRange: "Evening / Morning",
-        colorClass: "emerald",
-        tracks: [
-          { key: "free_workout", title: "Fitness & Movement", placeholder: "Gym, run, mobility..." },
-          { key: "free_reflection", title: "Daily Review & Wins", placeholder: "Daily retro, tomorrow's 3 big wins..." }
-        ]
-      }
-    ]
-  },
-
-  deep_work_research: {
-    id: "deep_work_research",
-    name: "Deep Work & Research",
-    description: "Math, Theory, Implementation, Experiments & Technical Writing",
-    phases: [
-      {
-        id: "res_theory",
-        title: "Math & Deep Theory",
-        timeRange: "06:00 — 11:00",
-        colorClass: "amber",
-        tracks: [
-          { key: "res_math", title: "Mathematical Derivations", placeholder: "Proofs, linear algebra, probability, loss surfaces..." },
-          { key: "res_papers", title: "ArXiv & Paper Deep Dives", placeholder: "Latest architectures, benchmarks, paper notes..." }
-        ]
-      },
-      {
-        id: "res_impl",
-        title: "Implementation & Compute",
-        timeRange: "12:00 — 17:00",
-        colorClass: "violet",
-        tracks: [
-          { key: "res_experiments", title: "Model Training & Eval", placeholder: "PyTorch/JAX pipelines, training runs, metrics..." },
-          { key: "res_infra", title: "Infrastructure & Compute", placeholder: "GPU clusters, CUDA kernels, data pipelines..." }
-        ]
-      },
-      {
-        id: "res_synthesis",
-        title: "Writing & Physical Training",
-        timeRange: "18:00 — 22:00",
-        colorClass: "emerald",
-        tracks: [
-          { key: "res_writing", title: "Technical Writing & Docs", placeholder: "Blog posts, research writeups, documentation..." },
-          { key: "res_fitness", title: "Physical Training & Sleep", placeholder: "Workout, sauna, sleep prep..." }
-        ]
-      }
-    ]
-  },
-
-  simple_3_flow: {
-    id: "simple_3_flow",
-    name: "Simple 3-Phase Flow",
-    description: "Morning High Priority, Afternoon Execution, Evening Wind-Down",
-    phases: [
-      {
-        id: "flow_morning",
-        title: "Morning Most Important Tasks",
-        timeRange: "Morning Focus",
-        colorClass: "amber",
-        tracks: [
-          { key: "flow_mit_1", title: "#1 Most Important Task", placeholder: "The one thing that makes today a win..." },
-          { key: "flow_mit_2", title: "#2 High-Value Focus", placeholder: "Second major milestone..." }
-        ]
-      },
-      {
-        id: "flow_afternoon",
-        title: "Afternoon Momentum",
-        timeRange: "Afternoon Execution",
-        colorClass: "violet",
-        tracks: [
-          { key: "flow_execution", title: "Tasks & Deliverables", placeholder: "Batching execution tasks..." },
-          { key: "flow_admin", title: "Comms & Quick Tasks", placeholder: "Replies, coordination, errands..." }
-        ]
-      },
-      {
-        id: "flow_evening",
-        title: "Evening Reset & Reflection",
-        timeRange: "Evening Reset",
-        colorClass: "emerald",
-        tracks: [
-          { key: "flow_personal", title: "Personal Projects & Reading", placeholder: "Unstructured creative time..." },
-          { key: "flow_reflection", title: "Daily Review & Habits", placeholder: "Gratitude, workout check, tomorrow plan..." }
+          { key: "custom_col_1", title: "Focus Track 1", placeholder: "Tasks, milestones, notes..." }
         ]
       }
     ]
@@ -268,7 +161,7 @@ function getActiveBlockKeys() {
   });
   if (currentDayData && typeof currentDayData === 'object') {
     Object.keys(currentDayData).forEach(k => {
-      if (k !== 'date' && k !== 'updatedAt' && k !== 'importedFrom' && k !== 'importedAt') {
+      if (k !== 'date' && k !== 'updatedAt' && k !== 'importedFrom' && k !== 'importedAt' && k !== 'customLayout') {
         keys.add(k);
       }
     });
@@ -276,38 +169,167 @@ function getActiveBlockKeys() {
   return Array.from(keys);
 }
 
-function getActiveLayout() {
-  try {
-    const saved = safeStorage.getItem('mrt_custom_layout');
-    if (saved) {
-      const parsed = JSON.parse(saved);
+// Layout helper functions: scoped per-date
+function getLayoutForDate(dateKey, dayData) {
+  if (dayData && dayData.customLayout && Array.isArray(dayData.customLayout.phases) && dayData.customLayout.phases.length > 0) {
+    return dayData.customLayout;
+  }
+  const cached = safeStorage.getItem(`mrt_layout_${dateKey}`);
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached);
       if (parsed && Array.isArray(parsed.phases) && parsed.phases.length > 0) {
         return parsed;
       }
-    }
-  } catch (e) {
-    console.warn("Could not load custom layout:", e);
+    } catch (e) { }
   }
   return PRESETS.default_polymath;
 }
 
-function applyLayout(layout) {
+function getActiveLayout() {
+  const dateKey = formatDateKey(currentDate);
+  return getLayoutForDate(dateKey, currentDayData);
+}
+
+function syncWorkspaceLayoutForDate(dateKey, dayData) {
   const workspaceEl = document.querySelector('.planner-workspace');
   if (!workspaceEl) return;
 
+  const layout = getLayoutForDate(dateKey, dayData);
   if (!layout || layout.id === 'default_polymath') {
-    safeStorage.removeItem('mrt_custom_layout');
     if (defaultWorkspaceHTML) {
       workspaceEl.innerHTML = defaultWorkspaceHTML;
     }
   } else {
-    safeStorage.setItem('mrt_custom_layout', JSON.stringify(layout));
     renderCustomWorkspace(layout, workspaceEl);
   }
 
-  // Re-bind events to all cards and populate current day
+  // Attach dynamic + Column and ✕ Delete Column controls on canvas
+  attachCanvasLayoutControls(layout);
   bindCardEvents();
+}
+
+function saveAndApplyLayoutForToday(layout) {
+  const dateKey = formatDateKey(currentDate);
+  if (!layout || layout.id === 'default_polymath') {
+    if (currentDayData) delete currentDayData.customLayout;
+    safeStorage.removeItem(`mrt_layout_${dateKey}`);
+  } else {
+    if (!currentDayData) currentDayData = getDefaultDayData(dateKey);
+    currentDayData.customLayout = layout;
+    safeStorage.setItem(`mrt_layout_${dateKey}`, JSON.stringify(layout));
+  }
+  isDirty = true;
+  triggerAutoSave();
+  syncWorkspaceLayoutForDate(dateKey, currentDayData);
   renderCurrentDay();
+}
+
+function attachCanvasLayoutControls(currentLayout) {
+  // 1. Add + Column button to every section banner
+  document.querySelectorAll('.col-master-banner').forEach(banner => {
+    let actions = banner.querySelector('.master-banner-actions');
+    if (!actions) {
+      actions = document.createElement('div');
+      actions.className = 'master-banner-actions';
+      banner.appendChild(actions);
+    }
+    if (!actions.querySelector('.btn-canvas-add-col')) {
+      const btnAdd = document.createElement('button');
+      btnAdd.type = 'button';
+      btnAdd.className = 'btn-canvas-add-col';
+      btnAdd.title = 'Add new column to this phase';
+      btnAdd.textContent = '+ Column';
+      btnAdd.addEventListener('click', (e) => {
+        e.stopPropagation();
+        handleCanvasAddColumn(banner);
+      });
+      actions.appendChild(btnAdd);
+    }
+  });
+
+  // 2. Add ✕ remove button to each card header
+  document.querySelectorAll('.cool-card, .block-card').forEach(card => {
+    const barRight = card.querySelector('.card-bar-right');
+    if (barRight && !barRight.querySelector('.btn-canvas-del-col')) {
+      const btnDel = document.createElement('button');
+      btnDel.type = 'button';
+      btnDel.className = 'btn-canvas-del-col';
+      btnDel.title = "Delete this column from today's layout";
+      btnDel.textContent = '✕';
+      btnDel.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const blockKey = card.getAttribute('data-block');
+        if (blockKey) handleCanvasDeleteColumn(blockKey);
+      });
+      barRight.appendChild(btnDel);
+    }
+  });
+}
+
+function handleCanvasAddColumn(banner) {
+  const dateKey = formatDateKey(currentDate);
+  let activeLayout = JSON.parse(JSON.stringify(getLayoutForDate(dateKey, currentDayData)));
+
+  // Identify phase
+  const customCol = banner.closest('.phase-col-custom');
+  const phaseId = customCol ? customCol.getAttribute('data-phase-id') : null;
+
+  let targetPhase = null;
+  if (phaseId && activeLayout.phases) {
+    targetPhase = activeLayout.phases.find(p => p.id === phaseId);
+  }
+  if (!targetPhase && activeLayout.phases && activeLayout.phases.length > 0) {
+    if (banner.closest('#phase-col-learning') || banner.classList.contains('banner-learning-master')) {
+      targetPhase = activeLayout.phases.find(p => p.id === 'phase_learning') || activeLayout.phases[0];
+    } else if (banner.closest('#phase-col-productive') || banner.classList.contains('banner-work-master')) {
+      targetPhase = activeLayout.phases.find(p => p.id === 'phase_productive') || activeLayout.phases[1] || activeLayout.phases[0];
+    } else if (banner.closest('#phase-row-evening') || banner.classList.contains('banner-evening-master')) {
+      targetPhase = activeLayout.phases.find(p => p.id === 'phase_evening') || activeLayout.phases[2] || activeLayout.phases[0];
+    } else if (banner.closest('.health-section') || banner.classList.contains('banner-health-master')) {
+      targetPhase = activeLayout.phases.find(p => p.id === 'phase_health') || activeLayout.phases[3] || activeLayout.phases[0];
+    } else {
+      targetPhase = activeLayout.phases[0];
+    }
+  }
+
+  if (targetPhase) {
+    if (!Array.isArray(targetPhase.tracks)) targetPhase.tracks = [];
+    const newKey = `custom_${Date.now()}`;
+    targetPhase.tracks.push({
+      key: newKey,
+      title: `Column ${targetPhase.tracks.length + 1}`,
+      placeholder: "Tasks, milestones, notes..."
+    });
+    activeLayout.id = 'custom';
+    saveAndApplyLayoutForToday(activeLayout);
+    showToast(`Added column to ${targetPhase.title}!`);
+  }
+}
+
+function handleCanvasDeleteColumn(blockKey) {
+  const dateKey = formatDateKey(currentDate);
+  let activeLayout = JSON.parse(JSON.stringify(getLayoutForDate(dateKey, currentDayData)));
+
+  let removed = false;
+  if (activeLayout.phases) {
+    for (const phase of activeLayout.phases) {
+      if (Array.isArray(phase.tracks)) {
+        const idx = phase.tracks.findIndex(t => t.key === blockKey);
+        if (idx !== -1) {
+          phase.tracks.splice(idx, 1);
+          removed = true;
+          break;
+        }
+      }
+    }
+  }
+
+  if (removed) {
+    activeLayout.id = 'custom';
+    saveAndApplyLayoutForToday(activeLayout);
+    showToast("Column removed from today's layout");
+  }
 }
 
 function renderCustomWorkspace(layout, workspaceEl) {
@@ -336,14 +358,17 @@ function renderCustomWorkspace(layout, workspaceEl) {
   const bottomPhases = phases.slice(half);
 
   function renderPhaseCol(p, pIdx) {
-    const color = p.colorClass || 'amber';
+    const color = p.colorClass || 'cyan';
     const tracks = p.tracks || [];
     return `
-      <div class="planner-col phase-col-custom" style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 12px;">
+      <div class="planner-col phase-col-custom" data-phase-id="${p.id}" style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 12px;">
         <div class="col-master-banner banner-${color}-master">
           <div class="master-banner-left">
             <span class="column-time-pill pill-${color}">${escapeHtml(p.timeRange || '')}</span>
             <span class="column-name">${escapeHtml(p.title)}</span>
+          </div>
+          <div class="master-banner-actions">
+            <button type="button" class="btn-canvas-add-col" data-phase-id="${p.id}" title="Add new column to ${escapeHtml(p.title)}">+ Column</button>
           </div>
         </div>
         <div class="cards-grid-dynamic">
@@ -358,6 +383,7 @@ function renderCustomWorkspace(layout, workspaceEl) {
                   <span class="card-checklist-stat"></span>
                   <button class="btn-check-insert" title="Insert Checkbox">☐</button>
                   <button class="btn-bullet-insert" title="Insert Bullet">•</button>
+                  <button type="button" class="btn-canvas-del-col" data-track-key="${t.key}" title="Delete this column from today">✕</button>
                 </div>
               </div>
               <div class="card-editor-area">
@@ -408,7 +434,10 @@ function renderCustomWorkspace(layout, workspaceEl) {
 function openCustomizeModal() {
   const modal = document.getElementById('customize-layout-modal');
   if (!modal) return;
-  currentEditingLayout = JSON.parse(JSON.stringify(getActiveLayout()));
+  const dateKey = formatDateKey(currentDate);
+  currentEditingLayout = JSON.parse(JSON.stringify(getLayoutForDate(dateKey, currentDayData)));
+  const dateDisp = document.getElementById('customize-date-display');
+  if (dateDisp) dateDisp.textContent = formatDateDisplay(currentDate);
   renderPresetCards();
   renderPhaseCustomizer();
   modal.classList.add('open');
@@ -425,16 +454,14 @@ function renderPresetCards() {
   grid.innerHTML = '';
 
   const presetList = [
-    { id: 'default_polymath', icon: '🌟', name: "Polymath Golden Routine", desc: "4-9 Foundation (4 quads) + 9-6 + 6-11 + Health" },
-    { id: 'freelancer_builder', icon: '💼', name: "Freelancer & Builder", desc: "Client Deliverables, Own Products, Growth, Ops" },
-    { id: 'deep_work_research', icon: '🔬', name: "Deep Work & Research", desc: "Math & Theory, Implementation, Writing & Gym" },
-    { id: 'simple_3_flow', icon: '🎯', name: "Simple 3-Phase Flow", desc: "Morning #1 Focus, Afternoon Momentum, Evening Reset" }
+    { id: 'default_polymath', icon: '🌟', name: "Polymath Golden Routine (Default)", desc: "4-9 Foundation (5 tracks) + 9-6 Work + 6-11 Evening + Health" },
+    { id: 'blank_canvas', icon: '📄', name: "Blank / Custom Canvas", desc: "Clean slate. Create your own columns, sections, and workflows" }
   ];
 
   presetList.forEach(p => {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = `preset-card-btn ${currentEditingLayout.id === p.id ? 'active' : ''}`;
+    btn.className = `preset-card-btn ${currentEditingLayout && currentEditingLayout.id === p.id ? 'active' : ''}`;
     btn.innerHTML = `
       <div class="preset-card-title">
         <span>${p.icon}</span>
@@ -464,24 +491,35 @@ function renderPhaseCustomizer() {
     const box = document.createElement('div');
     box.className = 'phase-customizer-box';
 
-    // Header: phase title and time
+    // Header: phase title, time, and delete section button
     const header = document.createElement('div');
     header.className = 'phase-customizer-header';
     header.innerHTML = `
       <input type="text" class="phase-customizer-title-input" value="${escapeHtml(phase.title || '')}" placeholder="Phase Title (e.g. Morning Focus)" />
       <input type="text" class="phase-customizer-time-input" value="${escapeHtml(phase.timeRange || '')}" placeholder="Time (09:00 — 18:00)" />
+      ${(phases.length > 1) ? `<button type="button" class="phase-delete-btn" title="Delete this section">🗑 Delete Section</button>` : ''}
     `;
 
     const titleInput = header.querySelector('.phase-customizer-title-input');
     titleInput.addEventListener('input', () => {
       phase.title = titleInput.value;
       currentEditingLayout.id = 'custom';
+      renderPresetCards();
     });
     const timeInput = header.querySelector('.phase-customizer-time-input');
     timeInput.addEventListener('input', () => {
       phase.timeRange = timeInput.value;
       currentEditingLayout.id = 'custom';
     });
+    const delPhaseBtn = header.querySelector('.phase-delete-btn');
+    if (delPhaseBtn) {
+      delPhaseBtn.addEventListener('click', () => {
+        phases.splice(phaseIdx, 1);
+        currentEditingLayout.id = 'custom';
+        renderPresetCards();
+        renderPhaseCustomizer();
+      });
+    }
     box.appendChild(header);
 
     // Tracks list
@@ -502,6 +540,7 @@ function renderPhaseCustomizer() {
       tInput.addEventListener('input', () => {
         track.title = tInput.value;
         currentEditingLayout.id = 'custom';
+        renderPresetCards();
       });
       const sInput = row.querySelector('.track-edit-sub-input');
       sInput.addEventListener('input', () => {
@@ -514,6 +553,7 @@ function renderPhaseCustomizer() {
         delBtn.addEventListener('click', () => {
           phase.tracks.splice(trackIdx, 1);
           currentEditingLayout.id = 'custom';
+          renderPresetCards();
           renderPhaseCustomizer();
         });
       }
@@ -536,6 +576,7 @@ function renderPhaseCustomizer() {
         placeholder: "Tasks, research, notes..."
       });
       currentEditingLayout.id = 'custom';
+      renderPresetCards();
       renderPhaseCustomizer();
     });
     box.appendChild(addBtn);
@@ -597,6 +638,7 @@ const btnCloseCustomizeModal = document.getElementById('btn-close-customize-moda
 const btnCancelCustomize = document.getElementById('btn-cancel-customize');
 const btnSaveCustomLayout = document.getElementById('btn-save-custom-layout');
 const btnResetDefaultLayout = document.getElementById('btn-reset-default-layout');
+const btnAddNewPhase = document.getElementById('btn-add-new-phase');
 
 // Phase Isolation & Lock-In Deep Work DOM Elements
 let currentPhase = safeStorage.getItem('mrt_phase') || 'all';
@@ -713,41 +755,28 @@ function getDefaultBlockData(defaultTitle) {
 
 // Default Data Structure
 function getDefaultDayData(dateKey) {
+  const layout = getLayoutForDate(dateKey, null);
   const data = {
     date: dateKey,
-    part1_quad1: getDefaultBlockData("CS & SWE"),
-    part1_quad2: getDefaultBlockData("Core AI"),
-    part1_quad3: getDefaultBlockData("Applications"),
-    part1_quad4: getDefaultBlockData("RSWE"),
-    part2: getDefaultBlockData("Breadth"),
-    productive: getDefaultBlockData("Productive (Get Things Done)"),
-    admin: getDefaultBlockData("Admin & Operations"),
-    evening_huro: getDefaultBlockData("Huro"),
-    evening_kana: getDefaultBlockData("Kana"),
-    evening_bana: getDefaultBlockData("Bana"),
-    evening_curio: getDefaultBlockData("Curio"),
-    evening_survivi: getDefaultBlockData("Survivo"),
-    evening_random: getDefaultBlockData("Random"),
-    health_workout: getDefaultBlockData("Workout (5-6 AM)"),
-    health_diet: getDefaultBlockData("Diet & Meals"),
-    health_habits: getDefaultBlockData("Hydration & Supplements"),
-    health_recovery: getDefaultBlockData("Body & Recovery"),
     updatedAt: new Date().toISOString()
   };
 
-  // Also initialize any custom tracks from active layout if present
-  try {
-    const layout = getActiveLayout();
-    if (layout && Array.isArray(layout.phases)) {
+  if (!layout || layout.id === 'default_polymath') {
+    ALL_BLOCK_KEYS.forEach(k => {
+      data[k] = getDefaultBlockData(getDefaultTitle(k));
+    });
+  } else {
+    data.customLayout = layout;
+    if (Array.isArray(layout.phases)) {
       layout.phases.forEach(p => {
         (p.tracks || []).forEach(t => {
-          if (t.key && !data[t.key]) {
+          if (t.key) {
             data[t.key] = getDefaultBlockData(t.title || getDefaultTitle(t.key));
           }
         });
       });
     }
-  } catch (e) { }
+  }
 
   return data;
 }
@@ -871,7 +900,7 @@ function normalizeDayData(raw, dateKey) {
 
   const allKeys = new Set(ALL_BLOCK_KEYS);
   for (const k of Object.keys(raw)) {
-    if (!['date', 'updatedAt', 'importedFrom', 'importedAt', 'evening', 'part1', 'health'].includes(k)) {
+    if (!['date', 'updatedAt', 'importedFrom', 'importedAt', 'evening', 'part1', 'health', 'customLayout'].includes(k)) {
       allKeys.add(k);
     }
   }
@@ -884,17 +913,24 @@ function normalizeDayData(raw, dateKey) {
   normalized.updatedAt = raw.updatedAt || new Date().toISOString();
   if (raw.importedFrom) normalized.importedFrom = raw.importedFrom;
   if (raw.importedAt) normalized.importedAt = raw.importedAt;
+  if (raw.customLayout && typeof raw.customLayout === 'object') {
+    normalized.customLayout = raw.customLayout;
+  }
 
   // Strict normalization for Part 2 (Breadth)
-  const p2Title = (normalized.part2.title || '').trim().toLowerCase();
-  if (!p2Title || p2Title.includes('electronics') || p2Title.includes('motors') || p2Title.includes('part - 2') || p2Title.includes('part-2') || p2Title.includes('part 2')) {
-    normalized.part2.title = "Breadth";
+  if (normalized.part2) {
+    const p2Title = (normalized.part2.title || '').trim().toLowerCase();
+    if (!p2Title || p2Title.includes('electronics') || p2Title.includes('motors') || p2Title.includes('part - 2') || p2Title.includes('part-2') || p2Title.includes('part 2')) {
+      normalized.part2.title = "Breadth";
+    }
   }
 
   // Strict normalization for Evening Survivo
-  const survTitle = (normalized.evening_survivi.title || '').trim().toLowerCase();
-  if (!survTitle || survTitle.includes('survivi')) {
-    normalized.evening_survivi.title = "Survivo";
+  if (normalized.evening_survivi) {
+    const survTitle = (normalized.evening_survivi.title || '').trim().toLowerCase();
+    if (!survTitle || survTitle.includes('survivi')) {
+      normalized.evening_survivi.title = "Survivo";
+    }
   }
 
   return normalized;
@@ -1839,6 +1875,7 @@ function changeDate(newDate) {
   } else {
     currentDayData = getDefaultDayData(targetDateKey);
   }
+  syncWorkspaceLayoutForDate(targetDateKey, currentDayData);
   renderCurrentDay();
 
   // If day has an active import link, sync unfinished tasks from source day
@@ -1856,6 +1893,7 @@ function changeDate(newDate) {
       const curTime = new Date(currentDayData.updatedAt || 0).getTime();
       if (diskTime > curTime) {
         currentDayData = normalizeDayData(diskData, targetDateKey);
+        syncWorkspaceLayoutForDate(targetDateKey, currentDayData);
         renderCurrentDay();
         if (currentDayData.importedFrom) {
           quickSync(currentDayData.importedFrom, true);
@@ -3587,18 +3625,37 @@ if (btnCancelCustomize) {
 }
 if (btnResetDefaultLayout) {
   btnResetDefaultLayout.addEventListener('click', () => {
-    applyLayout(PRESETS.default_polymath);
+    saveAndApplyLayoutForToday(PRESETS.default_polymath);
     closeCustomizeModal();
-    showToast("Restored Polymath Golden Workflow");
+    showToast(`Restored Polymath Golden Routine for ${formatDateDisplay(currentDate)}`);
   });
 }
 if (btnSaveCustomLayout) {
   btnSaveCustomLayout.addEventListener('click', () => {
     if (currentEditingLayout) {
-      applyLayout(currentEditingLayout);
+      saveAndApplyLayoutForToday(currentEditingLayout);
       closeCustomizeModal();
-      showToast("Custom workflow applied & saved");
+      showToast(`Workflow layout saved for ${formatDateDisplay(currentDate)}!`);
     }
+  });
+}
+if (btnAddNewPhase) {
+  btnAddNewPhase.addEventListener('click', () => {
+    if (!currentEditingLayout) currentEditingLayout = JSON.parse(JSON.stringify(getActiveLayout()));
+    if (!Array.isArray(currentEditingLayout.phases)) currentEditingLayout.phases = [];
+    const pIdx = currentEditingLayout.phases.length + 1;
+    currentEditingLayout.phases.push({
+      id: `phase_custom_${Date.now()}`,
+      title: `Section ${pIdx}`,
+      timeRange: "Custom Hours",
+      colorClass: pIdx % 2 === 0 ? "violet" : "cyan",
+      tracks: [
+        { key: `custom_${Date.now()}`, title: "Focus Track 1", placeholder: "Tasks, milestones, notes..." }
+      ]
+    });
+    currentEditingLayout.id = 'custom';
+    renderPresetCards();
+    renderPhaseCustomizer();
   });
 }
 if (customizeLayoutModal) {
@@ -3920,19 +3977,6 @@ function init() {
     defaultWorkspaceHTML = workspaceEl.innerHTML;
   }
 
-  // Restore saved custom layout if one exists
-  const savedLayoutStr = safeStorage.getItem('mrt_custom_layout');
-  if (savedLayoutStr && workspaceEl) {
-    try {
-      const savedLayout = JSON.parse(savedLayoutStr);
-      if (savedLayout && Array.isArray(savedLayout.phases) && savedLayout.phases.length > 0) {
-        renderCustomWorkspace(savedLayout, workspaceEl);
-      }
-    } catch (e) {
-      console.warn("Could not restore custom layout:", e);
-    }
-  }
-
   // 0. Pre-load cached active dates synchronously
   const cachedDates = safeStorage.getItem('mrt_active_dates');
   if (cachedDates) {
@@ -3964,6 +4008,7 @@ function init() {
   } else {
     currentDayData = getDefaultDayData(dateKey);
   }
+  syncWorkspaceLayoutForDate(dateKey, currentDayData);
   renderCurrentDay();
 
   // Apply Phase Isolation
@@ -3979,6 +4024,7 @@ function init() {
       const curTime = new Date(currentDayData.updatedAt || 0).getTime();
       if (diskTime > curTime) {
         currentDayData = normalizeDayData(diskData, dateKey);
+        syncWorkspaceLayoutForDate(dateKey, currentDayData);
         renderCurrentDay();
         checkPendingCarryover(dateKey);
       }
