@@ -80,22 +80,48 @@ const PRESETS = {
         title: "Foundation & Learning",
         timeRange: "04:00 — 09:00",
         colorClass: "amber",
-        tracks: [
-          { key: "part1_quad1", title: "CS & SWE", placeholder: "Data structures, algorithms, system design..." },
-          { key: "part1_quad2", title: "Core AI", placeholder: "Math, transformers, LLM architectures..." },
-          { key: "part1_quad3", title: "Applications", placeholder: "Web apps, backends, products..." },
-          { key: "part1_quad4", title: "RSWE", placeholder: "Reliability, observability, metrics..." },
-          { key: "part2", title: "Breadth", placeholder: "Adjacent disciplines, cross-domain knowledge..." }
+        orientation: "vertical",
+        rows: [
+          {
+            id: "row_learning_part1",
+            title: "PART 1 — DEPTH",
+            tracks: [
+              { key: "part1_quad1", title: "CS & SWE", placeholder: "Data structures, algorithms, system design..." },
+              { key: "part1_quad2", title: "Core AI", placeholder: "Math, transformers, LLM architectures..." },
+              { key: "part1_quad3", title: "Applications", placeholder: "Web apps, backends, products..." },
+              { key: "part1_quad4", title: "RSWE", placeholder: "Reliability, observability, metrics..." }
+            ]
+          },
+          {
+            id: "row_learning_part2",
+            title: "PART 2 — BREADTH",
+            tracks: [
+              { key: "part2", title: "Breadth", placeholder: "Adjacent disciplines, cross-domain knowledge..." }
+            ]
+          }
         ]
       },
       {
         id: "phase_productive",
-        title: "Productive & Admin",
+        title: "Work & Execution",
         timeRange: "09:00 — 18:00",
         colorClass: "violet",
-        tracks: [
-          { key: "productive", title: "Productive (Get Things Done)", placeholder: "High impact work, core deliverables..." },
-          { key: "admin", title: "Admin & Operations", placeholder: "Logistics, operations, emails..." }
+        orientation: "vertical",
+        rows: [
+          {
+            id: "row_work_productive",
+            title: "09:00 — 14:00 · PRODUCTIVE",
+            tracks: [
+              { key: "productive", title: "Productive (Get Things Done)", placeholder: "High impact work, core deliverables..." }
+            ]
+          },
+          {
+            id: "row_work_admin",
+            title: "14:00 — 18:00 · ADMIN",
+            tracks: [
+              { key: "admin", title: "Admin & Operations", placeholder: "Logistics, operations, emails..." }
+            ]
+          }
         ]
       },
       {
@@ -103,13 +129,20 @@ const PRESETS = {
         title: "Creative Evening",
         timeRange: "18:00 — 23:00",
         colorClass: "emerald",
-        tracks: [
-          { key: "evening_huro", title: "Huro", placeholder: "Huro development & creative..." },
-          { key: "evening_kana", title: "Kana", placeholder: "Kana clothing & store..." },
-          { key: "evening_bana", title: "Bana", placeholder: "Bana projects..." },
-          { key: "evening_curio", title: "Curio", placeholder: "Curio research..." },
-          { key: "evening_survivi", title: "Survivo", placeholder: "Survivo survival tools..." },
-          { key: "evening_random", title: "Random", placeholder: "Spontaneous thoughts & tests..." }
+        orientation: "horizontal",
+        rows: [
+          {
+            id: "row_evening_projects",
+            title: "",
+            tracks: [
+              { key: "evening_huro", title: "Huro", placeholder: "Huro development & creative..." },
+              { key: "evening_kana", title: "Kana", placeholder: "Kana clothing & store..." },
+              { key: "evening_bana", title: "Bana", placeholder: "Bana projects..." },
+              { key: "evening_curio", title: "Curio", placeholder: "Curio research..." },
+              { key: "evening_survivi", title: "Survivo", placeholder: "Survivo survival tools..." },
+              { key: "evening_random", title: "Random", placeholder: "Spontaneous thoughts & tests..." }
+            ]
+          }
         ]
       },
       {
@@ -117,11 +150,18 @@ const PRESETS = {
         title: "Diet & Exercise",
         timeRange: "05:00 — 06:00",
         colorClass: "emerald",
-        tracks: [
-          { key: "health_workout", title: "Workout (5-6 AM)", placeholder: "Push/Pull/Legs, Cardio..." },
-          { key: "health_diet", title: "Diet & Meals", placeholder: "Nutrition, macro targets, meal timing..." },
-          { key: "health_habits", title: "Hydration & Supplements", placeholder: "Water, vitamins, minerals, creatine..." },
-          { key: "health_recovery", title: "Body & Recovery", placeholder: "Mobility, stretching, sleep prep..." }
+        orientation: "horizontal",
+        rows: [
+          {
+            id: "row_health_habits",
+            title: "",
+            tracks: [
+              { key: "health_workout", title: "Workout (5-6 AM)", placeholder: "Push/Pull/Legs, Cardio..." },
+              { key: "health_diet", title: "Diet & Meals", placeholder: "Nutrition, macro targets, meal timing..." },
+              { key: "health_habits", title: "Hydration & Supplements", placeholder: "Water, vitamins, minerals, creatine..." },
+              { key: "health_recovery", title: "Body & Recovery", placeholder: "Mobility, stretching, sleep prep..." }
+            ]
+          }
         ]
       }
     ]
@@ -442,21 +482,26 @@ function handleCanvasDeleteSection(phaseId) {
   }
 }
 
-function handleCanvasAddSection() {
+function handleCanvasAddSection(orientation = 'vertical') {
   const dateKey = formatDateKey(currentDate);
   let activeLayout = JSON.parse(JSON.stringify(getLayoutForDate(dateKey, currentDayData)));
   if (!Array.isArray(activeLayout.phases)) activeLayout.phases = [];
   const pIdx = activeLayout.phases.length + 1;
+  const isHoriz = (orientation === 'horizontal');
   activeLayout.phases.push({
     id: `phase_custom_${Date.now()}`,
-    title: `Section ${pIdx}`,
+    title: isHoriz ? `Row Section ${pIdx}` : `Column Section ${pIdx}`,
     timeRange: "Custom Hours",
+    orientation: isHoriz ? 'horizontal' : 'vertical',
     colorClass: pIdx % 2 === 0 ? "violet" : "cyan",
     rows: [
       {
         id: `row_${Date.now()}`,
         title: "",
-        tracks: [
+        tracks: isHoriz ? [
+          { key: `custom_${Date.now()}_1`, title: "Track 1", placeholder: "Tasks, notes..." },
+          { key: `custom_${Date.now()}_2`, title: "Track 2", placeholder: "Tasks, notes..." }
+        ] : [
           { key: `custom_${Date.now()}`, title: "Focus Track 1", placeholder: "Tasks, milestones, notes..." }
         ]
       }
@@ -464,7 +509,22 @@ function handleCanvasAddSection() {
   });
   activeLayout.id = 'custom';
   saveAndApplyLayoutForToday(activeLayout);
-  showToast(`Added Section ${pIdx}!`);
+  showToast(`Added ${isHoriz ? 'Horizontal Row' : 'Vertical Column'} Section!`);
+}
+
+function handleCanvasToggleOrientation(phaseId) {
+  const dateKey = formatDateKey(currentDate);
+  let activeLayout = JSON.parse(JSON.stringify(getLayoutForDate(dateKey, currentDayData)));
+  if (!activeLayout.phases) return;
+
+  const targetPhase = activeLayout.phases.find(p => p.id === phaseId);
+  if (targetPhase) {
+    const nextOrient = (targetPhase.orientation === 'horizontal') ? 'vertical' : 'horizontal';
+    targetPhase.orientation = nextOrient;
+    activeLayout.id = 'custom';
+    saveAndApplyLayoutForToday(activeLayout);
+    showToast(`Switched "${targetPhase.title || 'Section'}" to ${nextOrient === 'horizontal' ? 'Horizontal Row' : 'Vertical Column'}`);
+  }
 }
 
 // Global delegated click listener for canvas layout modifications
@@ -502,7 +562,18 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // 4. Delete row button
+  // 4. Toggle Orientation button (↕ Column / ↔ Row)
+  const toggleOrientBtn = e.target.closest('.btn-toggle-orientation');
+  if (toggleOrientBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    const phaseCol = toggleOrientBtn.closest('.phase-col-custom');
+    const phaseId = toggleOrientBtn.getAttribute('data-phase-id') || (phaseCol && phaseCol.getAttribute('data-phase-id'));
+    if (phaseId) handleCanvasToggleOrientation(phaseId);
+    return;
+  }
+
+  // 5. Delete row button
   const delRowBtn = e.target.closest('.btn-canvas-del-row');
   if (delRowBtn) {
     e.preventDefault();
@@ -515,7 +586,7 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // 5. Delete section button
+  // 6. Delete section button
   const delSecBtn = e.target.closest('.btn-canvas-del-section');
   if (delSecBtn) {
     e.preventDefault();
@@ -526,16 +597,26 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // 6. Bottom toolbar buttons
-  const addSecBtn = e.target.closest('#btn-canvas-bottom-add-section');
-  if (addSecBtn) {
+  // 7. Add Vertical Section buttons (Blank canvas or bottom bar)
+  const addVertBtn = e.target.closest('#btn-canvas-bottom-add-vertical, #btn-blank-canvas-add-vertical, .btn-add-vertical-section');
+  if (addVertBtn) {
     e.preventDefault();
     e.stopPropagation();
-    handleCanvasAddSection();
+    handleCanvasAddSection('vertical');
     return;
   }
 
-  const restorePolyBtn = e.target.closest('#btn-canvas-bottom-restore-polymath');
+  // 8. Add Horizontal Section buttons (Blank canvas or bottom bar)
+  const addHorizBtn = e.target.closest('#btn-canvas-bottom-add-horizontal, #btn-blank-canvas-add-horizontal, .btn-add-horizontal-section');
+  if (addHorizBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    handleCanvasAddSection('horizontal');
+    return;
+  }
+
+  // 9. Restore Polymath Routine
+  const restorePolyBtn = e.target.closest('#btn-canvas-bottom-restore-polymath, #btn-blank-canvas-restore-polymath');
   if (restorePolyBtn) {
     e.preventDefault();
     e.stopPropagation();
@@ -575,26 +656,12 @@ function renderCustomWorkspace(layout, workspaceEl) {
         <h3>100% Blank Canvas for ${escapeHtml(formatDateDisplay(currentDate))}</h3>
         <p>No columns or sections exist yet. Build your custom layout for today from scratch, or restore a routine:</p>
         <div class="blank-canvas-actions">
-          <button type="button" class="btn-canvas-welcome-add-section" id="btn-blank-canvas-add-section">+ Add Section / Phase</button>
+          <button type="button" class="btn-canvas-action-btn btn-canvas-welcome-add-vertical" id="btn-blank-canvas-add-vertical">+ Add Vertical Section (Column)</button>
+          <button type="button" class="btn-canvas-action-btn btn-canvas-welcome-add-horizontal" id="btn-blank-canvas-add-horizontal">+ Add Horizontal Section (Row)</button>
           <button type="button" class="btn-canvas-welcome-preset" id="btn-blank-canvas-restore-polymath">↺ Load Polymath Golden Routine</button>
         </div>
       </div>
     `;
-
-    const btnAddSec = document.getElementById('btn-blank-canvas-add-section');
-    if (btnAddSec) {
-      btnAddSec.addEventListener('click', () => {
-        handleCanvasAddSection();
-      });
-    }
-
-    const btnRest = document.getElementById('btn-blank-canvas-restore-polymath');
-    if (btnRest) {
-      btnRest.addEventListener('click', () => {
-        saveAndApplyLayoutForToday(PRESETS.default_polymath);
-        showToast("Restored Polymath Golden Routine");
-      });
-    }
 
     // Re-bind carryover banner buttons
     const bApply = document.getElementById('btn-carryover-apply');
@@ -606,23 +673,26 @@ function renderCustomWorkspace(layout, workspaceEl) {
     return;
   }
 
-  const half = Math.ceil(phases.length / 2);
-  const topPhases = phases.slice(0, half);
-  const bottomPhases = phases.slice(half);
-
-  function renderPhaseCol(p, pIdx) {
+  function renderPhaseCol(p, isHoriz) {
     const color = p.colorClass || 'cyan';
     const rows = getPhaseRows(p);
+    const colStyle = isHoriz
+      ? 'width: 100%; display: flex; flex-direction: column; gap: 12px;'
+      : 'flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 12px;';
+
     return `
-      <div class="planner-col phase-col-custom" data-phase-id="${p.id}" style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 12px;">
+      <div class="planner-col phase-col-custom ${isHoriz ? 'phase-horizontal' : 'phase-vertical'}" data-phase-id="${p.id}" style="${colStyle}">
         <div class="col-master-banner banner-${color}-master">
           <div class="master-banner-left">
             <span class="column-time-pill pill-${color}">${escapeHtml(p.timeRange || '')}</span>
             <span class="column-name">${escapeHtml(p.title)}</span>
           </div>
           <div class="master-banner-actions">
-            <button type="button" class="btn-canvas-add-row" data-phase-id="${p.id}" title="Add new row of columns to ${escapeHtml(p.title)}">+ Row</button>
-            <button type="button" class="btn-canvas-add-col" data-phase-id="${p.id}" title="Add new column to ${escapeHtml(p.title)}">+ Column</button>
+            <button type="button" class="btn-toggle-orientation btn-canvas-mini" data-phase-id="${p.id}" title="Toggle between Vertical Column and Horizontal Row">
+              ${isHoriz ? '↔ Horizontal Row' : '↕ Vertical Column'}
+            </button>
+            <button type="button" class="btn-canvas-add-row btn-canvas-mini" data-phase-id="${p.id}" title="Add new row of columns to ${escapeHtml(p.title)}">+ Row</button>
+            <button type="button" class="btn-canvas-add-col btn-canvas-mini" data-phase-id="${p.id}" title="Add new column to ${escapeHtml(p.title)}">+ Column</button>
             <button type="button" class="btn-canvas-del-section" data-phase-id="${p.id}" title="Delete entire section">✕</button>
           </div>
         </div>
@@ -633,81 +703,118 @@ function renderCustomWorkspace(layout, workspaceEl) {
               <button type="button" class="btn-canvas-add-row" data-phase-id="${p.id}">+ Add Row</button>
               <button type="button" class="btn-canvas-add-col" data-phase-id="${p.id}">+ Add Column</button>
             </div>
-          ` : rows.map((row, rIdx) => `
-            <div class="phase-row-block" data-row-id="${row.id}">
-              ${(rows.length > 1 || row.title) ? `
-                <div class="sub-split-header-clean" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-                  <span class="sub-split-tag tag-${color}">${escapeHtml(row.title || ('Row ' + (rIdx + 1)))}</span>
-                  <div class="row-canvas-actions">
-                    <button type="button" class="btn-canvas-add-col-to-row btn-canvas-mini" data-phase-id="${p.id}" data-row-id="${row.id}" title="Add column to this row">+ Column</button>
-                    <button type="button" class="btn-canvas-del-row btn-canvas-mini" data-phase-id="${p.id}" data-row-id="${row.id}" title="Delete this row">✕ Row</button>
-                  </div>
-                </div>
-              ` : ''}
-              <div class="cards-grid-dynamic" data-row-id="${row.id}">
-                ${(row.tracks || []).map((t, tIdx) => `
-                  <div class="cool-card dynamic-col-card" data-block="${t.key || ('custom_' + p.id + '_' + tIdx)}">
-                    <div class="card-bar">
-                      <div class="card-bar-left">
-                        <span class="track-indicator dot-${color}"></span>
-                        <input type="text" class="card-title-input" value="${escapeHtml(t.title)}" placeholder="${escapeHtml(t.title)}" spellcheck="false" title="Click to rename this column" />
-                      </div>
-                      <div class="card-bar-right">
-                        <span class="card-checklist-stat"></span>
-                        <button class="btn-check-insert" title="Insert Checkbox">☐</button>
-                        <button class="btn-bullet-insert" title="Insert Bullet">•</button>
-                        <button type="button" class="btn-canvas-del-col" data-track-key="${t.key}" title="Delete this column from today">✕</button>
-                      </div>
+          ` : rows.map((row, rIdx) => {
+            const trackCount = (row.tracks || []).length;
+            let gridClass = 'cards-grid-dynamic';
+            let gridStyle = '';
+            if (isHoriz) {
+              gridClass = 'cards-grid-horizontal';
+              gridStyle = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; width: 100%;';
+            } else {
+              if (trackCount === 4) {
+                gridClass = 'quadrants-grid';
+                gridStyle = 'display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%;';
+              } else if (trackCount === 2) {
+                gridClass = 'two-col-grid';
+                gridStyle = 'display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%;';
+              } else if (trackCount === 1) {
+                gridClass = 'single-card-grid';
+                gridStyle = 'display: grid; grid-template-columns: 1fr; gap: 10px; width: 100%;';
+              } else {
+                gridClass = 'cards-grid-dynamic';
+                gridStyle = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; width: 100%;';
+              }
+            }
+
+            return `
+              <div class="phase-row-block" data-row-id="${row.id}">
+                ${(rows.length > 1 || row.title) ? `
+                  <div class="sub-split-header-clean" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                    <span class="sub-split-tag tag-${color}">${escapeHtml(row.title || ('Row ' + (rIdx + 1)))}</span>
+                    <div class="row-canvas-actions">
+                      <button type="button" class="btn-canvas-add-col-to-row btn-canvas-mini" data-phase-id="${p.id}" data-row-id="${row.id}" title="Add column to this row">+ Column</button>
+                      <button type="button" class="btn-canvas-del-row btn-canvas-mini" data-phase-id="${p.id}" data-row-id="${row.id}" title="Delete this row">✕ Row</button>
                     </div>
-                    <div class="card-editor-area">
-                      <textarea class="card-text-editor" placeholder="${escapeHtml(t.placeholder || 'Tasks and notes...')}"></textarea>
-                    </div>
                   </div>
-                `).join('')}
-                ${(!row.tracks || row.tracks.length === 0) ? `
-                  <div class="empty-row-hint">No columns in this row. <button type="button" class="btn-canvas-add-col" data-phase-id="${p.id}" data-row-id="${row.id}">+ Column</button></div>
                 ` : ''}
+                <div class="${gridClass}" data-row-id="${row.id}" style="${gridStyle}">
+                  ${(row.tracks || []).map((t, tIdx) => `
+                    <div class="cool-card dynamic-col-card" data-block="${t.key || ('custom_' + p.id + '_' + tIdx)}">
+                      <div class="card-bar">
+                        <div class="card-bar-left">
+                          <span class="track-indicator dot-${color}"></span>
+                          <input type="text" class="card-title-input" value="${escapeHtml(t.title)}" placeholder="${escapeHtml(t.title)}" spellcheck="false" title="Click to rename this column" />
+                        </div>
+                        <div class="card-bar-right">
+                          <span class="card-checklist-stat"></span>
+                          <button class="btn-check-insert" title="Insert Checkbox">☐</button>
+                          <button class="btn-bullet-insert" title="Insert Bullet">•</button>
+                          <button type="button" class="btn-canvas-del-col" data-track-key="${t.key}" title="Delete this column from today">✕</button>
+                        </div>
+                      </div>
+                      <div class="card-editor-area">
+                        <textarea class="card-text-editor" placeholder="${escapeHtml(t.placeholder || 'Tasks and notes...')}"></textarea>
+                      </div>
+                    </div>
+                  `).join('')}
+                  ${(!row.tracks || row.tracks.length === 0) ? `
+                    <div class="empty-row-hint">No columns in this row. <button type="button" class="btn-canvas-add-col" data-phase-id="${p.id}" data-row-id="${row.id}">+ Column</button></div>
+                  ` : ''}
+                </div>
               </div>
-            </div>
-            ${(rIdx < rows.length - 1) ? `<div class="clean-split-rule"></div>` : ''}
-          `).join('')}
+              ${(rIdx < rows.length - 1) ? `<div class="clean-split-rule"></div>` : ''}
+            `;
+          }).join('')}
         </div>
       </div>
     `;
   }
 
-  const topRowHTML = `
-    <section class="planner-row row-top" id="planner-row-top" style="display: flex; gap: 20px; align-items: stretch;">
-      ${topPhases.map((p, i) => renderPhaseCol(p, i)).join('')}
-    </section>
-  `;
+  // Partition phases into orientation groups
+  const groups = [];
+  let currentVertGroup = [];
 
-  const dividerHTML = `
-    <div class="phase-transition-fold phase-fold-divider" id="phase-fold-divider">
-      <span class="neon-line"></span>
-      <div class="phase-pill-glow">
-        <span class="pill-sparkle">✦</span>
-        <span>WORKSPACE FLOW</span>
-        <span class="pill-sparkle">✦</span>
-      </div>
-      <span class="neon-line"></span>
-    </div>
-  `;
+  phases.forEach((p) => {
+    const isHoriz = (p.orientation === 'horizontal');
+    if (isHoriz) {
+      if (currentVertGroup.length > 0) {
+        groups.push({ type: 'vertical-row', phases: currentVertGroup });
+        currentVertGroup = [];
+      }
+      groups.push({ type: 'horizontal-row', phase: p });
+    } else {
+      currentVertGroup.push(p);
+    }
+  });
+  if (currentVertGroup.length > 0) {
+    groups.push({ type: 'vertical-row', phases: currentVertGroup });
+  }
 
-  const bottomRowHTML = bottomPhases.length > 0 ? `
-    <section class="planner-row row-bottom phase-row-evening" id="phase-row-evening" style="display: flex; gap: 20px; align-items: stretch;">
-      ${bottomPhases.map((p, i) => renderPhaseCol(p, half + i)).join('')}
-    </section>
-  ` : '';
+  const groupsHTML = groups.map((g) => {
+    if (g.type === 'vertical-row') {
+      return `
+        <section class="planner-row planner-row-vertical" style="display: flex; gap: 20px; align-items: stretch; width: 100%; margin-bottom: 24px;">
+          ${g.phases.map(p => renderPhaseCol(p, false)).join('')}
+        </section>
+      `;
+    } else {
+      return `
+        <section class="planner-row-horizontal" style="width: 100%; display: flex; flex-direction: column; gap: 14px; margin-bottom: 24px;">
+          ${renderPhaseCol(g.phase, true)}
+        </section>
+      `;
+    }
+  }).join('');
 
   const bottomToolbarHTML = `
     <div class="custom-workspace-bottom-bar" style="display: flex; justify-content: center; gap: 12px; margin-top: 24px; padding-bottom: 20px;">
-      <button type="button" class="btn-canvas-welcome-add-section" id="btn-canvas-bottom-add-section">+ Add Section / Phase</button>
+      <button type="button" class="btn-canvas-action-btn" id="btn-canvas-bottom-add-vertical">+ Add Vertical Section (Column)</button>
+      <button type="button" class="btn-canvas-action-btn" id="btn-canvas-bottom-add-horizontal">+ Add Horizontal Section (Row)</button>
       <button type="button" class="btn-canvas-welcome-preset" id="btn-canvas-bottom-restore-polymath">↺ Load Polymath Golden Routine</button>
     </div>
   `;
 
-  workspaceEl.innerHTML = bannerHTML + topRowHTML + dividerHTML + bottomRowHTML + bottomToolbarHTML;
+  workspaceEl.innerHTML = bannerHTML + groupsHTML + bottomToolbarHTML;
 
   // Re-bind carryover banner buttons
   const bApply = document.getElementById('btn-carryover-apply');
@@ -789,12 +896,14 @@ function renderPhaseCustomizer() {
     const box = document.createElement('div');
     box.className = 'phase-customizer-box';
 
-    // Header: phase title, time, and delete section button
+    // Header: phase title, time, orientation, and delete section button
+    const isHoriz = (phase.orientation === 'horizontal');
     const header = document.createElement('div');
     header.className = 'phase-customizer-header';
     header.innerHTML = `
       <input type="text" class="phase-customizer-title-input" value="${escapeHtml(phase.title || '')}" placeholder="Phase Title (e.g. Morning Focus)" />
       <input type="text" class="phase-customizer-time-input" value="${escapeHtml(phase.timeRange || '')}" placeholder="Time (09:00 — 18:00)" />
+      <button type="button" class="phase-orientation-btn ${isHoriz ? 'is-horiz' : 'is-vert'}" title="Toggle Orientation">${isHoriz ? '↔ Horizontal Row' : '↕ Vertical Column'}</button>
       <button type="button" class="phase-delete-btn" title="Delete this section">🗑 Delete Section</button>
     `;
 
@@ -809,6 +918,15 @@ function renderPhaseCustomizer() {
       phase.timeRange = timeInput.value;
       currentEditingLayout.id = 'custom';
     });
+    const orientBtn = header.querySelector('.phase-orientation-btn');
+    if (orientBtn) {
+      orientBtn.addEventListener('click', () => {
+        phase.orientation = (phase.orientation === 'horizontal') ? 'vertical' : 'horizontal';
+        currentEditingLayout.id = 'custom';
+        renderPresetCards();
+        renderPhaseCustomizer();
+      });
+    }
     const delPhaseBtn = header.querySelector('.phase-delete-btn');
     if (delPhaseBtn) {
       delPhaseBtn.addEventListener('click', () => {
@@ -4013,30 +4131,45 @@ if (btnSaveCustomLayout) {
     }
   });
 }
-if (btnAddNewPhase) {
-  btnAddNewPhase.addEventListener('click', () => {
-    if (!currentEditingLayout) currentEditingLayout = JSON.parse(JSON.stringify(getActiveLayout()));
-    if (!Array.isArray(currentEditingLayout.phases)) currentEditingLayout.phases = [];
-    const pIdx = currentEditingLayout.phases.length + 1;
-    currentEditingLayout.phases.push({
-      id: `phase_custom_${Date.now()}`,
-      title: `Section ${pIdx}`,
-      timeRange: "Custom Hours",
-      colorClass: pIdx % 2 === 0 ? "violet" : "cyan",
-      rows: [
-        {
-          id: `row_${Date.now()}`,
-          title: "",
-          tracks: [
-            { key: `custom_${Date.now()}`, title: "Focus Track 1", placeholder: "Tasks, milestones, notes..." }
-          ]
-        }
-      ]
-    });
-    currentEditingLayout.id = 'custom';
-    renderPresetCards();
-    renderPhaseCustomizer();
+function addPhaseToModal(orientation = 'vertical') {
+  if (!currentEditingLayout) currentEditingLayout = JSON.parse(JSON.stringify(getActiveLayout()));
+  if (!Array.isArray(currentEditingLayout.phases)) currentEditingLayout.phases = [];
+  const pIdx = currentEditingLayout.phases.length + 1;
+  const isHoriz = (orientation === 'horizontal');
+  currentEditingLayout.phases.push({
+    id: `phase_custom_${Date.now()}`,
+    title: isHoriz ? `Row Section ${pIdx}` : `Column Section ${pIdx}`,
+    timeRange: "Custom Hours",
+    orientation: isHoriz ? 'horizontal' : 'vertical',
+    colorClass: pIdx % 2 === 0 ? "violet" : "cyan",
+    rows: [
+      {
+        id: `row_${Date.now()}`,
+        title: "",
+        tracks: isHoriz ? [
+          { key: `custom_${Date.now()}_1`, title: "Track 1", placeholder: "Tasks, notes..." },
+          { key: `custom_${Date.now()}_2`, title: "Track 2", placeholder: "Tasks, notes..." }
+        ] : [
+          { key: `custom_${Date.now()}`, title: "Focus Track 1", placeholder: "Tasks, milestones, notes..." }
+        ]
+      }
+    ]
   });
+  currentEditingLayout.id = 'custom';
+  renderPresetCards();
+  renderPhaseCustomizer();
+}
+
+const btnAddVertPhase = document.getElementById('btn-add-vertical-phase');
+if (btnAddVertPhase) {
+  btnAddVertPhase.addEventListener('click', () => addPhaseToModal('vertical'));
+}
+const btnAddHorizPhase = document.getElementById('btn-add-horizontal-phase');
+if (btnAddHorizPhase) {
+  btnAddHorizPhase.addEventListener('click', () => addPhaseToModal('horizontal'));
+}
+if (btnAddNewPhase) {
+  btnAddNewPhase.addEventListener('click', () => addPhaseToModal('vertical'));
 }
 if (customizeLayoutModal) {
   customizeLayoutModal.addEventListener('click', (e) => {
