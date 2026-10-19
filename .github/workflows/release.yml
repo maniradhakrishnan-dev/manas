@@ -94,15 +94,12 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Setup Android NDK
+      - name: Setup Android Environment & NDK
         run: |
-          ANDROID_NDK_VERSION="26.1.10909125"
-          echo "Installing NDK $ANDROID_NDK_VERSION"
-          ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;$ANDROID_NDK_VERSION"
-          echo "NDK_HOME=${ANDROID_HOME}/ndk/${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
+          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> $GITHUB_ENV
+          NDK_DIR=$(find /usr/local/lib/android/sdk/ndk -maxdepth 1 -mindepth 1 | sort -V | tail -n 1)
+          echo "Using pre-installed NDK: $NDK_DIR"
+          echo "NDK_HOME=$NDK_DIR" >> $GITHUB_ENV
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -126,12 +123,12 @@ jobs:
         run: npx tauri android init --ci
 
       - name: Build Android APK
-        run: npx tauri android build --apk
+        run: npx tauri android build --apk --target aarch64-linux-android
 
-      - name: Copy & Rename APK
+      - name: Copy & Prepare APK
         run: |
           mkdir -p dist-apk
-          find src-tauri/gen/android -name "*.apk" -exec cp {} dist-apk/ \;
+          find src-tauri/gen/android -name "*.apk" -exec cp {} dist-apk/manas-arm64.apk \;
           ls -la dist-apk/
 
       - name: Attach APK to GitHub Release
