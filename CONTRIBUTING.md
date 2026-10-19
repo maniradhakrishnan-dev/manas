@@ -37,7 +37,7 @@ Thank you for your interest in contributing to **Manas**! We welcome bug reports
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/your-username/manas.git
+   git clone https://github.com/maniradhakrishnan-dev/manas.git
    cd manas
    ```
 

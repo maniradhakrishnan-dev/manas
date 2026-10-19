@@ -5,7 +5,7 @@
   # MANAS
   **A tactile, distraction-free daily planner and thinking space built with Tauri 2.0 & Rust.**
 
-  [![CI](https://github.com/manas-app/manas/actions/workflows/ci.yml/badge.svg)](https://github.com/manas-app/manas/actions)
+  [![CI](https://github.com/maniradhakrishnan-dev/manas/actions/workflows/ci.yml/badge.svg)](https://github.com/maniradhakrishnan-dev/manas/actions)
   [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
   [![Built with Tauri](https://img.shields.io/badge/Tauri-v2.0-blueviolet?logo=tauri)](https://tauri.app)
   [![Rust](https://img.shields.io/badge/Language-Rust-orange?logo=rust)](https://www.rust-lang.org)
@@ -29,7 +29,7 @@ Unlike conventional bloated task apps that trap your life in proprietary databas
 
 ## 📦 Installation & Downloads
 
-Pre-built binaries are available for every major platform on the **[Releases](https://github.com/manas-app/manas/releases)** page:
+Pre-built binaries are available for every major platform on the **[Releases](https://github.com/maniradhakrishnan-dev/manas/releases)** page:
 
 ### 🐧 Linux
 Download the `.deb` file (for Ubuntu/Debian) or the standalone `.AppImage`:
@@ -91,7 +91,7 @@ All planner entries are stored on your local hard drive in simple, transparent J
 ### Quick Start
 ```bash
 # Clone the repository
-git clone https://github.com/manas-app/manas.git
+git clone https://github.com/maniradhakrishnan-dev/manas.git
 cd manas
 
 # Install frontend dependencies
