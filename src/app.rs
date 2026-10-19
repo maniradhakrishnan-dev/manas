@@ -123,7 +123,7 @@ impl eframe::App for MrtApp {
                 ui.horizontal(|ui| {
                     // App Logo & Branding
                     ui.label(
-                        RichText::new("MRT")
+                        RichText::new("MANAS")
                             .strong()
                             .size(19.0)
                             .color(colors.accent),
