@@ -123,7 +123,7 @@ jobs:
         run: npx tauri android init --ci
 
       - name: Build Android APK
-        run: npx tauri android build --apk --target aarch64-linux-android
+        run: npx tauri android build --apk --target aarch64 --debug
 
       - name: Copy & Prepare APK
         run: |
