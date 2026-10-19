@@ -1,6 +1,10 @@
 # Manas
 > **A tactile, distraction-free daily planner and thinking space built with Tauri 2.0 & Rust.**
 
+<div align="center">
+  <img src="ui/assets/logo.png" width="96" height="96" alt="Manas Compass Logo" style="border-radius: 22px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);" />
+</div>
+
 ---
 
 ## 🚀 Overview
