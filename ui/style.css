@@ -1976,6 +1976,130 @@ body[data-section-focus] .planner-col.phase-col-custom.section-focused {
 }
 
 /* ==========================================================================
+   Task Reordering, Move Controls & Drag Handle
+   ========================================================================== */
+.task-drag-handle,
+.subtask-drag-handle {
+  width: 14px;
+  min-width: 14px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1;
+  opacity: 0.35;
+  cursor: grab;
+  user-select: none;
+  flex-shrink: 0 !important;
+  background: transparent;
+  border: none;
+  padding: 0;
+  outline: none;
+  box-shadow: none;
+  transition: opacity 0.14s ease, color 0.14s ease, transform 0.14s ease;
+  letter-spacing: -0.5px;
+}
+
+.task-row:hover .task-drag-handle,
+.task-row.is-active-task .task-drag-handle,
+.subtask-row:hover .subtask-drag-handle {
+  opacity: 0.85;
+}
+
+.task-drag-handle:hover,
+.subtask-drag-handle:hover {
+  opacity: 1 !important;
+  color: var(--accent-cyan) !important;
+  transform: scale(1.15);
+}
+
+.task-drag-handle:active,
+.subtask-drag-handle:active {
+  cursor: grabbing;
+}
+
+/* Dragging visual indicators */
+.task-row.is-dragging,
+.subtask-row.is-dragging {
+  opacity: 0.3 !important;
+  background: rgba(56, 189, 248, 0.12) !important;
+  outline: 1.5px dashed var(--accent-cyan);
+}
+
+.task-row.drag-over-top,
+.subtask-row.drag-over-top {
+  border-top: 2px solid var(--accent-cyan) !important;
+  border-radius: 4px 4px 0 0;
+}
+
+.task-row.drag-over-bottom,
+.subtask-row.drag-over-bottom {
+  border-bottom: 2px solid var(--accent-cyan) !important;
+  border-radius: 0 0 4px 4px;
+}
+
+/* Up/Down task move buttons */
+.task-move-group,
+.subtask-move-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  flex-shrink: 0 !important;
+  opacity: 0.55;
+  transition: opacity 0.14s ease;
+}
+
+.task-row:hover .task-move-group,
+.task-row.is-active-task .task-move-group,
+.task-row-input:focus ~ .task-move-group,
+.subtask-row:hover .subtask-move-group,
+.subtask-row-input:focus ~ .subtask-move-group {
+  opacity: 1 !important;
+}
+
+.task-move-btn,
+.subtask-move-btn {
+  width: 15px;
+  height: 16px;
+  min-width: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-glass);
+  border-radius: 3px;
+  color: var(--text-dim);
+  font-size: 7.5px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+[data-theme="paper"] .task-move-btn,
+[data-theme="paper"] .subtask-move-btn {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+.task-move-btn:hover:not(:disabled),
+.subtask-move-btn:hover:not(:disabled) {
+  color: var(--accent-cyan) !important;
+  background: rgba(56, 189, 248, 0.2) !important;
+  border-color: var(--accent-cyan) !important;
+  transform: translateY(-0.5px);
+}
+
+.task-move-btn:disabled,
+.subtask-move-btn:disabled {
+  opacity: 0.18 !important;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ==========================================================================
    Subtasks & Hierarchical Trees
    ========================================================================== */
 .task-row-add-sub {

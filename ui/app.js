@@ -2178,6 +2178,115 @@ function setCardActiveTab(card, tabName) {
   }
 }
 
+// Move task within a block or reorder to any target index
+function moveTask(blockKey, fromIdx, toIdx) {
+  const block = currentDayData[blockKey];
+  if (!block || !Array.isArray(block.tasks) || block.tasks.length === 0) return;
+
+  toIdx = Math.max(0, Math.min(block.tasks.length - 1, toIdx));
+  if (fromIdx === toIdx || fromIdx < 0 || fromIdx >= block.tasks.length) return;
+
+  const [moved] = block.tasks.splice(fromIdx, 1);
+  block.tasks.splice(toIdx, 0, moved);
+
+  syncBlockContent(blockKey);
+  const card = document.querySelector(`.cool-card[data-block="${blockKey}"]`);
+  if (card) {
+    renderCardTasks(card, blockKey);
+  }
+  updateCardTabBadges(card, blockKey);
+  triggerAutoSave();
+
+  setTimeout(() => {
+    const targetInput = document.querySelector(`.cool-card[data-block="${blockKey}"] .task-row[data-task-idx="${toIdx}"] .task-row-input`);
+    if (targetInput) {
+      targetInput.focus();
+      setActiveTaskSelection(blockKey, toIdx);
+    }
+  }, 30);
+}
+
+// Move task between two different blocks/columns
+function moveTaskBetweenBlocks(fromBlockKey, fromIdx, toBlockKey, toIdx) {
+  const srcBlock = currentDayData[fromBlockKey];
+  const dstBlock = currentDayData[toBlockKey];
+  if (!srcBlock || !Array.isArray(srcBlock.tasks) || !dstBlock) return;
+  if (!Array.isArray(dstBlock.tasks)) dstBlock.tasks = [];
+  if (fromIdx < 0 || fromIdx >= srcBlock.tasks.length) return;
+
+  const [moved] = srcBlock.tasks.splice(fromIdx, 1);
+  const insertAt = (typeof toIdx === 'number' && toIdx >= 0) ? Math.min(dstBlock.tasks.length, toIdx) : dstBlock.tasks.length;
+  dstBlock.tasks.splice(insertAt, 0, moved);
+
+  syncBlockContent(fromBlockKey);
+  syncBlockContent(toBlockKey);
+
+  const srcCard = document.querySelector(`.cool-card[data-block="${fromBlockKey}"]`);
+  if (srcCard) renderCardTasks(srcCard, fromBlockKey);
+  const dstCard = document.querySelector(`.cool-card[data-block="${toBlockKey}"]`);
+  if (dstCard) renderCardTasks(dstCard, toBlockKey);
+
+  triggerAutoSave();
+
+  setTimeout(() => {
+    const targetInput = document.querySelector(`.cool-card[data-block="${toBlockKey}"] .task-row[data-task-idx="${insertAt}"] .task-row-input`);
+    if (targetInput) {
+      targetInput.focus();
+      setActiveTaskSelection(toBlockKey, insertAt);
+    }
+  }, 30);
+}
+
+// Prompt dialog to jump task to any specific position number (1-based, e.g. #3 to #1)
+function promptMoveTask(blockKey, currentIdx, totalCount) {
+  const currentNum = currentIdx + 1;
+  const ans = prompt(`Move task #${currentNum} to position (1 to ${totalCount}):`, String(currentNum));
+  if (ans === null) return;
+  const targetNum = parseInt(ans.trim(), 10);
+  if (!isNaN(targetNum) && targetNum >= 1 && targetNum <= totalCount) {
+    moveTask(blockKey, currentIdx, targetNum - 1);
+  }
+}
+
+// Move subtask within parent task
+function moveSubtask(blockKey, parentTaskIdx, fromSubIdx, toSubIdx) {
+  const block = currentDayData[blockKey];
+  if (!block || !Array.isArray(block.tasks)) return;
+  const task = block.tasks[parentTaskIdx];
+  if (!task || !Array.isArray(task.subtasks) || task.subtasks.length === 0) return;
+
+  toSubIdx = Math.max(0, Math.min(task.subtasks.length - 1, toSubIdx));
+  if (fromSubIdx === toSubIdx || fromSubIdx < 0 || fromSubIdx >= task.subtasks.length) return;
+
+  const [moved] = task.subtasks.splice(fromSubIdx, 1);
+  task.subtasks.splice(toSubIdx, 0, moved);
+
+  syncBlockContent(blockKey);
+  const card = document.querySelector(`.cool-card[data-block="${blockKey}"]`);
+  if (card) {
+    renderCardTasks(card, blockKey);
+  }
+  triggerAutoSave();
+
+  setTimeout(() => {
+    const targetSubInput = document.querySelector(`.cool-card[data-block="${blockKey}"] .task-subtasks-tree[data-parent-task-idx="${parentTaskIdx}"] .subtask-row[data-sub-idx="${toSubIdx}"] .subtask-row-input`);
+    if (targetSubInput) {
+      targetSubInput.focus();
+    }
+  }, 30);
+}
+
+// Prompt dialog to jump subtask to any position number (1-based)
+function promptMoveSubtask(blockKey, parentTaskIdx, currentSubIdx, totalCount) {
+  const currentNum = currentSubIdx + 1;
+  const ans = prompt(`Move subtask #${currentNum} to position (1 to ${totalCount}):`, String(currentNum));
+  if (ans === null) return;
+  const targetNum = parseInt(ans.trim(), 10);
+  if (!isNaN(targetNum) && targetNum >= 1 && targetNum <= totalCount) {
+    moveSubtask(blockKey, parentTaskIdx, currentSubIdx, targetNum - 1);
+  }
+}
+
 // Render Tasks List for a Card
 function renderCardTasks(card, blockKey) {
   const tasksPanel = card.querySelector('.card-tasks-panel');
@@ -2220,6 +2329,7 @@ function renderCardTasks(card, blockKey) {
       : '';
 
     row.innerHTML = `
+      <button type="button" class="task-drag-handle" title="Drag to reorder, or click to jump to number (1-${tasks.length})" draggable="true">⠿</button>
       <button type="button" class="task-checkbox-btn ${task.done ? 'checked' : ''}" title="${task.done ? 'Mark active' : 'Mark completed'}">
         <svg class="task-check-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="20 6 9 17 4 12"></polyline>
@@ -2227,6 +2337,10 @@ function renderCardTasks(card, blockKey) {
       </button>
       <input type="text" class="task-row-input ${task.done ? 'task-done' : ''}" value="${escapeHtml(task.text)}" placeholder="Task..." spellcheck="false" />
       ${subBadgeHtml}
+      <div class="task-move-group">
+        <button type="button" class="task-move-btn task-move-up" title="Move task up (Alt+↑)" ${idx === 0 ? 'disabled' : ''}>▲</button>
+        <button type="button" class="task-move-btn task-move-down" title="Move task down (Alt+↓)" ${idx === tasks.length - 1 ? 'disabled' : ''}>▼</button>
+      </div>
       <button type="button" class="task-row-add-sub" title="Add Subtask (or press Tab in task)">↳ Sub</button>
       <button type="button" class="task-row-lockin ${hasNotes ? 'has-notes' : ''}" title="${lockinBtnTitle}">${lockinBtnLabel}</button>
       <button type="button" class="task-row-del" title="Delete task">×</button>
@@ -2238,10 +2352,102 @@ function renderCardTasks(card, blockKey) {
       setActiveTaskSelection(blockKey, idx);
     });
     row.addEventListener('click', (e) => {
-      if (!e.target.closest('.task-checkbox-btn') && !e.target.closest('.task-row-del') && !e.target.closest('.task-row-lockin') && !e.target.closest('.task-row-add-sub')) {
+      if (!e.target.closest('.task-checkbox-btn') && !e.target.closest('.task-row-del') && !e.target.closest('.task-row-lockin') && !e.target.closest('.task-row-add-sub') && !e.target.closest('.task-move-btn') && !e.target.closest('.task-drag-handle')) {
         setActiveTaskSelection(blockKey, idx);
       }
     });
+
+    // Drag Handle & Drag-and-Drop Reordering
+    const dragHandle = row.querySelector('.task-drag-handle');
+    let isDraggingTask = false;
+    if (dragHandle) {
+      dragHandle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (isDraggingTask) return;
+        promptMoveTask(blockKey, idx, tasks.length);
+      });
+      dragHandle.addEventListener('dragstart', (e) => {
+        e.stopPropagation();
+        isDraggingTask = true;
+        row.classList.add('is-dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', JSON.stringify({
+          type: 'task',
+          blockKey: blockKey,
+          taskIdx: idx
+        }));
+      });
+      dragHandle.addEventListener('dragend', () => {
+        setTimeout(() => { isDraggingTask = false; }, 80);
+        row.classList.remove('is-dragging');
+        listEl.querySelectorAll('.task-row').forEach(r => {
+          r.classList.remove('is-dragging', 'drag-over-top', 'drag-over-bottom');
+        });
+      });
+    }
+
+    row.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'move';
+      const rect = row.getBoundingClientRect();
+      const relY = e.clientY - rect.top;
+      const isBottom = relY > (rect.height / 2);
+      row.classList.toggle('drag-over-top', !isBottom);
+      row.classList.toggle('drag-over-bottom', isBottom);
+    });
+
+    row.addEventListener('dragleave', (e) => {
+      e.stopPropagation();
+      row.classList.remove('drag-over-top', 'drag-over-bottom');
+    });
+
+    row.addEventListener('drop', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      row.classList.remove('drag-over-top', 'drag-over-bottom');
+      try {
+        const rawData = e.dataTransfer.getData('text/plain');
+        if (!rawData) return;
+        const data = JSON.parse(rawData);
+        if (data.type === 'task') {
+          const rect = row.getBoundingClientRect();
+          const isBottom = (e.clientY - rect.top) > (rect.height / 2);
+          let targetIdx = isBottom ? idx + 1 : idx;
+
+          if (data.blockKey === blockKey) {
+            if (data.taskIdx < targetIdx) {
+              targetIdx--;
+            }
+            moveTask(blockKey, data.taskIdx, targetIdx);
+          } else {
+            moveTaskBetweenBlocks(data.blockKey, data.taskIdx, blockKey, targetIdx);
+          }
+        }
+      } catch (err) {
+        console.warn('Drag drop error:', err);
+      }
+    });
+
+    // Up / Down Button Actions
+    const btnUp = row.querySelector('.task-move-up');
+    const btnDown = row.querySelector('.task-move-down');
+    if (btnUp) {
+      btnUp.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (idx > 0) {
+          moveTask(blockKey, idx, idx - 1);
+        }
+      });
+    }
+    if (btnDown) {
+      btnDown.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (idx < tasks.length - 1) {
+          moveTask(blockKey, idx, idx + 1);
+        }
+      });
+    }
 
     // 1. Toggle Checkbox (Dedicated, no misclicks)
     const checkBtn = row.querySelector('.task-checkbox-btn');
@@ -2276,8 +2482,28 @@ function renderCardTasks(card, blockKey) {
       }
     });
 
-    // Enter to insert new task below; Tab to add subtask; Backspace on empty to delete
+    // Enter to insert new task below; Tab to add subtask; Backspace on empty to delete; Alt+Up/Down to reorder
     input.addEventListener('keydown', (e) => {
+      // Reordering shortcuts: Alt+Up / Alt+Down, Alt+Shift+Up (to top #1), Alt+Shift+Down (to bottom)
+      if (e.altKey && (e.key === 'ArrowUp' || e.key === 'Up')) {
+        e.preventDefault();
+        if (e.shiftKey) {
+          moveTask(blockKey, idx, 0);
+        } else if (idx > 0) {
+          moveTask(blockKey, idx, idx - 1);
+        }
+        return;
+      }
+      if (e.altKey && (e.key === 'ArrowDown' || e.key === 'Down')) {
+        e.preventDefault();
+        if (e.shiftKey) {
+          moveTask(blockKey, idx, tasks.length - 1);
+        } else if (idx < tasks.length - 1) {
+          moveTask(blockKey, idx, idx + 1);
+        }
+        return;
+      }
+
       if (e.key === 'Enter') {
         e.preventDefault();
         tasks.splice(idx + 1, 0, { text: '', done: false, notes: '', subtasks: [] });
@@ -2377,6 +2603,7 @@ function renderCardTasks(card, blockKey) {
         subRow.className = `subtask-row ${sub.done ? 'is-completed' : ''}`;
         subRow.dataset.subIdx = sIdx;
         subRow.innerHTML = `
+          <button type="button" class="subtask-drag-handle" title="Drag to reorder, or click to jump to number (1-${task.subtasks.length})" draggable="true">⠿</button>
           <span class="subtask-connector">↳</span>
           <button type="button" class="subtask-checkbox-btn ${sub.done ? 'checked' : ''}" title="${sub.done ? 'Mark active' : 'Mark completed'}">
             <svg class="subtask-check-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
@@ -2384,12 +2611,97 @@ function renderCardTasks(card, blockKey) {
             </svg>
           </button>
           <input type="text" class="subtask-row-input ${sub.done ? 'task-done' : ''}" value="${escapeHtml(sub.text)}" placeholder="Subtask..." spellcheck="false" />
+          <div class="subtask-move-group">
+            <button type="button" class="subtask-move-btn subtask-move-up" title="Move subtask up (Alt+↑)" ${sIdx === 0 ? 'disabled' : ''}>▲</button>
+            <button type="button" class="subtask-move-btn subtask-move-down" title="Move subtask down (Alt+↓)" ${sIdx === task.subtasks.length - 1 ? 'disabled' : ''}>▼</button>
+          </div>
           <button type="button" class="subtask-row-del" title="Delete subtask">×</button>
         `;
 
         const subInput = subRow.querySelector('.subtask-row-input');
         const subCheck = subRow.querySelector('.subtask-checkbox-btn');
         const subDel = subRow.querySelector('.subtask-row-del');
+        const subDrag = subRow.querySelector('.subtask-drag-handle');
+        const subBtnUp = subRow.querySelector('.subtask-move-up');
+        const subBtnDown = subRow.querySelector('.subtask-move-down');
+
+        // Subtask drag handle & jump prompt
+        let isDraggingSub = false;
+        if (subDrag) {
+          subDrag.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (isDraggingSub) return;
+            promptMoveSubtask(blockKey, idx, sIdx, task.subtasks.length);
+          });
+          subDrag.addEventListener('dragstart', (e) => {
+            e.stopPropagation();
+            isDraggingSub = true;
+            subRow.classList.add('is-dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', JSON.stringify({
+              type: 'subtask',
+              blockKey: blockKey,
+              parentTaskIdx: idx,
+              subIdx: sIdx
+            }));
+          });
+          subDrag.addEventListener('dragend', () => {
+            setTimeout(() => { isDraggingSub = false; }, 80);
+            subRow.classList.remove('is-dragging');
+            subtasksTree.querySelectorAll('.subtask-row').forEach(sr => {
+              sr.classList.remove('is-dragging', 'drag-over-top', 'drag-over-bottom');
+            });
+          });
+        }
+
+        subRow.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          e.dataTransfer.dropEffect = 'move';
+          const rect = subRow.getBoundingClientRect();
+          const isBottom = (e.clientY - rect.top) > (rect.height / 2);
+          subRow.classList.toggle('drag-over-top', !isBottom);
+          subRow.classList.toggle('drag-over-bottom', isBottom);
+        });
+
+        subRow.addEventListener('dragleave', (e) => {
+          e.stopPropagation();
+          subRow.classList.remove('drag-over-top', 'drag-over-bottom');
+        });
+
+        subRow.addEventListener('drop', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          subRow.classList.remove('drag-over-top', 'drag-over-bottom');
+          try {
+            const rawData = e.dataTransfer.getData('text/plain');
+            if (!rawData) return;
+            const data = JSON.parse(rawData);
+            if (data.type === 'subtask' && data.blockKey === blockKey && data.parentTaskIdx === idx) {
+              const rect = subRow.getBoundingClientRect();
+              const isBottom = (e.clientY - rect.top) > (rect.height / 2);
+              let targetSubIdx = isBottom ? sIdx + 1 : sIdx;
+              if (data.subIdx < targetSubIdx) {
+                targetSubIdx--;
+              }
+              moveSubtask(blockKey, idx, data.subIdx, targetSubIdx);
+            }
+          } catch (err) {}
+        });
+
+        // Subtask Move Buttons
+        if (subBtnUp) {
+          subBtnUp.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (sIdx > 0) moveSubtask(blockKey, idx, sIdx, sIdx - 1);
+          });
+        }
+        if (subBtnDown) {
+          subBtnDown.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (sIdx < task.subtasks.length - 1) moveSubtask(blockKey, idx, sIdx, sIdx + 1);
+          });
+        }
 
         // Subtask checkbox
         subCheck.addEventListener('click', (e) => {
@@ -2420,8 +2732,27 @@ function renderCardTasks(card, blockKey) {
           triggerAutoSave();
         });
 
-        // Subtask keyboard navigation: Enter creates next subtask, Backspace on empty deletes, Shift+Tab outdents
+        // Subtask keyboard navigation: Enter creates next subtask, Backspace on empty deletes, Shift+Tab outdents, Alt+Up/Down reorders
         subInput.addEventListener('keydown', (e) => {
+          if (e.altKey && (e.key === 'ArrowUp' || e.key === 'Up')) {
+            e.preventDefault();
+            if (e.shiftKey) {
+              moveSubtask(blockKey, idx, sIdx, 0);
+            } else if (sIdx > 0) {
+              moveSubtask(blockKey, idx, sIdx, sIdx - 1);
+            }
+            return;
+          }
+          if (e.altKey && (e.key === 'ArrowDown' || e.key === 'Down')) {
+            e.preventDefault();
+            if (e.shiftKey) {
+              moveSubtask(blockKey, idx, sIdx, task.subtasks.length - 1);
+            } else if (sIdx < task.subtasks.length - 1) {
+              moveSubtask(blockKey, idx, sIdx, sIdx + 1);
+            }
+            return;
+          }
+
           if (e.key === 'Enter') {
             e.preventDefault();
             task.subtasks.splice(sIdx + 1, 0, { text: '', done: false });
