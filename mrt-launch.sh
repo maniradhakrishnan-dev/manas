@@ -4,7 +4,7 @@ cd "$DIR"
 
 # Pick the newest compiled binary between release and debug
 NEWEST_BIN=""
-for b in "$DIR/src-tauri/target/release/mrt" "$DIR/src-tauri/target/debug/mrt" "$DIR/target/release/mrt" "$DIR/target/debug/mrt"; do
+for b in "$DIR/src-tauri/target/release/manas" "$DIR/src-tauri/target/debug/manas" "$DIR/target/release/manas" "$DIR/target/debug/manas" "$DIR/src-tauri/target/release/mrt" "$DIR/src-tauri/target/debug/mrt" "$DIR/target/release/mrt" "$DIR/target/debug/mrt"; do
     if [ -f "$b" ]; then
         if [ -z "$NEWEST_BIN" ] || [ "$b" -nt "$NEWEST_BIN" ]; then
             NEWEST_BIN="$b"

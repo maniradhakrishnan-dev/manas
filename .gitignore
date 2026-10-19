@@ -1,5 +1,7 @@
 /target
 mrt_data/
+manas_data/
+data/
 *.bak
 *.log
 scratchpad.md

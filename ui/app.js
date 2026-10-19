@@ -1,5 +1,5 @@
 // ==========================================================================
-// Manas — Daily Planner & Thinking Space
+// MANAS — Daily Planner & Thinking Space
 // High-Performance Resilient Daily Planner & 365 Diary Controller
 // ==========================================================================
 

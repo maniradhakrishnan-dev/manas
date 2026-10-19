@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "MRT",
+  "productName": "Manas",
   "version": "0.1.0",
   "identifier": "com.manas.app",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "MRT",
+        "title": "Manas",
         "width": 1360,
         "height": 940,
         "minWidth": 980,

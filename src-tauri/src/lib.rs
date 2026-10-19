@@ -3,9 +3,22 @@ use std::path::PathBuf;
 
 fn get_storage_dir() -> PathBuf {
     let base = if let Some(d) = dirs::data_dir() {
-        d.join("mrt").join("entries")
+        let manas_dir = d.join("manas").join("entries");
+        let legacy_mrt_dir = d.join("mrt").join("entries");
+        if !manas_dir.exists() && legacy_mrt_dir.exists() {
+            let _ = fs::create_dir_all(&manas_dir);
+            if let Ok(entries) = fs::read_dir(&legacy_mrt_dir) {
+                for entry in entries.flatten() {
+                    let p = entry.path();
+                    if let Some(fname) = p.file_name() {
+                        let _ = fs::copy(&p, manas_dir.join(fname));
+                    }
+                }
+            }
+        }
+        manas_dir
     } else {
-        PathBuf::from("./mrt_data/entries")
+        PathBuf::from("./manas_data/entries")
     };
     let _ = fs::create_dir_all(&base);
     base
