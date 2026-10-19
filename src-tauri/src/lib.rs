@@ -1,7 +1,8 @@
 use std::fs;
 use std::path::PathBuf;
+use tauri::Manager;
 
-fn get_storage_dir() -> PathBuf {
+fn get_storage_dir(app: &tauri::AppHandle) -> PathBuf {
     let base = if let Some(d) = dirs::data_dir() {
         let manas_dir = d.join("manas").join("entries");
         let legacy_mrt_dir = d.join("mrt").join("entries");
@@ -17,6 +18,8 @@ fn get_storage_dir() -> PathBuf {
             }
         }
         manas_dir
+    } else if let Ok(app_dir) = app.path().app_data_dir() {
+        app_dir.join("entries")
     } else {
         PathBuf::from("./manas_data/entries")
     };
@@ -25,8 +28,8 @@ fn get_storage_dir() -> PathBuf {
 }
 
 #[tauri::command]
-fn get_day(date: String) -> Option<serde_json::Value> {
-    let dir = get_storage_dir();
+fn get_day(app: tauri::AppHandle, date: String) -> Option<serde_json::Value> {
+    let dir = get_storage_dir(&app);
     let file = dir.join(format!("{}.json", date));
     if file.exists() {
         if let Ok(content) = fs::read_to_string(&file) {
@@ -39,13 +42,13 @@ fn get_day(date: String) -> Option<serde_json::Value> {
 }
 
 #[tauri::command]
-fn save_day(entry: serde_json::Value) -> Result<(), String> {
+fn save_day(app: tauri::AppHandle, entry: serde_json::Value) -> Result<(), String> {
     let date = entry
         .get("date")
         .and_then(|v| v.as_str())
         .ok_or("Missing date field")?;
 
-    let dir = get_storage_dir();
+    let dir = get_storage_dir(&app);
     let file = dir.join(format!("{}.json", date));
     let json_str = serde_json::to_string_pretty(&entry).map_err(|e| e.to_string())?;
     fs::write(file, json_str).map_err(|e| e.to_string())?;
@@ -53,9 +56,9 @@ fn save_day(entry: serde_json::Value) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn get_active_dates() -> Vec<String> {
+fn get_active_dates(app: tauri::AppHandle) -> Vec<String> {
     let mut dates = Vec::new();
-    let dir = get_storage_dir();
+    let dir = get_storage_dir(&app);
     if let Ok(entries) = fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
@@ -70,13 +73,13 @@ fn get_active_dates() -> Vec<String> {
 }
 
 #[tauri::command]
-fn get_data_folder_path() -> String {
-    get_storage_dir().to_string_lossy().to_string()
+fn get_data_folder_path(app: tauri::AppHandle) -> String {
+    get_storage_dir(&app).to_string_lossy().to_string()
 }
 
 #[tauri::command]
-fn open_data_folder() -> Result<(), String> {
-    let dir = get_storage_dir();
+fn open_data_folder(app: tauri::AppHandle) -> Result<(), String> {
+    let dir = get_storage_dir(&app);
     #[cfg(target_os = "linux")]
     {
         let _ = std::process::Command::new("xdg-open").arg(&dir).spawn();
@@ -92,13 +95,12 @@ fn open_data_folder() -> Result<(), String> {
     Ok(())
 }
 
-use tauri::Manager;
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_log::Builder::default().build())
         .setup(|app| {
+            #[cfg(desktop)]
             if let Some(window) = app.get_webview_window("main") {
                 let icon_bytes = include_bytes!("../icons/icon.png");
                 if let Ok(icon) = tauri::image::Image::from_bytes(icon_bytes) {

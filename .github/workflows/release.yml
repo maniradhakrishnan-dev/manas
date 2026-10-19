@@ -10,8 +10,8 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    name: Build & Package (${{ matrix.platform }})
+  release-desktop:
+    name: Build Desktop (${{ matrix.platform }})
     permissions:
       contents: write
     strategy:
@@ -54,7 +54,7 @@ jobs:
       - name: Install npm dependencies
         run: npm install
 
-      - name: Build Tauri Application & Publish Release
+      - name: Build Tauri Desktop & Publish Release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -66,13 +66,78 @@ jobs:
             Tactile, distraction-free daily planner and thinking space.
 
             #### 📦 Download Assets:
+            - **Android**: Download `manas.apk` to install directly on your phone or tablet.
             - **Linux**: Download `.deb` for Ubuntu/Debian or `.AppImage` for any Linux distribution.
             - **macOS**: Download `.dmg` (Universal binary for Apple Silicon & Intel).
             - **Windows**: Download `.msi` or `.exe` installer.
 
             #### 🔒 Privacy & Architecture:
             - 100% offline-first.
-            - All entries stay strictly local on your machine.
-          releaseDraft: true
+            - All entries stay strictly local on your device.
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+  release-android:
+    name: Build Android APK
+    needs: release-desktop
+    permissions:
+      contents: write
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Android NDK
+        run: |
+          ANDROID_NDK_VERSION="26.1.10909125"
+          echo "Installing NDK $ANDROID_NDK_VERSION"
+          ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;$ANDROID_NDK_VERSION"
+          echo "NDK_HOME=${ANDROID_HOME}/ndk/${ANDROID_NDK_VERSION}" >> $GITHUB_ENV
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Setup Rust toolchain with Android targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi
+
+      - name: Cache cargo dependencies
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install npm dependencies
+        run: npm install
+
+      - name: Initialize Android Scaffolding
+        run: npx tauri android init --ci
+
+      - name: Build Android APK
+        run: npx tauri android build --apk
+
+      - name: Copy & Rename APK
+        run: |
+          mkdir -p dist-apk
+          find src-tauri/gen/android -name "*.apk" -exec cp {} dist-apk/ \;
+          ls -la dist-apk/
+
+      - name: Attach APK to GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          files: dist-apk/*.apk

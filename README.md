@@ -31,6 +31,12 @@ Unlike conventional bloated task apps that trap your life in proprietary databas
 
 Pre-built binaries are available for every major platform on the **[Releases](https://github.com/maniradhakrishnan-dev/manas/releases)** page:
 
+### 📱 Android
+Download the `manas-*.apk` file directly to your phone:
+1. Tap the downloaded `.apk` file to install.
+2. If prompted by Android, allow *"Install unknown apps"* for your browser or file manager.
+3. Open **Manas** from your home screen — 100% offline with zero cloud dependencies.
+
 ### 🐧 Linux
 Download the `.deb` file (for Ubuntu/Debian) or the standalone `.AppImage`:
 ```bash

@@ -5834,3 +5834,165 @@ body[data-section-focus] .planner-col.phase-col-custom.section-focused {
   background: #f5eedf;
   border-color: #0284c7;
 }
+
+/* ==========================================================================
+   Mobile & Touch Responsive Optimizations (Android & Small Screens)
+   ========================================================================== */
+@media (max-width: 768px) {
+  :root {
+    --header-height: auto;
+  }
+
+  body {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  .app-shell {
+    height: 100dvh;
+  }
+
+  /* Safe Area Insets for Mobile Status Bar & Navigation Bar */
+  .app-header {
+    padding-top: max(8px, env(safe-area-inset-top));
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-bottom: 8px;
+    flex-wrap: wrap;
+    gap: 8px;
+    height: auto;
+  }
+
+  .header-section.left {
+    order: 1;
+  }
+
+  .header-section.right {
+    order: 2;
+    margin-left: auto;
+    gap: 6px;
+  }
+
+  .header-section.center {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .date-navigator-pill {
+    width: 100%;
+    justify-content: space-between;
+    padding: 6px 12px;
+  }
+
+  .date-text-container {
+    text-align: center;
+    flex: 1;
+  }
+
+  .current-date-title {
+    font-size: 13.5px;
+  }
+
+  /* Ribbon horizontal swipe on touch */
+  .day-timeline-ribbon {
+    padding: 6px 12px;
+    gap: 8px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .phase-tab-btn {
+    padding: 6px 14px;
+    font-size: 13px;
+  }
+
+  /* Workspace & Card Columns - Stack into single column full-width */
+  .planner-workspace {
+    padding: 10px 10px max(16px, env(safe-area-inset-bottom));
+  }
+
+  .page-row-sections-container {
+    flex-direction: column !important;
+    gap: 12px;
+  }
+
+  .page-section-box {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .section-cards-tier {
+    grid-template-columns: 1fr !important;
+    flex-direction: column !important;
+  }
+
+  .phase-card-wrapper,
+  .phase-column-card,
+  .evening-col-card {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .six-columns-grid, .evening-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Touch-optimized task rows */
+  .task-row {
+    padding: 6px 4px;
+    gap: 8px;
+  }
+
+  .task-checkbox-btn {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+  }
+
+  .task-row-input {
+    font-size: 15px; /* Prevents auto-zoom on mobile WebKit */
+    padding: 4px 6px;
+  }
+
+  .task-reorder-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 13px;
+  }
+
+  .task-drag-handle {
+    padding: 6px;
+    font-size: 16px;
+  }
+
+  .task-quick-add-input {
+    font-size: 15px;
+    padding: 10px 14px;
+  }
+
+  .btn-add-task-submit {
+    padding: 10px 16px;
+    font-size: 14px;
+  }
+
+  .app-footer {
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+    padding-left: 12px;
+    padding-right: 12px;
+    flex-direction: column;
+    gap: 6px;
+    text-align: center;
+  }
+
+  /* Mobile Modals */
+  .modal-card {
+    width: 95%;
+    max-height: 90vh;
+    padding: 12px;
+  }
+
+  .months-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
