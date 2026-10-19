@@ -1,0 +1,14 @@
+{
+  "name": "manas",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tactile, distraction-free daily planner and thinking space built with Tauri & Rust",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.2.0"
+  }
+}

@@ -1,0 +1,53 @@
+name: 🐛 Bug Report
+description: Create a report to help us improve Manas
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report an issue! Please provide as much detail as possible.
+  - type: input
+    id: os
+    attributes:
+      label: Operating System
+      description: What OS are you running Manas on?
+      placeholder: "e.g., Ubuntu 24.04, macOS Sonoma (M2), Windows 11"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Manas Version
+      placeholder: "e.g., v0.1.0 or Git commit hash"
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the Bug
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior.
+      placeholder: |
+        1. Open Manas
+        2. Click on '...'
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: A clear and concise description of what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context / Screenshots
+      description: Add any other context or screenshots about the problem here.

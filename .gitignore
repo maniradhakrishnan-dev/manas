@@ -1,7 +1,32 @@
-/target
+# Build outputs
+/target/
+src-tauri/target/
+dist/
+ui/dist/
+node_modules/
+
+# Local data & storage (NEVER commit user planner entries)
 mrt_data/
 manas_data/
 data/
+*.json.bak
 *.bak
 *.log
+*.tmp
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 scratchpad.md
+
+# OS Generated
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
