@@ -177,12 +177,19 @@ function markLayoutModified(activeLayout) {
   activeLayout.id = 'custom';
 }
 
-function renderLevel1TopBarHTML(activeLayout) {
+function getTemplateDropdownData(activeLayout) {
   const currentId = activeLayout ? activeLayout.id : 'blank_canvas';
   const userTemplates = getUserTemplates();
   const baseId = activeLayout ? (activeLayout.baseTemplateId || (userTemplates.some(t => t.id === currentId) ? currentId : null)) : null;
   const matchedUserTpl = userTemplates.find(t => t.id === baseId);
   const isModified = activeLayout ? (activeLayout.isModified && !!matchedUserTpl) : false;
+
+  let currentLabel = "📄 Blank Canvas";
+  if (matchedUserTpl) {
+    currentLabel = isModified ? `📌 ${matchedUserTpl.name} (Modified)` : `📌 ${matchedUserTpl.name}`;
+  } else if (currentId === 'custom') {
+    currentLabel = `✦ Custom (${formatDateDisplay(currentDate)})`;
+  }
 
   const standardOptions = [
     { id: 'blank_canvas', label: "📄 Blank Canvas" }
@@ -191,6 +198,19 @@ function renderLevel1TopBarHTML(activeLayout) {
   let optionsHTML = standardOptions.map(o => `
     <option value="${o.id}" ${currentId === o.id ? 'selected' : ''}>${escapeHtml(o.label)}</option>
   `).join('');
+
+  let menuItemsHTML = `
+    <div class="custom-template-header">Standard Routines</div>
+    ${standardOptions.map(o => {
+      const isSel = (currentId === o.id);
+      return `
+        <div class="custom-template-item ${isSel ? 'active' : ''}" data-tpl-id="${o.id}">
+          <span>${escapeHtml(o.label)}</span>
+          ${isSel ? '<span class="custom-template-item-check">✓</span>' : ''}
+        </div>
+      `;
+    }).join('')}
+  `;
 
   if (userTemplates.length > 0) {
     optionsHTML += `
@@ -202,11 +222,39 @@ function renderLevel1TopBarHTML(activeLayout) {
         }).join('')}
       </optgroup>
     `;
+
+    menuItemsHTML += `
+      <div class="custom-template-header" style="margin-top: 4px;">My Custom Routines</div>
+      ${userTemplates.map(t => {
+        const isSelected = (baseId === t.id);
+        const label = (isSelected && isModified) ? `📌 ${t.name} (Modified)` : `📌 ${t.name}`;
+        return `
+          <div class="custom-template-item ${isSelected ? 'active' : ''}" data-tpl-id="${t.id}">
+            <span>${escapeHtml(label)}</span>
+            ${isSelected ? '<span class="custom-template-item-check">✓</span>' : ''}
+          </div>
+        `;
+      }).join('')}
+    `;
   }
 
   if (!matchedUserTpl && currentId === 'custom') {
-    optionsHTML += `<option value="custom" selected>✦ Custom (${escapeHtml(formatDateDisplay(currentDate))})</option>`;
+    const customLabel = `✦ Custom (${formatDateDisplay(currentDate)})`;
+    optionsHTML += `<option value="custom" selected>${escapeHtml(customLabel)}</option>`;
+    menuItemsHTML += `
+      <div class="custom-template-header" style="margin-top: 4px;">Current Custom Layout</div>
+      <div class="custom-template-item active" data-tpl-id="custom">
+        <span>${escapeHtml(customLabel)}</span>
+        <span class="custom-template-item-check">✓</span>
+      </div>
+    `;
   }
+
+  return { currentLabel, optionsHTML, menuItemsHTML, matchedUserTpl, isModified };
+}
+
+function renderLevel1TopBarHTML(activeLayout) {
+  const { currentLabel, optionsHTML, menuItemsHTML, matchedUserTpl, isModified } = getTemplateDropdownData(activeLayout);
 
   let actionButtonsHTML = '';
   if (matchedUserTpl) {
@@ -235,15 +283,24 @@ function renderLevel1TopBarHTML(activeLayout) {
       </div>
       <div class="level1-actions">
         <button type="button" class="btn-level1-action btn-add-page-row" id="btn-top-add-page-row" title="Add a new horizontal page row to organize sections">
-          <span class="btn-level1-icon">＋</span> + Add Page Row
+          <span class="btn-level1-icon">＋</span> Add Page Row
         </button>
       </div>
       <div class="level1-divider"></div>
       <div class="level1-template-group">
         <span class="level1-template-label">Routine:</span>
-        <select id="level1-template-select" class="level1-template-select" title="Switch layout template for today">
-          ${optionsHTML}
-        </select>
+        <div class="custom-template-dropdown" id="level1-template-dropdown">
+          <button type="button" class="custom-template-trigger" id="level1-template-trigger" aria-haspopup="listbox" aria-expanded="false" title="Switch layout template for today">
+            <span class="custom-template-selected-text">${escapeHtml(currentLabel)}</span>
+            <span class="custom-template-arrow">▾</span>
+          </button>
+          <div class="custom-template-menu" id="level1-template-menu" role="listbox" style="display: none;">
+            ${menuItemsHTML}
+          </div>
+          <select id="level1-template-select" class="level1-template-select" style="display: none;" title="Switch layout template for today">
+            ${optionsHTML}
+          </select>
+        </div>
         ${actionButtonsHTML}
       </div>
     </div>
@@ -689,36 +746,13 @@ function updateTrackTitleInLayout(blockKey, newTitle) {
 function syncLevel1Bar(layout) {
   const bar = document.getElementById('workspace-level1-bar');
   if (!bar) return;
+  const { currentLabel, optionsHTML, menuItemsHTML } = getTemplateDropdownData(layout);
   const select = bar.querySelector('#level1-template-select');
-  if (!select) return;
-  const currentId = layout ? layout.id : 'blank_canvas';
-  const userTemplates = getUserTemplates();
-
-  const standardOptions = [
-    { id: 'blank_canvas', label: "📄 Blank Canvas" }
-  ];
-
-  let isKnown = standardOptions.some(o => o.id === currentId) || userTemplates.some(t => t.id === currentId);
-
-  let html = standardOptions.map(o => `
-    <option value="${o.id}" ${currentId === o.id ? 'selected' : ''}>${escapeHtml(o.label)}</option>
-  `).join('');
-
-  if (userTemplates.length > 0) {
-    html += `
-      <optgroup label="My Custom Templates">
-        ${userTemplates.map(t => `
-          <option value="${t.id}" ${currentId === t.id ? 'selected' : ''}>📌 ${escapeHtml(t.name)}</option>
-        `).join('')}
-      </optgroup>
-    `;
-  }
-
-  if (!isKnown) {
-    html += `<option value="custom" selected>✦ Custom (${escapeHtml(formatDateDisplay(currentDate))})</option>`;
-  }
-
-  select.innerHTML = html;
+  if (select) select.innerHTML = optionsHTML;
+  const triggerText = bar.querySelector('.custom-template-selected-text');
+  if (triggerText) triggerText.textContent = currentLabel;
+  const menu = bar.querySelector('#level1-template-menu');
+  if (menu) menu.innerHTML = menuItemsHTML;
 }
 
 function syncWorkspaceLayoutForDate(dateKey, dayData) {
@@ -1102,39 +1136,95 @@ function handleUpdateCurrentTemplate() {
   }
 }
 
+function applyTemplateSelection(tplId) {
+  if (!tplId || tplId === 'custom') return;
+  if (PRESETS[tplId]) {
+    const preset = JSON.parse(JSON.stringify(PRESETS[tplId]));
+    preset.isModified = false;
+    saveAndApplyLayoutForToday(preset);
+    showToast(`Switched today to "${PRESETS[tplId].name}"`);
+  } else {
+    const userTpls = getUserTemplates();
+    const match = userTpls.find(t => t.id === tplId);
+    if (match) {
+      const tplLayout = {
+        id: match.id,
+        baseTemplateId: match.id,
+        name: match.name,
+        baseTemplateName: match.name,
+        description: match.description,
+        isModified: false,
+        pageRows: JSON.parse(JSON.stringify(match.pageRows || normalizeLayoutPageRows(match))),
+        phases: JSON.parse(JSON.stringify(match.phases || []))
+      };
+      saveAndApplyLayoutForToday(tplLayout);
+      showToast(`Switched today to "${match.name}"`);
+    }
+  }
+}
+
 // Global delegated change listener for template selection
 document.addEventListener('change', (e) => {
   if (e.target && e.target.id === 'level1-template-select') {
-    const tplId = e.target.value;
-    if (tplId === 'custom') return;
-    if (PRESETS[tplId]) {
-      const preset = JSON.parse(JSON.stringify(PRESETS[tplId]));
-      preset.isModified = false;
-      saveAndApplyLayoutForToday(preset);
-      showToast(`Switched today to "${PRESETS[tplId].name}"`);
-    } else {
-      const userTpls = getUserTemplates();
-      const match = userTpls.find(t => t.id === tplId);
-      if (match) {
-        const tplLayout = {
-          id: match.id,
-          baseTemplateId: match.id,
-          name: match.name,
-          baseTemplateName: match.name,
-          description: match.description,
-          isModified: false,
-          pageRows: JSON.parse(JSON.stringify(match.pageRows || normalizeLayoutPageRows(match))),
-          phases: JSON.parse(JSON.stringify(match.phases || []))
-        };
-        saveAndApplyLayoutForToday(tplLayout);
-        showToast(`Switched today to "${match.name}"`);
-      }
-    }
+    applyTemplateSelection(e.target.value);
   }
 });
 
-// Global delegated click listener for canvas layout modifications
+// Global delegated click listener for canvas layout modifications & dropdowns
 document.addEventListener('click', (e) => {
+  // Handle custom template dropdown trigger
+  const tplTrigger = e.target.closest('#level1-template-trigger');
+  if (tplTrigger) {
+    e.preventDefault();
+    e.stopPropagation();
+    const dropdown = tplTrigger.closest('#level1-template-dropdown');
+    const menu = dropdown ? dropdown.querySelector('#level1-template-menu') : null;
+    if (dropdown && menu) {
+      const isOpen = dropdown.classList.contains('open');
+      if (isOpen) {
+        dropdown.classList.remove('open');
+        menu.style.display = 'none';
+        tplTrigger.setAttribute('aria-expanded', 'false');
+      } else {
+        dropdown.classList.add('open');
+        menu.style.display = 'flex';
+        tplTrigger.setAttribute('aria-expanded', 'true');
+      }
+    }
+    return;
+  }
+
+  // Handle custom template item selection
+  const tplItem = e.target.closest('.custom-template-item');
+  if (tplItem) {
+    e.preventDefault();
+    e.stopPropagation();
+    const tplId = tplItem.getAttribute('data-tpl-id');
+    const dropdown = tplItem.closest('#level1-template-dropdown');
+    if (dropdown) {
+      dropdown.classList.remove('open');
+      const menu = dropdown.querySelector('#level1-template-menu');
+      if (menu) menu.style.display = 'none';
+      const trigger = dropdown.querySelector('#level1-template-trigger');
+      if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    }
+    if (tplId) {
+      applyTemplateSelection(tplId);
+    }
+    return;
+  }
+
+  // Close custom template dropdown on outside click
+  if (!e.target.closest('#level1-template-dropdown')) {
+    document.querySelectorAll('.custom-template-dropdown.open').forEach(dd => {
+      dd.classList.remove('open');
+      const menu = dd.querySelector('.custom-template-menu');
+      if (menu) menu.style.display = 'none';
+      const trigger = dd.querySelector('.custom-template-trigger');
+      if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    });
+  }
+
   // 1. Delete column button
   const delColBtn = e.target.closest('.btn-canvas-del-col');
   if (delColBtn) {
@@ -1379,7 +1469,7 @@ function renderCustomWorkspace(layout, workspaceEl) {
         <p>Your daily planner is completely blank. Start by adding your first Page Row across the day.</p>
         <div style="margin-top: 14px;">
           <button type="button" class="btn-level1-action btn-add-page-row" id="btn-blank-canvas-add-row" style="display: inline-flex; font-size: 13px; padding: 8px 18px;">
-            <span class="btn-level1-icon">＋</span> + Add First Page Row
+            <span class="btn-level1-icon">＋</span> Add First Page Row
           </button>
         </div>
       </div>
@@ -1407,8 +1497,12 @@ function renderCustomWorkspace(layout, workspaceEl) {
             <input type="text" class="section-time-input pill-${color}" data-section-id="${sec.id}" value="${escapeHtml((sec.timeRange && sec.timeRange !== 'Custom Hours') ? sec.timeRange : '')}" placeholder="Hours (optional)..." spellcheck="false" title="Section time range or hours (optional)" />
           </div>
           <div class="master-banner-actions">
-            <button type="button" class="btn-canvas-add-col btn-canvas-mini" data-section-id="${sec.id}" data-row-id="${rowId}" title="Add column to this section">+ Column</button>
-            <button type="button" class="btn-canvas-add-row btn-canvas-mini" data-section-id="${sec.id}" data-row-id="${rowId}" title="Add row to this section">+ Row</button>
+            ${subRows.length <= 1 ? `
+              <button type="button" class="btn-canvas-add-col btn-canvas-mini" data-section-id="${sec.id}" data-row-id="${rowId}" title="Add column to this section">+ Column</button>
+              <button type="button" class="btn-canvas-add-row btn-canvas-mini" data-section-id="${sec.id}" data-row-id="${rowId}" title="Split into multiple rows">+ Row</button>
+            ` : `
+              <button type="button" class="btn-canvas-add-row btn-canvas-mini" data-section-id="${sec.id}" data-row-id="${rowId}" title="Add row tier to this section">+ Row</button>
+            `}
             <button type="button" class="btn-canvas-del-section" data-section-id="${sec.id}" data-row-id="${rowId}" title="Delete this section">✕</button>
           </div>
         </div>
@@ -6453,6 +6547,489 @@ function setThinkingView(view) {
   }
 }
 
+// ==========================================================================
+// Thinking Space: Slash Command Palette & Pre-built Templates Engine
+// ==========================================================================
+const THINKING_SLASH_COMMANDS = [
+  // Templates
+  {
+    id: 'tpl-research-paper',
+    category: 'Templates',
+    icon: '📑',
+    title: 'AI Research Paper Notes',
+    desc: 'Structured literature review, math equations & benchmark improvements',
+    snippet: `# [Paper Title / Method Name]
+
+> **Authors:** [Author et al.]  
+> **Source / Link:** [arXiv:XXXX.XXXXX](https://arxiv.org)  
+> **Keywords:** Deep Learning, Architecture, Optimization
+
+---
+
+## 1. Executive Summary & Core Contribution
+- What specific bottleneck or open problem does this paper solve?
+- What is the fundamental intuition behind the proposed approach?
+
+## 2. Mathematical Formulation & Architecture
+$$
+\\mathcal{L}_{total} = \\mathcal{L}_{task} + \\lambda \\mathcal{R}(\\theta)
+$$
+
+Key components:
+- **Component A:** Details...
+- **Component B:** Details...
+
+## 3. Key Empirical Results & Benchmarks
+| Benchmark / Dataset | Baseline | Proposed Method | $\\Delta$ Improvement |
+| :--- | :--- | :--- | :--- |
+| Metric A | 82.4% | **85.1%** | +2.7% |
+| Metric B | 71.2 | **76.8** | +5.6 |
+
+## 4. Strengths & Innovations
+- Core innovation 1
+- Core innovation 2
+
+## 5. Limitations, Edge Cases & Criticisms
+- Known failure modes or computational limits
+
+## 6. Actionable Takeaways & Next Steps
+- [ ] Implement prototype validation in scratch/
+`
+  },
+  {
+    id: 'tpl-system-spec',
+    category: 'Templates',
+    icon: '⚙️',
+    title: 'Machine Design / Hardware Spec',
+    desc: 'Engineering parameters, electrical constraints & CAD links',
+    snippet: `# Machine / Subsystem Specification: [Subsystem Name]
+
+> **Revision:** v1.0 | **Owner:** Lead Engineer | **Status:** In Review
+
+---
+
+## 1. Functional Requirements & Operating Scope
+- High-level mechanical or electrical purpose of this assembly.
+- Environmental constraints (temperature, vibration, ingress rating).
+
+## 2. Engineering Parameters & Operating Limits
+| Parameter | Min | Nominal | Max | Unit | Notes |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| Input Voltage | 18.0 | 24.0 | 28.5 | V DC | Regulated bus |
+| Operating Current | 0.8 | 2.4 | 6.5 | A | Peak stall torque |
+| Max Angular Velocity | — | 120 | 180 | RPM | Output shaft |
+| Total Mass Budget | — | 450 | 500 | g | Aluminum enclosure |
+
+## 3. Structural & Component Interfaces
+- **CAD Model Ref:** \`cad/chassis_assembly_v3.step\`
+- **PCB Interface:** 8-pin Molex Micro-Fit 3.0
+- **Fasteners:** M3 Grade 12.9 Socket Head Screws (Torque: 1.4 Nm)
+
+## 4. Verification Checklist
+- [ ] FEA stress simulation under 3G load
+- [ ] Thermal rise under continuous nominal load (<40°C rise)
+- [ ] Export STEP and BOM for fabrication
+`
+  },
+  {
+    id: 'tpl-arch-deepdive',
+    category: 'Templates',
+    icon: '🏛️',
+    title: 'System Architecture & RFC',
+    desc: 'Technical design proposal with Mermaid diagrams & tradeoffs',
+    snippet: `# RFC: [System / Architecture Proposal Name]
+
+> **Date:** [Date] | **Status:** Draft | **Target Version:** v2.0
+
+---
+
+## 1. Problem Statement
+Explain why the current design fails or becomes unmaintainable at scale.
+
+## 2. Architecture Diagram
+\`\`\`mermaid
+graph TD
+    Client[Web & Desktop Client] -->|IPC / WebSocket| Daemon[Backend Daemon]
+    Daemon --> SQLite[(Local SQLite Store)]
+    Daemon --> Worker[Async Task Worker]
+    Worker --> Engine[Hardware Engine]
+\`\`\`
+
+## 3. Data Flow & Sequence
+\`\`\`mermaid
+sequenceDiagram
+    autonumber
+    User->>UI: Trigger Action
+    UI->>Core: IPC Command Payload
+    Core->>Database: Transaction Write
+    Database-->>Core: Success
+    Core-->>UI: State Update Event
+\`\`\`
+
+## 4. Alternatives Considered & Trade-offs
+| Solution | Pros | Cons | Decision |
+| :--- | :--- | :--- | :--- |
+| Option A (Synchronous) | Simple | Blocks UI thread | Rejected |
+| Option B (Worker Channel) | Zero latency | Higher memory | **Accepted** |
+
+## 5. Implementation Phases
+- [ ] Phase 1: Core abstractions & unit tests
+- [ ] Phase 2: Async pipeline integration
+- [ ] Phase 3: Stress testing & benchmarks
+`
+  },
+  {
+    id: 'tpl-sprint-retro',
+    category: 'Templates',
+    icon: '🔄',
+    title: 'Sprint Retrospective & Debrief',
+    desc: 'Sprint goals, wins, friction points & prioritized action items',
+    snippet: `# Sprint Review & Retrospective: [Sprint Name]
+
+---
+
+## 🎯 1. Target Objectives vs Actual Outcome
+- **Goal 1:** Delivered ✅
+- **Goal 2:** In Progress (80%) ⏳
+- **Goal 3:** Blocked ⚠️
+
+## 🏆 2. Major Wins & Breakthroughs
+- Shipped key capability ahead of schedule
+- Resolved performance bottleneck
+
+## 🛑 3. Friction & Blockers Encountered
+- Technical hurdles or edge cases
+
+## ⚡ 4. Action Items for Next Iteration
+- [ ] High Priority Action 1
+- [ ] High Priority Action 2
+`
+  },
+  // Math & Formulas
+  {
+    id: 'math-block',
+    category: 'Math & Formulas',
+    icon: '🧮',
+    title: 'LaTeX Math Block ($$)',
+    desc: 'Full-width centered equation with aligned lines',
+    snippet: `\n$$\n\\begin{aligned}\n  \\nabla \\cdot \\mathbf{E} &= \\frac{\\rho}{\\varepsilon_0} \\\\[6pt]\n  \\nabla \\times \\mathbf{B} &= \\mu_0 \\mathbf{J} + \\mu_0 \\varepsilon_0 \\frac{\\partial \\mathbf{E}}{\\partial t}\n\\end{aligned}\n$$\n`
+  },
+  {
+    id: 'math-inline',
+    category: 'Math & Formulas',
+    icon: '📐',
+    title: 'Inline Formula ($)',
+    desc: 'Inline mathematical notation inside a sentence',
+    snippet: `$f(x) = \\int_{-\\infty}^{\\infty} e^{-t^2} dt$`
+  },
+  {
+    id: 'math-matrix',
+    category: 'Math & Formulas',
+    icon: '▦',
+    title: 'LaTeX Matrix',
+    desc: '2x2 rotation or state transformation matrix',
+    snippet: `\n$$\n\\mathbf{T} = \\begin{pmatrix}\n  \\cos\\theta & -\\sin\\theta \\\n  \\sin\\theta & \\cos\\theta\n\\end{pmatrix}\n$$\n`
+  },
+  // Diagrams & Tables
+  {
+    id: 'dia-flowchart',
+    category: 'Diagrams & Visuals',
+    icon: '📊',
+    title: 'Mermaid Flowchart',
+    desc: 'Interactive decision tree or flowchart',
+    snippet: `\n\`\`\`mermaid\ngraph TD\n    A[Start] --> B{Valid?}\n    B -->|Yes| C[Process Data]\n    B -->|No| D[Log Error]\n    C --> E[Complete]\n\`\`\`\n`
+  },
+  {
+    id: 'dia-sequence',
+    category: 'Diagrams & Visuals',
+    icon: '🔁',
+    title: 'Mermaid Sequence Diagram',
+    desc: 'Actor communication and request timeline',
+    snippet: `\n\`\`\`mermaid\nsequenceDiagram\n    Client->>Server: Request Data\n    Server-->>Database: Query Records\n    Database-->>Server: Result Set\n    Server-->>Client: 200 OK (JSON)\n\`\`\`\n`
+  },
+  {
+    id: 'data-table',
+    category: 'Diagrams & Visuals',
+    icon: '🗂️',
+    title: 'Data Table (3x3)',
+    desc: 'Formatted markdown table with headers',
+    snippet: `\n| Metric | Baseline | Target | Status |\n| :--- | :--- | :--- | :--- |\n| Latency | 45ms | <20ms | 🟢 On Track |\n| Memory | 280MB | <200MB | 🟡 Optimizing |\n| Throughput | 1.2k req/s | >3k req/s | 🟢 Done |\n`
+  },
+  // Callouts & Formatting
+  {
+    id: 'callout-note',
+    category: 'Callouts & Notes',
+    icon: '💡',
+    title: 'Info Callout',
+    desc: 'Highlighted informational callout note',
+    snippet: `\n> 💡 **Note:** Add your contextual insight or principle here.\n`
+  },
+  {
+    id: 'callout-warning',
+    category: 'Callouts & Notes',
+    icon: '⚠️',
+    title: 'Warning Callout',
+    desc: 'Highlighted caution or safety box',
+    snippet: `\n> ⚠️ **Warning:** Ensure power rails are de-energized before probing.\n`
+  },
+  {
+    id: 'callout-tip',
+    category: 'Callouts & Notes',
+    icon: '🚀',
+    title: 'Pro Tip Box',
+    desc: 'Practical tip or productivity recommendation',
+    snippet: `\n> 🚀 **Tip:** Use \`Ctrl+S\` to instantly persist changes to disk.\n`
+  },
+  {
+    id: 'code-python',
+    category: 'Code Blocks',
+    icon: '🐍',
+    title: 'Python Code Block',
+    desc: 'Syntax highlighted Python script block',
+    snippet: `\n\`\`\`python\ndef run_simulation(steps: int = 1000):\n    print(f"Simulating {steps} iterations...")\n    return True\n\`\`\`\n`
+  },
+  {
+    id: 'code-rust',
+    category: 'Code Blocks',
+    icon: '🦀',
+    title: 'Rust Code Block',
+    desc: 'Syntax highlighted Rust code block',
+    snippet: `\n\`\`\`rust\n#[derive(Debug, Clone)]\npub struct SystemState {\n    pub is_active: bool,\n    pub tick_rate: u32,\n}\n\`\`\`\n`
+  },
+  {
+    id: 'code-bash',
+    category: 'Code Blocks',
+    icon: '💻',
+    title: 'Bash / Shell Script',
+    desc: 'Terminal command sequence',
+    snippet: `\n\`\`\`bash\n# Build release binary\ncargo build --release\n\`\`\`\n`
+  },
+  {
+    id: 'checklist',
+    category: 'Callouts & Notes',
+    icon: '☑️',
+    title: 'Task Checklist',
+    desc: 'Interactive markdown checklist items',
+    snippet: `\n- [ ] Architectural review\n- [ ] Implementation & testing\n- [ ] Verification on bench\n`
+  },
+  {
+    id: 'h2',
+    category: 'Headings & Structure',
+    icon: '🏷️',
+    title: 'Heading 2 (##)',
+    desc: 'Major section heading',
+    snippet: `\n## Section Title\n`
+  },
+  {
+    id: 'h3',
+    category: 'Headings & Structure',
+    icon: '🔖',
+    title: 'Heading 3 (###)',
+    desc: 'Subsection heading',
+    snippet: `\n### Subsection Title\n`
+  },
+  {
+    id: 'hr',
+    category: 'Headings & Structure',
+    icon: '➖',
+    title: 'Horizontal Divider',
+    desc: 'Visual section boundary line',
+    snippet: `\n---\n`
+  },
+  {
+    id: 'timestamp',
+    category: 'Callouts & Notes',
+    icon: '🕒',
+    title: 'Current Timestamp',
+    desc: 'Insert current date and time',
+    snippet: () => `\n*Recorded on ${new Date().toISOString().replace('T', ' ').substring(0, 16)}*\n`
+  }
+];
+
+let slashTriggerPos = -1;
+let activeSlashIndex = 0;
+let currentFilteredCommands = [];
+
+function openThinkingSlashMenu(categoryFilter = '', query = '', fromSlash = false) {
+  const menu = document.getElementById('thinking-slash-menu');
+  const searchInput = document.getElementById('slash-menu-search');
+  const textarea = document.getElementById('thinking-editor-textarea');
+  if (!menu || !textarea) return;
+
+  slashTriggerPos = fromSlash ? textarea.selectionStart : -1;
+  menu.style.display = 'flex';
+  activeSlashIndex = 0;
+
+  filterAndRenderSlashCommands(query, categoryFilter);
+
+  if (searchInput) {
+    searchInput.value = query;
+    setTimeout(() => searchInput.focus(), 10);
+  }
+}
+
+function closeThinkingSlashMenu() {
+  const menu = document.getElementById('thinking-slash-menu');
+  if (!menu) return;
+  menu.style.display = 'none';
+  slashTriggerPos = -1;
+  const textarea = document.getElementById('thinking-editor-textarea');
+  if (textarea) textarea.focus();
+}
+
+function filterAndRenderSlashCommands(query = '', categoryFilter = '') {
+  const itemsContainer = document.getElementById('slash-menu-items');
+  if (!itemsContainer) return;
+
+  const q = (query || '').trim().toLowerCase();
+  currentFilteredCommands = THINKING_SLASH_COMMANDS.filter(cmd => {
+    if (categoryFilter && cmd.category !== categoryFilter) return false;
+    if (!q) return true;
+    return cmd.title.toLowerCase().includes(q) ||
+           cmd.desc.toLowerCase().includes(q) ||
+           cmd.category.toLowerCase().includes(q) ||
+           cmd.id.toLowerCase().includes(q);
+  });
+
+  if (currentFilteredCommands.length === 0) {
+    itemsContainer.innerHTML = `
+      <div style="padding: 16px; text-align: center; color: var(--text-dim); font-size: 12px;">
+        No commands match "${escapeHtml(query)}"
+      </div>
+    `;
+    return;
+  }
+
+  if (activeSlashIndex >= currentFilteredCommands.length) {
+    activeSlashIndex = 0;
+  }
+
+  const categories = {};
+  currentFilteredCommands.forEach(cmd => {
+    if (!categories[cmd.category]) categories[cmd.category] = [];
+    categories[cmd.category].push(cmd);
+  });
+
+  let html = '';
+  let globalIdx = 0;
+  for (const [catName, cmdList] of Object.entries(categories)) {
+    html += `<div class="slash-item-category">${escapeHtml(catName)}</div>`;
+    cmdList.forEach(cmd => {
+      const isSel = (globalIdx === activeSlashIndex);
+      html += `
+        <div class="slash-item ${isSel ? 'active' : ''}" data-cmd-id="${cmd.id}" data-idx="${globalIdx}">
+          <span class="slash-item-icon">${cmd.icon}</span>
+          <div class="slash-item-body">
+            <span class="slash-item-title">${escapeHtml(cmd.title)}</span>
+            <span class="slash-item-desc">${escapeHtml(cmd.desc)}</span>
+          </div>
+          <span class="slash-item-badge">${escapeHtml(cmd.category.split(' ')[0])}</span>
+        </div>
+      `;
+      globalIdx++;
+    });
+  }
+
+  itemsContainer.innerHTML = html;
+}
+
+function insertSlashCommandSnippet(cmd) {
+  const textarea = document.getElementById('thinking-editor-textarea');
+  if (!textarea) return;
+
+  const snippet = typeof cmd.snippet === 'function' ? cmd.snippet() : cmd.snippet;
+  const val = textarea.value;
+  let start = textarea.selectionStart;
+  let end = textarea.selectionEnd;
+
+  // If opened via '/', remove the '/' right before cursor
+  if (slashTriggerPos > 0 && val[slashTriggerPos - 1] === '/') {
+    start = slashTriggerPos - 1;
+    end = slashTriggerPos;
+  }
+
+  textarea.value = val.substring(0, start) + snippet + val.substring(end);
+  const newCursor = start + snippet.length;
+  textarea.selectionStart = textarea.selectionEnd = newCursor;
+  textarea.focus();
+
+  currentOpenDocContent = textarea.value;
+  queueAutoSaveDoc();
+  updateEditorStats();
+  if (currentThinkingView === 'split' || currentThinkingView === 'preview') {
+    renderThinkingPreview();
+  }
+
+  closeThinkingSlashMenu();
+  showToast(`Inserted ${cmd.title}`);
+}
+
+function initThinkingSlashPalette() {
+  const searchInput = document.getElementById('slash-menu-search');
+  const itemsContainer = document.getElementById('slash-menu-items');
+  const btnSlashTrigger = document.getElementById('btn-thinking-slash-trigger');
+  const btnTplTrigger = document.getElementById('btn-thinking-templates-trigger');
+
+  btnSlashTrigger?.addEventListener('click', () => {
+    openThinkingSlashMenu('', '');
+  });
+
+  btnTplTrigger?.addEventListener('click', () => {
+    openThinkingSlashMenu('Templates', '');
+  });
+
+  searchInput?.addEventListener('input', (e) => {
+    activeSlashIndex = 0;
+    filterAndRenderSlashCommands(e.target.value);
+  });
+
+  searchInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (currentFilteredCommands.length > 0) {
+        activeSlashIndex = (activeSlashIndex + 1) % currentFilteredCommands.length;
+        filterAndRenderSlashCommands(searchInput.value);
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (currentFilteredCommands.length > 0) {
+        activeSlashIndex = (activeSlashIndex - 1 + currentFilteredCommands.length) % currentFilteredCommands.length;
+        filterAndRenderSlashCommands(searchInput.value);
+      }
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (currentFilteredCommands[activeSlashIndex]) {
+        insertSlashCommandSnippet(currentFilteredCommands[activeSlashIndex]);
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      closeThinkingSlashMenu();
+    }
+  });
+
+  itemsContainer?.addEventListener('click', (e) => {
+    const item = e.target.closest('.slash-item');
+    if (!item) return;
+    const cmdId = item.getAttribute('data-cmd-id');
+    const cmd = THINKING_SLASH_COMMANDS.find(c => c.id === cmdId);
+    if (cmd) {
+      insertSlashCommandSnippet(cmd);
+    }
+  });
+
+  // Close palette on outside click
+  document.addEventListener('click', (e) => {
+    const menu = document.getElementById('thinking-slash-menu');
+    if (menu && menu.style.display !== 'none') {
+      if (!e.target.closest('#thinking-slash-menu') &&
+          !e.target.closest('#btn-thinking-slash-trigger') &&
+          !e.target.closest('#btn-thinking-templates-trigger')) {
+        closeThinkingSlashMenu();
+      }
+    }
+  });
+}
+
 // Initializing All Thinking Studio Events & Bridge
 function initDualSpaceAndThinkingStudio() {
   const btnModePlanner = document.getElementById('btn-mode-planner');
@@ -6588,8 +7165,12 @@ function initDualSpaceAndThinkingStudio() {
     }
   });
 
-  // Editor Keydown: Tab Indentation, Ctrl+B, Ctrl+I, Ctrl+S
+  // Initialize Slash Command Palette and Templates
+  initThinkingSlashPalette();
+
+  // Editor Keydown: Tab, Smart Enter, Auto-closing Pairs & Shortcuts
   textarea?.addEventListener('keydown', (e) => {
+    // 1. Tab Indentation & Unindentation
     if (e.key === 'Tab') {
       e.preventDefault();
       const start = textarea.selectionStart;
@@ -6608,12 +7189,196 @@ function initDualSpaceAndThinkingStudio() {
       }
       currentOpenDocContent = textarea.value;
       queueAutoSaveDoc();
-    } else if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+      return;
+    }
+
+    // 2. Smart Enter for list, checklist, and quote continuation
+    if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const val = textarea.value;
+      const start = textarea.selectionStart;
+      const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+      const currentLine = val.substring(lineStart, start);
+
+      // Checklist: - [ ] or - [x]
+      const taskMatch = currentLine.match(/^(\s*)-\s+\[[ xX]?\]\s+(.*)$/);
+      if (taskMatch) {
+        e.preventDefault();
+        const indent = taskMatch[1];
+        const text = taskMatch[2];
+        if (text.trim() === '') {
+          // Erase bullet on empty line
+          textarea.value = val.substring(0, lineStart) + val.substring(start);
+          textarea.selectionStart = textarea.selectionEnd = lineStart;
+        } else {
+          const insert = `\n${indent}- [ ] `;
+          textarea.value = val.substring(0, start) + insert + val.substring(textarea.selectionEnd);
+          textarea.selectionStart = textarea.selectionEnd = start + insert.length;
+        }
+        currentOpenDocContent = textarea.value;
+        queueAutoSaveDoc();
+        updateEditorStats();
+        return;
+      }
+
+      // Unordered list: - or *
+      const bulletMatch = currentLine.match(/^(\s*)([-*+])\s+(.*)$/);
+      if (bulletMatch) {
+        e.preventDefault();
+        const indent = bulletMatch[1];
+        const marker = bulletMatch[2];
+        const text = bulletMatch[3];
+        if (text.trim() === '') {
+          // Erase bullet on empty line
+          textarea.value = val.substring(0, lineStart) + val.substring(start);
+          textarea.selectionStart = textarea.selectionEnd = lineStart;
+        } else {
+          const insert = `\n${indent}${marker} `;
+          textarea.value = val.substring(0, start) + insert + val.substring(textarea.selectionEnd);
+          textarea.selectionStart = textarea.selectionEnd = start + insert.length;
+        }
+        currentOpenDocContent = textarea.value;
+        queueAutoSaveDoc();
+        updateEditorStats();
+        return;
+      }
+
+      // Ordered list: 1.
+      const numMatch = currentLine.match(/^(\s*)(\d+)\.\s+(.*)$/);
+      if (numMatch) {
+        e.preventDefault();
+        const indent = numMatch[1];
+        const num = parseInt(numMatch[2], 10);
+        const text = numMatch[3];
+        if (text.trim() === '') {
+          textarea.value = val.substring(0, lineStart) + val.substring(start);
+          textarea.selectionStart = textarea.selectionEnd = lineStart;
+        } else {
+          const insert = `\n${indent}${num + 1}. `;
+          textarea.value = val.substring(0, start) + insert + val.substring(textarea.selectionEnd);
+          textarea.selectionStart = textarea.selectionEnd = start + insert.length;
+        }
+        currentOpenDocContent = textarea.value;
+        queueAutoSaveDoc();
+        updateEditorStats();
+        return;
+      }
+
+      // Blockquote: >
+      const quoteMatch = currentLine.match(/^(\s*)>\s+(.*)$/);
+      if (quoteMatch) {
+        e.preventDefault();
+        const indent = quoteMatch[1];
+        const text = quoteMatch[2];
+        if (text.trim() === '') {
+          textarea.value = val.substring(0, lineStart) + val.substring(start);
+          textarea.selectionStart = textarea.selectionEnd = lineStart;
+        } else {
+          const insert = `\n${indent}> `;
+          textarea.value = val.substring(0, start) + insert + val.substring(textarea.selectionEnd);
+          textarea.selectionStart = textarea.selectionEnd = start + insert.length;
+        }
+        currentOpenDocContent = textarea.value;
+        queueAutoSaveDoc();
+        updateEditorStats();
+        return;
+      }
+    }
+
+    // 3. Auto-Closing Pairs and Selection Wrapping for brackets and quotes
+    const pairs = { '(': ')', '[': ']', '{': '}', '`': '`', '"': '"' };
+    if (pairs[e.key] && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const val = textarea.value;
+      const closing = pairs[e.key];
+
+      if (start !== end) {
+        e.preventDefault();
+        const sel = val.substring(start, end);
+        textarea.value = val.substring(0, start) + e.key + sel + closing + val.substring(end);
+        textarea.selectionStart = start + 1;
+        textarea.selectionEnd = end + 1;
+        currentOpenDocContent = textarea.value;
+        queueAutoSaveDoc();
+        return;
+      } else {
+        if ((e.key === '`' || e.key === '"') && val[start] === e.key) {
+          e.preventDefault();
+          textarea.selectionStart = textarea.selectionEnd = start + 1;
+          return;
+        }
+        e.preventDefault();
+        textarea.value = val.substring(0, start) + e.key + closing + val.substring(end);
+        textarea.selectionStart = textarea.selectionEnd = start + 1;
+        currentOpenDocContent = textarea.value;
+        queueAutoSaveDoc();
+        return;
+      }
+    }
+
+    // Skip over closing bracket: ) ] }
+    if ((e.key === ')' || e.key === ']' || e.key === '}') && !e.ctrlKey && !e.metaKey) {
+      const start = textarea.selectionStart;
+      if (textarea.value[start] === e.key) {
+        e.preventDefault();
+        textarea.selectionStart = textarea.selectionEnd = start + 1;
+        return;
+      }
+    }
+
+    // Auto-closing math: $ or $$
+    if (e.key === '$' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const val = textarea.value;
+      if (start !== end) {
+        e.preventDefault();
+        const sel = val.substring(start, end);
+        textarea.value = val.substring(0, start) + '$' + sel + '$' + val.substring(end);
+        textarea.selectionStart = start + 1;
+        textarea.selectionEnd = end + 1;
+        currentOpenDocContent = textarea.value;
+        queueAutoSaveDoc();
+        return;
+      } else if (start > 0 && val[start - 1] === '$') {
+        e.preventDefault();
+        textarea.value = val.substring(0, start) + '$\n\n$$\n' + val.substring(end);
+        textarea.selectionStart = textarea.selectionEnd = start + 2;
+        currentOpenDocContent = textarea.value;
+        queueAutoSaveDoc();
+        return;
+      } else {
+        e.preventDefault();
+        textarea.value = val.substring(0, start) + '$$' + val.substring(end);
+        textarea.selectionStart = textarea.selectionEnd = start + 1;
+        currentOpenDocContent = textarea.value;
+        queueAutoSaveDoc();
+        return;
+      }
+    }
+
+    // 4. Slash Command Trigger
+    if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const start = textarea.selectionStart;
+      const val = textarea.value;
+      const prevChar = start > 0 ? val[start - 1] : '\n';
+      if (prevChar === '\n' || prevChar === ' ' || start === 0) {
+        setTimeout(() => {
+          openThinkingSlashMenu('', '', true);
+        }, 20);
+      }
+    }
+
+    // 5. Keyboard formatting shortcuts
+    if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
       e.preventDefault();
       applyMarkdownFormatting('bold');
     } else if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
       e.preventDefault();
       applyMarkdownFormatting('italic');
+    } else if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+      e.preventDefault();
+      openThinkingSlashMenu();
     } else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
       e.preventDefault();
       if (currentOpenDocPath) {

@@ -213,15 +213,22 @@
         </div>
         <div class="level1-actions">
           <button type="button" class="btn-level1-action btn-add-page-row" id="btn-top-add-page-row" title="Add a new horizontal page row to organize sections">
-            <span class="btn-level1-icon">＋</span> + Add Page Row
+            <span class="btn-level1-icon">＋</span> Add Page Row
           </button>
         </div>
         <div class="level1-divider"></div>
         <div class="level1-template-group">
           <span class="level1-template-label">Routine:</span>
-          <select id="level1-template-select" class="level1-template-select" title="Switch layout template for today">
-            <option value="blank_canvas" selected>📄 Blank Canvas</option>
-          </select>
+          <div class="custom-template-dropdown" id="level1-template-dropdown">
+            <button type="button" class="custom-template-trigger" id="level1-template-trigger" aria-haspopup="listbox" aria-expanded="false" title="Switch layout template for today">
+              <span class="custom-template-selected-text">📄 Blank Canvas</span>
+              <span class="custom-template-arrow">▾</span>
+            </button>
+            <div class="custom-template-menu" id="level1-template-menu" role="listbox" style="display: none;"></div>
+            <select id="level1-template-select" class="level1-template-select" style="display: none;" title="Switch layout template for today">
+              <option value="blank_canvas" selected>📄 Blank Canvas</option>
+            </select>
+          </div>
           <button type="button" class="btn-level1-pill btn-save-template" id="btn-top-save-template" title="Save today's layout as a reusable template for different purposes">💾 Save Template</button>
         </div>
       </div>
@@ -323,11 +330,26 @@
               <button type="button" class="thinking-fmt-btn" data-fmt="code" title="Code Block"><code>&lt;/&gt;</code></button>
               <button type="button" class="thinking-fmt-btn" data-fmt="table" title="Insert Table">⊞ Table</button>
               <span class="thinking-fmt-sep"></span>
+              <button type="button" class="thinking-fmt-btn thinking-btn-highlight" id="btn-thinking-slash-trigger" title="Command Palette: Insert tables, math formulas, templates, diagrams (Shortcut: type '/')">⚡ Insert (/)...</button>
+              <button type="button" class="thinking-fmt-btn" id="btn-thinking-templates-trigger" title="Insert Pre-made Research, Engineering & Spec Templates">📋 Templates ▾</button>
+              <span class="thinking-fmt-sep"></span>
               <button type="button" class="thinking-fmt-btn" id="btn-thinking-export-md" title="Export as Markdown file">📥 Export .md</button>
               <button type="button" class="thinking-fmt-btn" id="btn-thinking-copy-md" title="Copy raw Markdown">📋 Copy</button>
             </div>
 
-            <textarea id="thinking-editor-textarea" class="thinking-editor-textarea" placeholder="Start writing your research, mathematical formulas ($$\tau = F \times r$$), code blocks, or notes... (Tip: You can paste screenshots directly!)"></textarea>
+            <div class="thinking-editor-wrapper" style="position: relative; flex: 1; display: flex; flex-direction: column;">
+              <textarea id="thinking-editor-textarea" class="thinking-editor-textarea" placeholder="Start writing your research, mathematical formulas ($$\tau = F \times r$$), code blocks, or notes... (Tip: Press '/' for quick commands & templates, paste screenshots directly)"></textarea>
+
+              <!-- Floating Slash Command Palette -->
+              <div id="thinking-slash-menu" class="thinking-slash-menu" style="display: none;">
+                <div class="slash-menu-header">
+                  <span class="slash-menu-icon">⚡</span>
+                  <input type="text" id="slash-menu-search" class="slash-menu-search" placeholder="Filter commands or templates (e.g. math, table, paper)..." autocomplete="off" />
+                  <span class="slash-menu-esc-hint">ESC</span>
+                </div>
+                <div id="slash-menu-items" class="slash-menu-items"></div>
+              </div>
+            </div>
 
             <!-- Editor Stats Strip -->
             <div class="thinking-editor-stats-bar" id="thinking-editor-stats-bar">
