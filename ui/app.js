@@ -55,6 +55,7 @@ async function callTauri(command, args = {}) {
 let currentDate = new Date();
 let currentDayData = {};
 let activeDatesSet = new Set();
+let activeStoragePath = '';
 let isDirty = false;
 let autoSaveTimer = null;
 let savedTheme = safeStorage.getItem('mrt_theme');
@@ -5014,7 +5015,7 @@ if (btnTheme) {
 if (btnExport) {
   btnExport.addEventListener('click', () => {
     const dateKey = formatDateKey(currentDate);
-    let md = `# MRT Daily Planner — ${formatDateDisplay(currentDate)}\n\n`;
+    let md = `# Manas Daily Planner — ${formatDateDisplay(currentDate)}\n\n`;
 
     const activeLayout = getActiveLayout();
     const pageRows = normalizeLayoutPageRows(activeLayout);
@@ -5041,10 +5042,10 @@ if (btnExport) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `mrt_${dateKey}.md`;
+    a.download = `manas_${dateKey}.md`;
     a.click();
     URL.revokeObjectURL(url);
-    showToast(`Exported mrt_${dateKey}.md`);
+    showToast(`Exported manas_${dateKey}.md`);
   });
 }
 
@@ -5052,10 +5053,25 @@ if (btnExport) {
 if (btnOpenFolder) {
   btnOpenFolder.addEventListener('click', async () => {
     const res = await callTauri('open_data_folder');
-    if (res !== null) {
-      showToast("Opened data folder in file manager");
+    const folder = res || activeStoragePath;
+    if (folder) {
+      showToast(`Opened: ${folder}`);
     } else {
-      showToast("Storage: ~/.local/share/mrt/entries");
+      showToast("Opened data folder");
+    }
+  });
+}
+
+// Click footer storage path to open folder directly
+if (footerStoragePath) {
+  footerStoragePath.style.cursor = 'pointer';
+  footerStoragePath.addEventListener('click', async () => {
+    const res = await callTauri('open_data_folder');
+    const folder = res || activeStoragePath;
+    if (folder) {
+      showToast(`Opened: ${folder}`);
+    } else {
+      showToast("Opened data folder");
     }
   });
 }
@@ -5705,8 +5721,12 @@ function init() {
 
   // 5. Query active dates & storage directory in background
   callTauri('get_data_folder_path').then(folderPath => {
-    if (folderPath && footerStoragePath) {
-      footerStoragePath.textContent = `Storage: ${folderPath}`;
+    if (folderPath) {
+      activeStoragePath = folderPath;
+      if (footerStoragePath) {
+        footerStoragePath.textContent = `Storage: ${folderPath}`;
+        footerStoragePath.title = `Click to open ${folderPath}`;
+      }
     }
   });
 

@@ -1,6 +1,6 @@
 {
   "name": "manas",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Tactile, distraction-free daily planner and thinking space built with Tauri & Rust",
   "scripts": {

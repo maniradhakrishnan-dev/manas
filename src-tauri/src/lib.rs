@@ -80,8 +80,9 @@ fn get_data_folder_path(app: tauri::AppHandle) -> String {
 }
 
 #[tauri::command]
-fn open_data_folder(app: tauri::AppHandle) -> Result<(), String> {
+fn open_data_folder(app: tauri::AppHandle) -> Result<String, String> {
     let dir = get_storage_dir(&app);
+    let path_str = dir.to_string_lossy().to_string();
     #[cfg(target_os = "linux")]
     {
         let _ = std::process::Command::new("xdg-open").arg(&dir).spawn();
@@ -94,7 +95,7 @@ fn open_data_folder(app: tauri::AppHandle) -> Result<(), String> {
     {
         let _ = std::process::Command::new("explorer").arg(&dir).spawn();
     }
-    Ok(())
+    Ok(path_str)
 }
 
 #[tauri::command]

@@ -70,7 +70,7 @@ impl MrtApp {
 
     fn export_markdown_file(&mut self) {
         let md = self.current_entry.to_markdown();
-        let filename = format!("mrt_{}.md", self.current_date.format("%Y-%m-%d"));
+        let filename = format!("manas_{}.md", self.current_date.format("%Y-%m-%d"));
         let export_path = std::env::current_dir()
             .unwrap_or_else(|_| std::path::PathBuf::from("."))
             .join(&filename);

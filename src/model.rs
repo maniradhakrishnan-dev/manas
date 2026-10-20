@@ -160,7 +160,7 @@ impl DayEntry {
     /// Export the day's notes cleanly to Markdown
     pub fn to_markdown(&self) -> String {
         let mut md = String::new();
-        md.push_str(&format!("# MRT Daily Entry - {}\n\n", self.date.format("%A, %B %d, %Y")));
+        md.push_str(&format!("# Manas Daily Entry - {}\n\n", self.date.format("%A, %B %d, %Y")));
 
         md.push_str("## 🌅 Part 1 (Learning)\n\n");
         md.push_str(&format!("### {}\n{}\n\n", self.part1.quad1.title, self.part1.quad1.content));
