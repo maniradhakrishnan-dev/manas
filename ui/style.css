@@ -6762,6 +6762,110 @@ body[data-section-focus] .planner-col.phase-col-custom.section-focused {
   background: rgba(255, 255, 255, 0.02);
 }
 
+/* Document Images in Preview */
+.thinking-doc-img-wrapper {
+  margin: 20px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.thinking-doc-img {
+  max-width: 100%;
+  max-height: 520px;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid var(--border-glass);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  background: rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease;
+}
+
+.thinking-doc-img:hover {
+  transform: scale(1.01);
+}
+
+.thinking-doc-img-caption {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-style: italic;
+  text-align: center;
+}
+
+/* Formatting Helper Toolbar */
+.thinking-formatting-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid var(--border-glass);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.thinking-fmt-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-sub);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.thinking-fmt-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
+  border-color: var(--border-glass);
+}
+
+.thinking-fmt-sep {
+  width: 1px;
+  height: 14px;
+  background: var(--border-glass);
+  margin: 0 4px;
+}
+
+/* Editor Bottom Stats Bar */
+.thinking-editor-stats-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 20px;
+  background: rgba(0, 0, 0, 0.15);
+  border-top: 1px solid var(--border-glass);
+  font-size: 11.5px;
+  color: var(--text-dim);
+  font-family: var(--font-code);
+  flex-shrink: 0;
+}
+
+.thinking-stats-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.thinking-stats-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.thinking-stat-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 /* Zen Focus Mode */
 .thinking-workspace.zen-focus .thinking-sidebar {
   display: none;

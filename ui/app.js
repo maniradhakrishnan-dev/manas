@@ -5787,6 +5787,7 @@ let currentOpenDocContent = '';
 let docAutoSaveTimer = null;
 let currentThinkingView = 'edit'; // 'edit' | 'split' | 'preview'
 let docsFolderPath = '';
+const docAssetCache = new Map();
 
 function switchAppMode(mode) {
   if (mode === currentAppMode) return;
@@ -5985,11 +5986,30 @@ async function openThinkingDoc(relPath) {
       }
     });
 
+    updateEditorStats();
     renderThinkingPreview();
   } catch (err) {
     console.warn("Error opening document:", err);
     showToast("Error opening document");
   }
+}
+
+function updateEditorStats() {
+  const textarea = document.getElementById('thinking-editor-textarea');
+  if (!textarea) return;
+  const text = textarea.value.trim();
+
+  const words = text ? text.split(/\s+/).length : 0;
+  const chars = textarea.value.length;
+  const minutes = Math.ceil(words / 200);
+
+  const wordEl = document.getElementById('thinking-stat-words');
+  const charEl = document.getElementById('thinking-stat-chars');
+  const timeEl = document.getElementById('thinking-stat-time');
+
+  if (wordEl) wordEl.textContent = `${words} word${words === 1 ? '' : 's'}`;
+  if (charEl) charEl.textContent = `${chars} char${chars === 1 ? '' : 's'}`;
+  if (timeEl) timeEl.textContent = `~${minutes} min read`;
 }
 
 function queueAutoSaveDoc() {
@@ -5998,6 +6018,8 @@ function queueAutoSaveDoc() {
     saveInd.textContent = "Saving...";
     saveInd.style.color = "var(--text-dim)";
   }
+
+  updateEditorStats();
 
   clearTimeout(docAutoSaveTimer);
   docAutoSaveTimer = setTimeout(async () => {
@@ -6033,6 +6055,33 @@ function renderThinkingPreview() {
       toggleMarkdownChecklistLine(lineIdx, e.target.checked);
     });
   });
+
+  // Asynchronously resolve local doc assets (e.g. pasted screenshots, KiCad snips)
+  previewContent.querySelectorAll('img[data-asset-src]').forEach(async (img) => {
+    const rawSrc = img.getAttribute('data-asset-src') || '';
+    if (rawSrc.startsWith('data:') || rawSrc.startsWith('http://') || rawSrc.startsWith('https://')) {
+      return;
+    }
+    const parts = (currentOpenDocPath || '').split('/');
+    parts.pop();
+    const folder = parts.join('/');
+    const filename = rawSrc.replace(/^assets\//, '').replace(/^\.\//, '');
+    const cacheKey = `${folder}:${filename}`;
+
+    if (docAssetCache.has(cacheKey)) {
+      img.src = docAssetCache.get(cacheKey);
+    } else {
+      try {
+        const dataUri = await callTauri('read_doc_asset', { folder, filename });
+        if (dataUri) {
+          docAssetCache.set(cacheKey, dataUri);
+          img.src = dataUri;
+        }
+      } catch (err) {
+        // file not yet written or path invalid
+      }
+    }
+  });
 }
 
 function toggleMarkdownChecklistLine(targetLineIdx, isChecked) {
@@ -6058,6 +6107,27 @@ function toggleMarkdownChecklistLine(targetLineIdx, isChecked) {
   queueAutoSaveDoc();
 }
 
+function formatMathExpression(expr) {
+  let out = escapeHTML(expr);
+  const symbols = [
+    [/\\tau/g, 'τ'], [/\\alpha/g, 'α'], [/\\beta/g, 'β'], [/\\gamma/g, 'γ'],
+    [/\\delta/g, 'δ'], [/\\epsilon/g, 'ε'], [/\\theta/g, 'θ'], [/\\lambda/g, 'λ'],
+    [/\\mu/g, 'μ'], [/\\pi/g, 'π'], [/\\rho/g, 'ρ'], [/\\sigma/g, 'σ'],
+    [/\\phi/g, 'ϕ'], [/\\omega/g, 'ω'], [/\\Delta/g, 'Δ'], [/\\Omega/g, 'Ω'],
+    [/\\nabla/g, '∇'], [/\\partial/g, '∂'], [/\\times/g, '×'], [/\\cdot/g, '·'],
+    [/\\div/g, '÷'], [/\\approx/g, '≈'], [/\\neq/g, '≠'], [/\\le(q)?/g, '≤'],
+    [/\\ge(q)?/g, '≥'], [/\\pm/g, '±'], [/\\int/g, '∫'], [/\\sum/g, '∑'],
+    [/\\infty/g, '∞'], [/\\sqrt\{([^}]+)\}/g, '√($1)'], [/\\sqrt/g, '√'],
+    [/\\frac\{([^}]+)\}\{([^}]+)\}/g, '($1 / $2)'],
+    [/\\mathcal\{L\}/g, 'ℒ'], [/\\parallel/g, '∥'],
+    [/\\text\{([^}]+)\}/g, '$1']
+  ];
+  for (const [pattern, rep] of symbols) {
+    out = out.replace(pattern, rep);
+  }
+  return out;
+}
+
 function parseMarkdownToHTML(md) {
   if (!md) return '<p class="text-dim">Empty document.</p>';
 
@@ -6079,7 +6149,7 @@ function parseMarkdownToHTML(md) {
     if (line.trim().startsWith('$$')) {
       if (inMathBlock) {
         inMathBlock = false;
-        html += `<div class="math-block">${escapeHTML(mathBuffer.join('\n'))}</div>`;
+        html += `<div class="math-block">${formatMathExpression(mathBuffer.join('\n'))}</div>`;
         mathBuffer = [];
         continue;
       } else if (line.trim() === '$$') {
@@ -6088,7 +6158,7 @@ function parseMarkdownToHTML(md) {
         continue;
       } else {
         const mathContent = line.trim().replace(/^\$\$\s*/, '').replace(/\s*\$\$$/, '');
-        html += `<div class="math-block">${escapeHTML(mathContent)}</div>`;
+        html += `<div class="math-block">${formatMathExpression(mathContent)}</div>`;
         continue;
       }
     }
@@ -6225,12 +6295,78 @@ function renderTableHTML(rows) {
 
 function inlineFormat(str) {
   let s = escapeHTML(str);
-  s = s.replace(/\$([^\$\n]+)\$/g, '<span class="math-inline">$1</span>');
+  // Images: ![alt](url)
+  s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, src) => {
+    return `<div class="thinking-doc-img-wrapper"><img src="${src}" data-asset-src="${src}" class="thinking-doc-img" alt="${alt}" loading="lazy" /><span class="thinking-doc-img-caption">${alt || 'Image'}</span></div>`;
+  });
+  // Links: [text](url)
+  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  // Math: $expr$
+  s = s.replace(/\$([^\$\n]+)\$/g, (m, g1) => `<span class="math-inline">${formatMathExpression(g1)}</span>`);
+  // Bold & Italic & Code
   s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
   s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
-  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
   return s;
+}
+
+function applyMarkdownFormatting(action) {
+  const textarea = document.getElementById('thinking-editor-textarea');
+  if (!textarea) return;
+
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const sel = textarea.value.substring(start, end);
+
+  let replacement = '';
+  let cursorOffset = 0;
+
+  switch (action) {
+    case 'bold':
+      replacement = `**${sel || 'bold text'}**`;
+      cursorOffset = sel ? replacement.length : 2;
+      break;
+    case 'italic':
+      replacement = `*${sel || 'italic text'}*`;
+      cursorOffset = sel ? replacement.length : 1;
+      break;
+    case 'h2':
+      replacement = `\n## ${sel || 'Section Heading'}\n`;
+      cursorOffset = replacement.length;
+      break;
+    case 'h3':
+      replacement = `\n### ${sel || 'Subheading'}\n`;
+      cursorOffset = replacement.length;
+      break;
+    case 'math-inline':
+      replacement = `$${sel || 'x = y + z'}$`;
+      cursorOffset = sel ? replacement.length : 1;
+      break;
+    case 'math-block':
+      replacement = `\n$$\n${sel || '\\tau = F \\times r'}\n$$\n`;
+      cursorOffset = replacement.length;
+      break;
+    case 'code':
+      replacement = `\n\`\`\`python\n${sel || '# write code or pseudocode here'}\n\`\`\`\n`;
+      cursorOffset = replacement.length;
+      break;
+    case 'check':
+      replacement = `\n- [ ] ${sel || 'Action item'}`;
+      cursorOffset = replacement.length;
+      break;
+    case 'table':
+      replacement = `\n| Parameter | Value | Unit | Notes |\n| :--- | :--- | :--- | :--- |\n| Voltage | 3.3 | V | Nominal |\n| Current | 240 | mA | Peak burst |\n`;
+      cursorOffset = replacement.length;
+      break;
+  }
+
+  textarea.value = textarea.value.substring(0, start) + replacement + textarea.value.substring(end);
+  textarea.focus();
+  textarea.selectionStart = textarea.selectionEnd = start + (sel ? replacement.length : cursorOffset);
+
+  currentOpenDocContent = textarea.value;
+  queueAutoSaveDoc();
+  updateEditorStats();
 }
 
 function setThinkingView(view) {
@@ -6333,6 +6469,142 @@ function initDualSpaceAndThinkingStudio() {
   const textarea = document.getElementById('thinking-editor-textarea');
   textarea?.addEventListener('input', () => {
     queueAutoSaveDoc();
+  });
+
+  // Paste handler: Intercept screenshot/image paste directly into document
+  textarea?.addEventListener('paste', (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        e.preventDefault();
+        const file = items[i].getAsFile();
+        if (!file) continue;
+
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+          const base64Data = event.target.result;
+          const ext = file.type.split('/')[1] || 'png';
+          const timestamp = Date.now();
+          const filename = `snip_${timestamp}.${ext}`;
+
+          const parts = (currentOpenDocPath || '').split('/');
+          parts.pop();
+          const folder = parts.join('/');
+
+          showToast("Saving pasted image to project assets...");
+          try {
+            const savedRelPath = await callTauri('save_doc_asset', {
+              folder,
+              filename,
+              base64_data: base64Data
+            });
+
+            // Cache it immediately so preview renders instantly
+            const cacheKey = `${folder}:${filename}`;
+            docAssetCache.set(cacheKey, base64Data);
+
+            // Insert markdown image tag at cursor position
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const imgMarkdown = `\n![Screenshot](${savedRelPath})\n`;
+            textarea.value = textarea.value.substring(0, start) + imgMarkdown + textarea.value.substring(end);
+            textarea.selectionStart = textarea.selectionEnd = start + imgMarkdown.length;
+
+            currentOpenDocContent = textarea.value;
+            queueAutoSaveDoc();
+            showToast("Pasted image saved into document assets!");
+          } catch (err) {
+            console.error("Failed to save doc asset:", err);
+            showToast("Failed to save image: " + err);
+          }
+        };
+        reader.readAsDataURL(file);
+        break;
+      }
+    }
+  });
+
+  // Editor Keydown: Tab Indentation, Ctrl+B, Ctrl+I, Ctrl+S
+  textarea?.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+
+      if (e.shiftKey) {
+        const val = textarea.value;
+        const lineStart = val.lastIndexOf('\n', start - 1) + 1;
+        if (val.substring(lineStart, lineStart + 2) === '  ') {
+          textarea.value = val.substring(0, lineStart) + val.substring(lineStart + 2);
+          textarea.selectionStart = textarea.selectionEnd = Math.max(lineStart, start - 2);
+        }
+      } else {
+        textarea.value = textarea.value.substring(0, start) + '  ' + textarea.value.substring(end);
+        textarea.selectionStart = textarea.selectionEnd = start + 2;
+      }
+      currentOpenDocContent = textarea.value;
+      queueAutoSaveDoc();
+    } else if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+      e.preventDefault();
+      applyMarkdownFormatting('bold');
+    } else if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
+      e.preventDefault();
+      applyMarkdownFormatting('italic');
+    } else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      if (currentOpenDocPath) {
+        callTauri('save_doc', {
+          path: currentOpenDocPath,
+          content: textarea.value
+        }).then(() => {
+          showToast(`Saved '${currentOpenDocPath.split('/').pop()}'`);
+          const saveInd = document.getElementById('thinking-save-indicator');
+          if (saveInd) {
+            saveInd.textContent = "Saved";
+            saveInd.style.color = "var(--accent-emerald)";
+          }
+        });
+      }
+    }
+  });
+
+  // Formatting Toolbar Buttons
+  document.querySelectorAll('#thinking-formatting-toolbar .thinking-fmt-btn[data-fmt]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      applyMarkdownFormatting(btn.dataset.fmt);
+    });
+  });
+
+  // Export Markdown File
+  document.getElementById('btn-thinking-export-md')?.addEventListener('click', () => {
+    if (!currentOpenDocPath) {
+      showToast("No document open to export");
+      return;
+    }
+    const filename = currentOpenDocPath.split('/').pop() || 'document.md';
+    const blob = new Blob([currentOpenDocContent || ''], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast(`Exported ${filename}`);
+  });
+
+  // Copy Markdown
+  document.getElementById('btn-thinking-copy-md')?.addEventListener('click', () => {
+    if (!currentOpenDocContent) {
+      showToast("Document is empty");
+      return;
+    }
+    navigator.clipboard.writeText(currentOpenDocContent).then(() => {
+      showToast("Document markdown copied to clipboard!");
+    });
   });
 
   // Rename Doc Title Input

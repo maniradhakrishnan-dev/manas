@@ -320,7 +320,38 @@
         <div class="thinking-editor-container" id="thinking-editor-container">
           <!-- Raw Markdown Editor -->
           <div class="thinking-editor-pane" id="thinking-editor-pane">
-            <textarea id="thinking-editor-textarea" class="thinking-editor-textarea" placeholder="Start writing your research, mathematical formulas ($$\tau = F \times r$$), code blocks, or checklists..."></textarea>
+            <!-- Formatting Helper Toolbar -->
+            <div class="thinking-formatting-toolbar" id="thinking-formatting-toolbar">
+              <button type="button" class="thinking-fmt-btn" data-fmt="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+              <button type="button" class="thinking-fmt-btn" data-fmt="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+              <button type="button" class="thinking-fmt-btn" data-fmt="h2" title="Heading 2">H2</button>
+              <button type="button" class="thinking-fmt-btn" data-fmt="h3" title="Heading 3">H3</button>
+              <span class="thinking-fmt-sep"></span>
+              <button type="button" class="thinking-fmt-btn" data-fmt="math-inline" title="Inline Math ($x$)">$x$</button>
+              <button type="button" class="thinking-fmt-btn" data-fmt="math-block" title="Math Block ($$\dots$$)">$$\dots$$</button>
+              <button type="button" class="thinking-fmt-btn" data-fmt="code" title="Code Block"><code>&lt;/&gt;</code></button>
+              <button type="button" class="thinking-fmt-btn" data-fmt="check" title="Task Checkbox">- [ ]</button>
+              <button type="button" class="thinking-fmt-btn" data-fmt="table" title="Insert Table">⊞ Table</button>
+              <span class="thinking-fmt-sep"></span>
+              <button type="button" class="thinking-fmt-btn" id="btn-thinking-export-md" title="Export as Markdown file">📥 Export .md</button>
+              <button type="button" class="thinking-fmt-btn" id="btn-thinking-copy-md" title="Copy raw Markdown">📋 Copy</button>
+            </div>
+
+            <textarea id="thinking-editor-textarea" class="thinking-editor-textarea" placeholder="Start writing your research, mathematical formulas ($$\tau = F \times r$$), code blocks, or checklists... (Tip: You can paste screenshots directly!)"></textarea>
+
+            <!-- Editor Stats Strip -->
+            <div class="thinking-editor-stats-bar" id="thinking-editor-stats-bar">
+              <div class="thinking-stats-left">
+                <span class="thinking-stat-item" id="thinking-stat-words">0 words</span>
+                <span>•</span>
+                <span class="thinking-stat-item" id="thinking-stat-chars">0 chars</span>
+                <span>•</span>
+                <span class="thinking-stat-item" id="thinking-stat-time">~0 min read</span>
+              </div>
+              <div class="thinking-stats-right">
+                <span class="thinking-stat-item" id="thinking-stat-hint">Tip: Paste screenshots (Ctrl+V) directly into editor</span>
+              </div>
+            </div>
           </div>
 
           <!-- Live Rendered Preview -->
