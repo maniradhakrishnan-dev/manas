@@ -17,7 +17,7 @@
 
 ## 🧭 Philosophy
 
-**Manas** (*Sanskrit for the sensory mind, contemplation, and inner purpose*) is an intentional daily rhythm planner designed for deep focus and structured clarity.
+**Manas** is an intentional daily rhythm planner designed for deep focus and structured clarity.
 
 Unlike conventional bloated task apps that trap your life in proprietary databases, cloud subscriptions, or distracting notifications, Manas is:
 * **100% Offline & Private**: Zero accounts, zero tracking, zero telemetry.
