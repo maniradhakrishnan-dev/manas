@@ -2121,7 +2121,9 @@ function saveDay(targetDateKey = null, targetData = null) {
   if (statusDot) statusDot.classList.add('pulsing');
   if (statusLabel) statusLabel.textContent = "Saving...";
 
-  safeStorage.setItem(`mrt_${dateKey}`, JSON.stringify(dataToSave));
+  if (typeof window.__TAURI__ === 'undefined') {
+    safeStorage.setItem(`mrt_${dateKey}`, JSON.stringify(dataToSave));
+  }
   callTauri('save_day', { entry: dataToSave });
 
   if (hasContent(dataToSave)) {
@@ -3300,7 +3302,28 @@ function changeDate(newDate) {
   if (carryoverBanner) carryoverBanner.style.display = 'none';
   currentPendingCarryover = [];
 
-  // 3. Instant cache render (0ms response)
+  // 3. Render target date: In Tauri desktop app, read strictly from disk!
+  if (typeof window.__TAURI__ !== 'undefined') {
+    callTauri('get_day', { date: targetDateKey }).then(diskData => {
+      if (formatDateKey(currentDate) === targetDateKey) {
+        if (diskData && typeof diskData === 'object') {
+          currentDayData = normalizeDayData(diskData, targetDateKey);
+        } else {
+          activeDatesSet.delete(targetDateKey);
+          currentDayData = getDefaultDayData(targetDateKey);
+        }
+        syncWorkspaceLayoutForDate(targetDateKey, currentDayData);
+        renderCurrentDay();
+        if (currentDayData.importedFrom) {
+          quickSync(currentDayData.importedFrom, true);
+        }
+        checkPendingCarryover(targetDateKey);
+      }
+    });
+    return;
+  }
+
+  // Fallback for pure browser mode without native backend
   const localCached = safeStorage.getItem(`mrt_${targetDateKey}`);
   if (localCached) {
     try {
@@ -3314,30 +3337,11 @@ function changeDate(newDate) {
   syncWorkspaceLayoutForDate(targetDateKey, currentDayData);
   renderCurrentDay();
 
-  // If day has an active import link, sync unfinished tasks from source day
   if (currentDayData.importedFrom) {
     quickSync(currentDayData.importedFrom, true);
   }
 
-  // Check carryover for target date
   checkPendingCarryover(targetDateKey);
-
-  // 4. Background fetch from native filesystem if available
-  callTauri('get_day', { date: targetDateKey }).then(diskData => {
-    if (formatDateKey(currentDate) === targetDateKey && diskData && typeof diskData === 'object') {
-      const diskTime = new Date(diskData.updatedAt || 0).getTime();
-      const curTime = new Date(currentDayData.updatedAt || 0).getTime();
-      if (diskTime > curTime) {
-        currentDayData = normalizeDayData(diskData, targetDateKey);
-        syncWorkspaceLayoutForDate(targetDateKey, currentDayData);
-        renderCurrentDay();
-        if (currentDayData.importedFrom) {
-          quickSync(currentDayData.importedFrom, true);
-        }
-        checkPendingCarryover(targetDateKey);
-      }
-    }
-  });
 }
 
 // ==========================================================================
@@ -5480,16 +5484,29 @@ function init() {
     else btnToday.classList.remove('active-today');
   }
 
-  // 3. Immediately render cached data or defaults
-  const localCached = safeStorage.getItem(`mrt_${dateKey}`);
-  if (localCached) {
+  // In desktop app, purge any legacy localStorage day keys so disk is the sole source of truth
+  const isDesktop = typeof window.__TAURI__ !== 'undefined';
+  if (isDesktop) {
     try {
-      currentDayData = normalizeDayData(JSON.parse(localCached), dateKey);
-    } catch (e) {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith('mrt_20') || k.startsWith('mrt_active_dates'))) {
+          localStorage.removeItem(k);
+        }
+      }
+    } catch (e) { }
+    currentDayData = getDefaultDayData(dateKey);
+  } else {
+    const localCached = safeStorage.getItem(`mrt_${dateKey}`);
+    if (localCached) {
+      try {
+        currentDayData = normalizeDayData(JSON.parse(localCached), dateKey);
+      } catch (e) {
+        currentDayData = getDefaultDayData(dateKey);
+      }
+    } else {
       currentDayData = getDefaultDayData(dateKey);
     }
-  } else {
-    currentDayData = getDefaultDayData(dateKey);
   }
   syncWorkspaceLayoutForDate(dateKey, currentDayData);
   renderCurrentDay();
