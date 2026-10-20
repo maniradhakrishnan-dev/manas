@@ -351,6 +351,98 @@ fn open_docs_folder(app: tauri::AppHandle) -> Result<String, String> {
     Ok(path_str)
 }
 
+fn base64_decode(input: &str) -> Result<Vec<u8>, String> {
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = Vec::new();
+    let mut buf = 0u32;
+    let mut bits = 0;
+    for &b in input.as_bytes() {
+        if b == b'=' || b.is_ascii_whitespace() { continue; }
+        let val = match TABLE.iter().position(|&x| x == b) {
+            Some(p) => p as u32,
+            None => return Err(format!("Invalid base64 character: {}", b as char)),
+        };
+        buf = (buf << 6) | val;
+        bits += 6;
+        if bits >= 8 {
+            bits -= 8;
+            out.push((buf >> bits) as u8);
+        }
+    }
+    Ok(out)
+}
+
+fn base64_encode(data: &[u8]) -> String {
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::new();
+    let mut val = 0u32;
+    let mut valb = -6;
+    for &b in data {
+        val = (val << 8) + b as u32;
+        valb += 8;
+        while valb >= 0 {
+            out.push(TABLE[((val >> valb) & 0x3F) as usize] as char);
+            valb -= 6;
+        }
+    }
+    if valb > -6 {
+        out.push(TABLE[((val << 8) >> (valb + 8)) as usize & 0x3F] as char);
+    }
+    while out.len() % 4 != 0 {
+        out.push('=');
+    }
+    out
+}
+
+#[tauri::command]
+fn save_doc_asset(app: tauri::AppHandle, folder: String, filename: String, base64_data: String) -> Result<String, String> {
+    let dir = get_docs_dir(&app);
+    let target_folder = if folder.is_empty() {
+        dir.join("assets")
+    } else {
+        dir.join(&folder).join("assets")
+    };
+    let _ = fs::create_dir_all(&target_folder);
+    let target_file = target_folder.join(&filename);
+
+    let clean = if let Some(idx) = base64_data.find(",") {
+        &base64_data[idx + 1..]
+    } else {
+        &base64_data
+    };
+
+    let bytes = base64_decode(clean)?;
+    fs::write(&target_file, bytes).map_err(|e| e.to_string())?;
+
+    Ok(format!("assets/{}", filename))
+}
+
+#[tauri::command]
+fn read_doc_asset(app: tauri::AppHandle, folder: String, filename: String) -> Result<String, String> {
+    let dir = get_docs_dir(&app);
+    let target_file = if folder.is_empty() {
+        dir.join("assets").join(&filename)
+    } else {
+        dir.join(&folder).join("assets").join(&filename)
+    };
+
+    if !target_file.exists() {
+        return Err(format!("Asset '{}' not found", filename));
+    }
+
+    let bytes = fs::read(&target_file).map_err(|e| e.to_string())?;
+    let ext = target_file.extension().and_then(|e| e.to_str()).unwrap_or("png");
+    let mime = match ext {
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "svg" => "image/svg+xml",
+        "webp" => "image/webp",
+        _ => "image/png",
+    };
+    let enc = base64_encode(&bytes);
+    Ok(format!("data:{};base64,{}", mime, enc))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -383,6 +475,8 @@ pub fn run() {
             rename_doc,
             append_to_doc,
             open_docs_folder,
+            save_doc_asset,
+            read_doc_asset,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
