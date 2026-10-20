@@ -177,19 +177,12 @@ function markLayoutModified(activeLayout) {
   activeLayout.id = 'custom';
 }
 
-function getTemplateDropdownData(activeLayout) {
+function getTemplateDropdownOptionsHTML(activeLayout) {
   const currentId = activeLayout ? activeLayout.id : 'blank_canvas';
   const userTemplates = getUserTemplates();
   const baseId = activeLayout ? (activeLayout.baseTemplateId || (userTemplates.some(t => t.id === currentId) ? currentId : null)) : null;
   const matchedUserTpl = userTemplates.find(t => t.id === baseId);
   const isModified = activeLayout ? (activeLayout.isModified && !!matchedUserTpl) : false;
-
-  let currentLabel = "📄 Blank Canvas";
-  if (matchedUserTpl) {
-    currentLabel = isModified ? `📌 ${matchedUserTpl.name} (Modified)` : `📌 ${matchedUserTpl.name}`;
-  } else if (currentId === 'custom') {
-    currentLabel = `✦ Custom (${formatDateDisplay(currentDate)})`;
-  }
 
   const standardOptions = [
     { id: 'blank_canvas', label: "📄 Blank Canvas" }
@@ -198,19 +191,6 @@ function getTemplateDropdownData(activeLayout) {
   let optionsHTML = standardOptions.map(o => `
     <option value="${o.id}" ${currentId === o.id ? 'selected' : ''}>${escapeHtml(o.label)}</option>
   `).join('');
-
-  let menuItemsHTML = `
-    <div class="custom-template-header">Standard Routines</div>
-    ${standardOptions.map(o => {
-      const isSel = (currentId === o.id);
-      return `
-        <div class="custom-template-item ${isSel ? 'active' : ''}" data-tpl-id="${o.id}">
-          <span>${escapeHtml(o.label)}</span>
-          ${isSel ? '<span class="custom-template-item-check">✓</span>' : ''}
-        </div>
-      `;
-    }).join('')}
-  `;
 
   if (userTemplates.length > 0) {
     optionsHTML += `
@@ -222,58 +202,44 @@ function getTemplateDropdownData(activeLayout) {
         }).join('')}
       </optgroup>
     `;
-
-    menuItemsHTML += `
-      <div class="custom-template-header" style="margin-top: 4px;">My Custom Routines</div>
-      ${userTemplates.map(t => {
-        const isSelected = (baseId === t.id);
-        const label = (isSelected && isModified) ? `📌 ${t.name} (Modified)` : `📌 ${t.name}`;
-        return `
-          <div class="custom-template-item ${isSelected ? 'active' : ''}" data-tpl-id="${t.id}">
-            <span>${escapeHtml(label)}</span>
-            ${isSelected ? '<span class="custom-template-item-check">✓</span>' : ''}
-          </div>
-        `;
-      }).join('')}
-    `;
   }
 
   if (!matchedUserTpl && currentId === 'custom') {
-    const customLabel = `✦ Custom (${formatDateDisplay(currentDate)})`;
-    optionsHTML += `<option value="custom" selected>${escapeHtml(customLabel)}</option>`;
-    menuItemsHTML += `
-      <div class="custom-template-header" style="margin-top: 4px;">Current Custom Layout</div>
-      <div class="custom-template-item active" data-tpl-id="custom">
-        <span>${escapeHtml(customLabel)}</span>
-        <span class="custom-template-item-check">✓</span>
-      </div>
-    `;
+    optionsHTML += `<option value="custom" selected>✦ Custom (${escapeHtml(formatDateDisplay(currentDate))})</option>`;
   }
 
-  return { currentLabel, optionsHTML, menuItemsHTML, matchedUserTpl, isModified };
+  return optionsHTML;
 }
 
-function renderLevel1TopBarHTML(activeLayout) {
-  const { currentLabel, optionsHTML, menuItemsHTML, matchedUserTpl, isModified } = getTemplateDropdownData(activeLayout);
+function getTemplateActionButtonsHTML(activeLayout) {
+  const currentId = activeLayout ? activeLayout.id : 'blank_canvas';
+  const userTemplates = getUserTemplates();
+  const baseId = activeLayout ? (activeLayout.baseTemplateId || (userTemplates.some(t => t.id === currentId) ? currentId : null)) : null;
+  const matchedUserTpl = userTemplates.find(t => t.id === baseId);
+  const isModified = activeLayout ? (activeLayout.isModified && !!matchedUserTpl) : false;
 
-  let actionButtonsHTML = '';
   if (matchedUserTpl) {
     if (isModified) {
-      actionButtonsHTML = `
+      return `
         <button type="button" class="btn-level1-pill btn-update-template" id="btn-top-update-template" title="Update the saved template '${escapeHtml(matchedUserTpl.name)}' with your current layout changes">🔄 Update "${escapeHtml(matchedUserTpl.name)}"</button>
         <button type="button" class="btn-level1-pill btn-save-new-template" id="btn-top-save-new-template" title="Save these changes as a brand new template">💾 Save as New...</button>
       `;
     } else {
-      actionButtonsHTML = `
+      return `
         <button type="button" class="btn-level1-pill btn-save-new-template" id="btn-top-save-new-template" title="Save a copy of this template with a new name">💾 Duplicate...</button>
         <button type="button" class="btn-level1-pill btn-del-template" id="btn-top-del-template" data-tpl-id="${matchedUserTpl.id}" title="Delete template '${escapeHtml(matchedUserTpl.name)}'">🗑️ Delete</button>
       `;
     }
   } else {
-    actionButtonsHTML = `
+    return `
       <button type="button" class="btn-level1-pill btn-save-template" id="btn-top-save-template" title="Save today's layout as a reusable template">💾 Save Template</button>
     `;
   }
+}
+
+function renderLevel1TopBarHTML(activeLayout) {
+  const optionsHTML = getTemplateDropdownOptionsHTML(activeLayout);
+  const actionButtonsHTML = getTemplateActionButtonsHTML(activeLayout);
 
   return `
     <div class="workspace-level1-bar" id="workspace-level1-bar">
@@ -289,19 +255,10 @@ function renderLevel1TopBarHTML(activeLayout) {
       <div class="level1-divider"></div>
       <div class="level1-template-group">
         <span class="level1-template-label">Routine:</span>
-        <div class="custom-template-dropdown" id="level1-template-dropdown">
-          <button type="button" class="custom-template-trigger" id="level1-template-trigger" aria-haspopup="listbox" aria-expanded="false" title="Switch layout template for today">
-            <span class="custom-template-selected-text">${escapeHtml(currentLabel)}</span>
-            <span class="custom-template-arrow">▾</span>
-          </button>
-          <div class="custom-template-menu" id="level1-template-menu" role="listbox" style="display: none;">
-            ${menuItemsHTML}
-          </div>
-          <select id="level1-template-select" class="level1-template-select" style="display: none;" title="Switch layout template for today">
-            ${optionsHTML}
-          </select>
-        </div>
-        ${actionButtonsHTML}
+        <select id="level1-template-select" class="level1-template-select" title="Switch layout template for today">
+          ${optionsHTML}
+        </select>
+        <span class="level1-action-buttons-wrap">${actionButtonsHTML}</span>
       </div>
     </div>
   `;
@@ -744,15 +701,14 @@ function updateTrackTitleInLayout(blockKey, newTitle) {
 }
 
 function syncLevel1Bar(layout) {
-  const bar = document.getElementById('workspace-level1-bar');
-  if (!bar) return;
-  const { currentLabel, optionsHTML, menuItemsHTML } = getTemplateDropdownData(layout);
-  const select = bar.querySelector('#level1-template-select');
-  if (select) select.innerHTML = optionsHTML;
-  const triggerText = bar.querySelector('.custom-template-selected-text');
-  if (triggerText) triggerText.textContent = currentLabel;
-  const menu = bar.querySelector('#level1-template-menu');
-  if (menu) menu.innerHTML = menuItemsHTML;
+  const select = document.getElementById('level1-template-select');
+  if (select) {
+    select.innerHTML = getTemplateDropdownOptionsHTML(layout);
+  }
+  const buttonsWrap = document.querySelector('.level1-action-buttons-wrap');
+  if (buttonsWrap) {
+    buttonsWrap.innerHTML = getTemplateActionButtonsHTML(layout);
+  }
 }
 
 function syncWorkspaceLayoutForDate(dateKey, dayData) {
@@ -1170,61 +1126,8 @@ document.addEventListener('change', (e) => {
   }
 });
 
-// Global delegated click listener for canvas layout modifications & dropdowns
+// Global delegated click listener for canvas layout modifications
 document.addEventListener('click', (e) => {
-  // Handle custom template dropdown trigger
-  const tplTrigger = e.target.closest('#level1-template-trigger');
-  if (tplTrigger) {
-    e.preventDefault();
-    e.stopPropagation();
-    const dropdown = tplTrigger.closest('#level1-template-dropdown');
-    const menu = dropdown ? dropdown.querySelector('#level1-template-menu') : null;
-    if (dropdown && menu) {
-      const isOpen = dropdown.classList.contains('open');
-      if (isOpen) {
-        dropdown.classList.remove('open');
-        menu.style.display = 'none';
-        tplTrigger.setAttribute('aria-expanded', 'false');
-      } else {
-        dropdown.classList.add('open');
-        menu.style.display = 'flex';
-        tplTrigger.setAttribute('aria-expanded', 'true');
-      }
-    }
-    return;
-  }
-
-  // Handle custom template item selection
-  const tplItem = e.target.closest('.custom-template-item');
-  if (tplItem) {
-    e.preventDefault();
-    e.stopPropagation();
-    const tplId = tplItem.getAttribute('data-tpl-id');
-    const dropdown = tplItem.closest('#level1-template-dropdown');
-    if (dropdown) {
-      dropdown.classList.remove('open');
-      const menu = dropdown.querySelector('#level1-template-menu');
-      if (menu) menu.style.display = 'none';
-      const trigger = dropdown.querySelector('#level1-template-trigger');
-      if (trigger) trigger.setAttribute('aria-expanded', 'false');
-    }
-    if (tplId) {
-      applyTemplateSelection(tplId);
-    }
-    return;
-  }
-
-  // Close custom template dropdown on outside click
-  if (!e.target.closest('#level1-template-dropdown')) {
-    document.querySelectorAll('.custom-template-dropdown.open').forEach(dd => {
-      dd.classList.remove('open');
-      const menu = dd.querySelector('.custom-template-menu');
-      if (menu) menu.style.display = 'none';
-      const trigger = dd.querySelector('.custom-template-trigger');
-      if (trigger) trigger.setAttribute('aria-expanded', 'false');
-    });
-  }
-
   // 1. Delete column button
   const delColBtn = e.target.closest('.btn-canvas-del-col');
   if (delColBtn) {

@@ -5480,10 +5480,11 @@ body[data-section-focus] .planner-col.phase-col-custom.section-focused {
 }
 
 .level1-template-select {
+  color-scheme: dark;
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
-  padding: 6px 30px 6px 12px;
+  padding: 6px 32px 6px 12px;
   font-size: 12px;
   font-weight: 600;
   border-radius: 8px;
@@ -5491,17 +5492,19 @@ body[data-section-focus] .planner-col.phase-col-custom.section-focused {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   color: #f8fafc !important;
   outline: none;
   cursor: pointer;
   transition: all 0.15s ease;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  max-width: 260px;
 }
 
 .level1-template-select:hover {
   border-color: var(--accent-cyan);
   background-color: #24344d;
+  color: #ffffff !important;
 }
 
 .level1-template-select:focus {
@@ -5509,131 +5512,20 @@ body[data-section-focus] .planner-col.phase-col-custom.section-focused {
   box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
 }
 
-.level1-template-select option,
-.level1-template-select optgroup {
-  background-color: #1e293b;
-  color: #f8fafc;
+.level1-template-select option {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
   padding: 6px 10px;
 }
 
-/* ==========================================================================
-   Custom Accessible Template Dropdown Component (Theme Independent)
-   ========================================================================== */
-.custom-template-dropdown {
-  position: relative;
-  display: inline-block;
-}
-
-.custom-template-trigger {
-  display: inline-flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-width: 155px;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: 8px;
-  background-color: #1e293b;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: #f8fafc !important;
-  outline: none;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-  user-select: none;
-  font-family: inherit;
-}
-
-.custom-template-trigger:hover {
-  border-color: var(--accent-cyan);
-  background-color: #24344d;
-}
-
-.custom-template-trigger:focus-visible {
-  border-color: var(--accent-cyan);
-  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
-}
-
-.custom-template-selected-text {
-  flex: 1;
-  text-align: left;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.custom-template-arrow {
-  font-size: 10px;
-  color: #94a3b8;
-  transition: transform 0.18s ease;
-}
-
-.custom-template-dropdown.open .custom-template-arrow {
-  transform: rotate(180deg);
-}
-
-.custom-template-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  min-width: 240px;
-  max-height: 340px;
-  overflow-y: auto;
-  background: #141a24;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 10px;
-  padding: 6px;
-  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.65), 0 2px 8px rgba(0, 0, 0, 0.3);
-  z-index: 1000;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  animation: slideDownFade 0.15s ease-out;
-}
-
-.custom-template-header {
-  font-size: 9.5px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #94a3b8;
-  padding: 6px 8px 3px 8px;
-}
-
-.custom-template-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 7px 10px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  color: #f8fafc;
-  cursor: pointer;
-  transition: all 0.12s ease;
-  user-select: none;
-}
-
-.custom-template-item:hover {
-  background: rgba(56, 189, 248, 0.14);
-  color: #fff;
-}
-
-.custom-template-item.active {
-  background: rgba(56, 189, 248, 0.22);
-  color: var(--accent-cyan);
-  font-weight: 600;
-}
-
-.custom-template-item-check {
-  font-size: 11px;
-  color: var(--accent-cyan);
+.level1-template-select optgroup {
+  background-color: #1e293b !important;
+  color: #94a3b8 !important;
   font-weight: 700;
+  font-style: normal;
+  padding: 6px 10px;
 }
+
 
 .btn-level1-pill {
   padding: 5px 11px;
@@ -5953,6 +5845,7 @@ body[data-section-focus] .planner-col.phase-col-custom.section-focused {
 }
 
 [data-theme="paper"] .level1-template-select {
+  color-scheme: light;
   background-color: #ffffff;
   border-color: #d1c7b7;
   color: #1e293b !important;
@@ -5960,56 +5853,16 @@ body[data-section-focus] .planner-col.phase-col-custom.section-focused {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
-[data-theme="paper"] .level1-template-select option,
-[data-theme="paper"] .level1-template-select optgroup {
-  background-color: #ffffff;
-  color: #1e293b;
-}
-
-[data-theme="paper"] .custom-template-trigger {
-  background-color: #ffffff;
-  border-color: #d1c7b7;
+[data-theme="paper"] .level1-template-select option {
+  background-color: #ffffff !important;
   color: #1e293b !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
-[data-theme="paper"] .custom-template-trigger:hover {
-  background-color: #f7f5f0;
-  border-color: #1e3a8a;
-  color: #1e3a8a !important;
-}
-
-[data-theme="paper"] .custom-template-arrow {
-  color: #78736a;
-}
-
-[data-theme="paper"] .custom-template-menu {
-  background: #ffffff;
-  border: 1px solid #d1c7b7;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
-}
-
-[data-theme="paper"] .custom-template-header {
-  color: #78736a;
-}
-
-[data-theme="paper"] .custom-template-item {
-  color: #1e293b;
-}
-
-[data-theme="paper"] .custom-template-item:hover {
-  background: #f1ebd9;
-  color: #1e3a8a;
-}
-
-[data-theme="paper"] .custom-template-item.active {
-  background: #ede8dc;
-  color: #1e3a8a;
+[data-theme="paper"] .level1-template-select optgroup {
+  background-color: #ffffff !important;
+  color: #78736a !important;
   font-weight: 700;
-}
-
-[data-theme="paper"] .custom-template-item-check {
-  color: #1e3a8a;
+  font-style: normal;
 }
 
 [data-theme="paper"] .btn-level1-pill {
@@ -6052,6 +5905,7 @@ body[data-section-focus] .planner-col.phase-col-custom.section-focused {
 }
 
 [data-theme="ceramic"] .level1-template-select {
+  color-scheme: light;
   background-color: #ffffff;
   border-color: #cbd5e1;
   color: #0f172a !important;
@@ -6059,56 +5913,16 @@ body[data-section-focus] .planner-col.phase-col-custom.section-focused {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
-[data-theme="ceramic"] .level1-template-select option,
-[data-theme="ceramic"] .level1-template-select optgroup {
-  background-color: #ffffff;
-  color: #0f172a;
-}
-
-[data-theme="ceramic"] .custom-template-trigger {
-  background-color: #ffffff;
-  border-color: #cbd5e1;
+[data-theme="ceramic"] .level1-template-select option {
+  background-color: #ffffff !important;
   color: #0f172a !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
-[data-theme="ceramic"] .custom-template-trigger:hover {
-  background-color: #f1f5f9;
-  border-color: #2563eb;
-  color: #1d4ed8 !important;
-}
-
-[data-theme="ceramic"] .custom-template-arrow {
-  color: #64748b;
-}
-
-[data-theme="ceramic"] .custom-template-menu {
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
-}
-
-[data-theme="ceramic"] .custom-template-header {
-  color: #64748b;
-}
-
-[data-theme="ceramic"] .custom-template-item {
-  color: #0f172a;
-}
-
-[data-theme="ceramic"] .custom-template-item:hover {
-  background: #f1f5f9;
-  color: #1d4ed8;
-}
-
-[data-theme="ceramic"] .custom-template-item.active {
-  background: #e2e8f0;
-  color: #1d4ed8;
+[data-theme="ceramic"] .level1-template-select optgroup {
+  background-color: #ffffff !important;
+  color: #64748b !important;
   font-weight: 700;
-}
-
-[data-theme="ceramic"] .custom-template-item-check {
-  color: #1d4ed8;
+  font-style: normal;
 }
 
 [data-theme="ceramic"] .btn-level1-pill {
@@ -6129,62 +5943,23 @@ body[data-section-focus] .planner-col.phase-col-custom.section-focused {
 }
 
 [data-theme="chalk"] .level1-template-select {
+  color-scheme: dark;
   background-color: #18181b;
   border-color: #3f3f46;
   color: #f4f4f5 !important;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a1a1aa' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
 }
 
-[data-theme="chalk"] .level1-template-select option,
-[data-theme="chalk"] .level1-template-select optgroup {
-  background-color: #18181b;
-  color: #f4f4f5;
-}
-
-[data-theme="chalk"] .custom-template-trigger {
-  background-color: #18181b;
-  border-color: #3f3f46;
+[data-theme="chalk"] .level1-template-select option {
+  background-color: #18181b !important;
   color: #f4f4f5 !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
-[data-theme="chalk"] .custom-template-trigger:hover {
-  background-color: #27272a;
-  border-color: #71717a;
-  color: #ffffff !important;
-}
-
-[data-theme="chalk"] .custom-template-arrow {
-  color: #a1a1aa;
-}
-
-[data-theme="chalk"] .custom-template-menu {
-  background: #18181b;
-  border: 1px solid #3f3f46;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-}
-
-[data-theme="chalk"] .custom-template-header {
-  color: #a1a1aa;
-}
-
-[data-theme="chalk"] .custom-template-item {
-  color: #f4f4f5;
-}
-
-[data-theme="chalk"] .custom-template-item:hover {
-  background: #27272a;
-  color: #ffffff;
-}
-
-[data-theme="chalk"] .custom-template-item.active {
-  background: #3f3f46;
-  color: #ffffff;
+[data-theme="chalk"] .level1-template-select optgroup {
+  background-color: #18181b !important;
+  color: #a1a1aa !important;
   font-weight: 700;
-}
-
-[data-theme="chalk"] .custom-template-item-check {
-  color: #ffffff;
+  font-style: normal;
 }
 
 [data-theme="paper"] .empty-section-starter {
