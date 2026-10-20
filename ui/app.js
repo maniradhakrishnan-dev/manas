@@ -6737,9 +6737,19 @@ function initDualSpaceAndThinkingStudio() {
   const btnCancelPushModal = document.getElementById('btn-cancel-push-planner');
   const btnConfirmPushModal = document.getElementById('btn-confirm-push-planner');
 
-  btnPushToPlanner?.addEventListener('click', () => {
+  btnPushToPlanner?.addEventListener('click', async () => {
+    // Auto-open first doc if none currently selected
     if (!currentOpenDocPath) {
-      showToast("Please select a document first");
+      if (activeDocsList && activeDocsList.length > 0) {
+        const firstDoc = getFirstDocItem(activeDocsList);
+        if (firstDoc) {
+          await openThinkingDoc(firstDoc.path);
+        }
+      }
+    }
+
+    if (!currentOpenDocPath) {
+      showToast("Please open or select a document first");
       return;
     }
 
@@ -6778,6 +6788,20 @@ function initDualSpaceAndThinkingStudio() {
         }
       });
     });
+
+    // Fallback if layout structure yields empty list
+    if (sectionList.length === 0) {
+      sectionList.push({
+        id: 'sec_focus',
+        title: "Today's Focus",
+        timeRange: '',
+        columns: [
+          { key: 'morning_focus', title: 'Morning Focus' },
+          { key: 'midday_focus', title: 'Midday Focus' },
+          { key: 'evening_focus', title: 'Evening Wrap-up' }
+        ]
+      });
+    }
 
     function updateColumnDropdown(selectedSecIdx) {
       if (!targetColumnSelect) return;
@@ -6821,19 +6845,35 @@ function initDualSpaceAndThinkingStudio() {
       updateColumnDropdown(0);
     }
 
-    // Extract checklists from current open doc
+    // Extract actionable checklists, bullets, and selected text from editor
     const checklistPreview = document.getElementById('bridge-doc-checklist-preview');
+    const customInput = document.getElementById('bridge-custom-task-input');
+    const textarea = document.getElementById('thinking-editor-textarea');
+
+    // Fresh content from editor or cached doc content
+    const docText = (textarea && textarea.value) ? textarea.value : (currentOpenDocContent || '');
+
+    // Check if user has selected text in editor
+    let selText = '';
+    if (textarea && textarea.selectionStart !== textarea.selectionEnd) {
+      selText = textarea.value.substring(textarea.selectionStart, textarea.selectionEnd).trim();
+    }
+    if (customInput) {
+      customInput.value = selText;
+    }
+
     if (checklistPreview) {
       checklistPreview.innerHTML = '';
-      const lines = (currentOpenDocContent || '').split('\n');
+      const lines = docText.split('\n');
       let foundAny = false;
 
       lines.forEach(line => {
-        const m = line.match(/^\s*-\s*\[([ xX])\]\s+(.*)$/);
-        if (m) {
+        // 1. Markdown checkboxes: - [ ] Task, * [ ] Task, - [x] Done
+        const checkMatch = line.match(/^\s*[-*]\s*\[([ xX])\]\s+(.*)$/);
+        if (checkMatch) {
           foundAny = true;
-          const itemText = m[2];
-          const isDone = m[1].toLowerCase() === 'x';
+          const itemText = checkMatch[2].trim();
+          const isDone = checkMatch[1].toLowerCase() === 'x';
           const row = document.createElement('label');
           row.className = 'bridge-check-item';
           row.innerHTML = `
@@ -6841,11 +6881,29 @@ function initDualSpaceAndThinkingStudio() {
             <span>${escapeHTML(itemText)}</span>
           `;
           checklistPreview.appendChild(row);
+          return;
+        }
+
+        // 2. Standard bullet items (- item, * item) and numbered lists (1. item)
+        const bulletMatch = line.match(/^\s*(?:[-*]|\d+\.)\s+([A-Za-z0-9"'].*)$/);
+        if (bulletMatch && bulletMatch[1].length > 3 && !bulletMatch[1].startsWith('#')) {
+          foundAny = true;
+          const itemText = bulletMatch[1].trim();
+          const row = document.createElement('label');
+          row.className = 'bridge-check-item';
+          row.innerHTML = `
+            <input type="checkbox" value="${escapeHTML(itemText)}" checked />
+            <span>${escapeHTML(itemText)}</span>
+          `;
+          checklistPreview.appendChild(row);
         }
       });
 
       if (!foundAny) {
-        checklistPreview.innerHTML = '<span class="text-dim" style="font-size: 12px;">No checklists found in doc. Type a custom action below:</span>';
+        checklistPreview.innerHTML = '<span class="text-dim" style="font-size: 12px; padding: 4px 0;">No bullet items or checkboxes found in doc. Type your action item below:</span>';
+        if (customInput && !customInput.value) {
+          setTimeout(() => customInput.focus(), 100);
+        }
       }
     }
 
@@ -6863,15 +6921,15 @@ function initDualSpaceAndThinkingStudio() {
       };
     }
 
-    const customInput = document.getElementById('bridge-custom-task-input');
-    if (customInput) customInput.value = '';
-
-    pushModal?.classList.add('show');
+    pushModal?.classList.add('open', 'show');
   });
 
-  const closePushModal = () => pushModal?.classList.remove('show');
+  const closePushModal = () => pushModal?.classList.remove('open', 'show', 'active');
   btnClosePushModal?.addEventListener('click', closePushModal);
   btnCancelPushModal?.addEventListener('click', closePushModal);
+  pushModal?.addEventListener('click', (e) => {
+    if (e.target === pushModal) closePushModal();
+  });
 
   btnConfirmPushModal?.addEventListener('click', async () => {
     const targetColumnSelect = document.getElementById('bridge-target-column');
@@ -6888,10 +6946,12 @@ function initDualSpaceAndThinkingStudio() {
       if (cb.value && cb.value.trim()) tasksToAdd.push(cb.value.trim());
     });
 
-    // Plus custom input text
+    // Plus custom input text (supports multiline)
     const customText = document.getElementById('bridge-custom-task-input')?.value?.trim();
     if (customText) {
-      tasksToAdd.push(customText);
+      customText.split('\n').map(l => l.trim()).filter(Boolean).forEach(l => {
+        tasksToAdd.push(l);
+      });
     }
 
     if (tasksToAdd.length === 0) {
@@ -6900,6 +6960,20 @@ function initDualSpaceAndThinkingStudio() {
     }
 
     const dateKeyToUse = formatDateKey(currentDate);
+
+    // Ensure currentDayData is valid and loaded for today
+    if (!currentDayData || typeof currentDayData !== 'object' || !currentDayData.date || currentDayData.date !== dateKeyToUse) {
+      try {
+        const diskData = await callTauri('get_day', { date: dateKeyToUse });
+        if (diskData && typeof diskData === 'object') {
+          currentDayData = normalizeDayData(diskData, dateKeyToUse);
+        } else {
+          currentDayData = getDefaultDayData(dateKeyToUse);
+        }
+      } catch (e) {
+        currentDayData = getDefaultDayData(dateKeyToUse);
+      }
+    }
 
     // Ensure target block exists in currentDayData
     if (!currentDayData[targetKey]) {
@@ -6910,12 +6984,13 @@ function initDualSpaceAndThinkingStudio() {
       currentDayData[targetKey].tasks = [];
     }
 
-    const docTag = currentOpenDocPath.split('/').pop().replace(/\.md$/i, '');
+    const docTag = currentOpenDocPath ? currentOpenDocPath.split('/').pop().replace(/\.(md|markdown|txt)$/i, '') : 'Doc';
     tasksToAdd.forEach(tText => {
+      const cleanText = tText.replace(/^\s*(?:[-*]\s*(\[[ xX]\]\s*)?|\d+\.\s*)/, '').trim();
       currentDayData[targetKey].tasks.push({
-        text: `[${docTag}] ${tText}`,
+        text: `[${docTag}] ${cleanText || tText}`,
         done: false,
-        notes: `Source doc: ${currentOpenDocPath}`,
+        notes: `Source doc: ${currentOpenDocPath || 'Thinking Space'}`,
         subtasks: []
       });
     });
@@ -6934,7 +7009,7 @@ function initDualSpaceAndThinkingStudio() {
       }
     }
 
-    // Append pulse log to document
+    // Append pulse log to document editor
     const secTitle = targetSectionSelect?.options[targetSectionSelect.selectedIndex]?.textContent || 'Section';
     const colTitle = targetColumnSelect?.options[targetColumnSelect.selectedIndex]?.textContent || targetKey;
     const logEntry = `\n> *🚀 Pushed ${tasksToAdd.length} task${tasksToAdd.length > 1 ? 's' : ''} to Daily Planner [${secTitle} → ${colTitle}] on ${dateKeyToUse}*\n`;
@@ -6948,11 +7023,38 @@ function initDualSpaceAndThinkingStudio() {
 
     closePushModal();
 
-    // Re-render planner workspace immediately
+    // Re-render planner workspace immediately so the new task is right there
     syncWorkspaceLayoutForDate(dateKeyToUse, currentDayData);
     renderCurrentDay();
 
-    showToast(`Pushed ${tasksToAdd.length} task(s) into [${secTitle} → ${colTitle}]!`);
+    // Check if user wants to switch to planner immediately or view via toast
+    const switchCb = document.getElementById('bridge-switch-to-planner-cb');
+    const shouldSwitch = switchCb ? switchCb.checked : false;
+
+    if (shouldSwitch) {
+      switchAppMode('planner');
+      setTimeout(() => {
+        const targetCard = document.querySelector(`.block-card[data-key="${targetKey}"]`);
+        if (targetCard) {
+          targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          targetCard.classList.add('highlight-pulse');
+          setTimeout(() => targetCard.classList.remove('highlight-pulse'), 1800);
+        }
+      }, 150);
+      showToast(`Pushed into [${secTitle} → ${colTitle}]!`);
+    } else {
+      showToast(`Pushed ${tasksToAdd.length} task(s) into [${secTitle} → ${colTitle}]!`, 5000, "View in Planner →", () => {
+        switchAppMode('planner');
+        setTimeout(() => {
+          const targetCard = document.querySelector(`.block-card[data-key="${targetKey}"]`);
+          if (targetCard) {
+            targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            targetCard.classList.add('highlight-pulse');
+            setTimeout(() => targetCard.classList.remove('highlight-pulse'), 1800);
+          }
+        }, 150);
+      });
+    }
   });
 
   // ========================================================================
@@ -6963,9 +7065,24 @@ function initDualSpaceAndThinkingStudio() {
   const btnCancelPushThinking = document.getElementById('btn-cancel-push-thinking');
   const btnConfirmPushThinking = document.getElementById('btn-confirm-push-thinking');
 
-  const closePushThinkingModal = () => pushThinkingModal?.classList.remove('show');
+  const closePushThinkingModal = () => pushThinkingModal?.classList.remove('open', 'show', 'active');
   btnClosePushThinkingModal?.addEventListener('click', closePushThinkingModal);
   btnCancelPushThinking?.addEventListener('click', closePushThinkingModal);
+  pushThinkingModal?.addEventListener('click', (e) => {
+    if (e.target === pushThinkingModal) closePushThinkingModal();
+  });
+
+  // Escape key closes modals
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (pushModal?.classList.contains('open') || pushModal?.classList.contains('show')) {
+        closePushModal();
+      }
+      if (pushThinkingModal?.classList.contains('open') || pushThinkingModal?.classList.contains('show')) {
+        closePushThinkingModal();
+      }
+    }
+  });
 
   btnConfirmPushThinking?.addEventListener('click', async () => {
     const docSelect = document.getElementById('bridge-target-doc');
@@ -7036,7 +7153,7 @@ function openPushToThinkingModal(presetText = '') {
   if (newDocInput) newDocInput.value = '';
   if (contentArea) contentArea.value = presetText;
 
-  modal?.classList.add('show');
+  modal?.classList.add('open', 'show');
 }
 
 // Start application immediately
