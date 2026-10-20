@@ -3,28 +3,27 @@ use std::path::PathBuf;
 use tauri::Manager;
 
 fn get_storage_dir(app: &tauri::AppHandle) -> PathBuf {
-    let base = if let Some(d) = dirs::data_dir() {
-        let manas_dir = d.join("manas").join("entries");
-        let legacy_mrt_dir = d.join("mrt").join("entries");
-        if legacy_mrt_dir.exists() {
-            let _ = fs::create_dir_all(&manas_dir);
-            if let Ok(entries) = fs::read_dir(&legacy_mrt_dir) {
-                for entry in entries.flatten() {
-                    let p = entry.path();
-                    if let Some(fname) = p.file_name() {
-                        let dest = manas_dir.join(fname);
-                        if !dest.exists() {
-                            let _ = fs::copy(&p, dest);
-                        }
-                    }
-                }
-            }
-        }
-        manas_dir
-    } else if let Ok(app_dir) = app.path().app_data_dir() {
-        app_dir.join("entries")
+    if let Ok(custom) = std::env::var("MANAS_STORAGE_DIR") {
+        let p = PathBuf::from(custom);
+        let _ = fs::create_dir_all(&p);
+        return p;
+    }
+
+    // Isolate Development / Testing from Real Production User Space:
+    // Debug builds / Dev tests strictly use ~/.local/share/mrt/entries
+    // Release builds / Installed app strictly use ~/.local/share/manas/entries
+    let subfolder = if cfg!(debug_assertions) {
+        "mrt"
     } else {
-        PathBuf::from("./manas_data/entries")
+        "manas"
+    };
+
+    let base = if let Some(d) = dirs::data_dir() {
+        d.join(subfolder).join("entries")
+    } else if let Ok(app_dir) = app.path().app_data_dir() {
+        app_dir.join(subfolder).join("entries")
+    } else {
+        PathBuf::from(format!("./{}_data/entries", subfolder))
     };
     let _ = fs::create_dir_all(&base);
     base

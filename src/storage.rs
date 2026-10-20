@@ -12,26 +12,11 @@ pub struct Storage {
 
 impl Storage {
     pub fn new() -> Self {
+        let subfolder = if cfg!(debug_assertions) { "mrt" } else { "manas" };
         let entries_dir = if let Some(proj_dirs) = dirs::data_dir() {
-            let manas_dir = proj_dirs.join("manas").join("entries");
-            let legacy_mrt_dir = proj_dirs.join("mrt").join("entries");
-            if legacy_mrt_dir.exists() {
-                let _ = fs::create_dir_all(&manas_dir);
-                if let Ok(entries) = fs::read_dir(&legacy_mrt_dir) {
-                    for entry in entries.flatten() {
-                        let p = entry.path();
-                        if let Some(fname) = p.file_name() {
-                            let dest = manas_dir.join(fname);
-                            if !dest.exists() {
-                                let _ = fs::copy(&p, dest);
-                            }
-                        }
-                    }
-                }
-            }
-            manas_dir
+            proj_dirs.join(subfolder).join("entries")
         } else {
-            PathBuf::from("./manas_data/entries")
+            PathBuf::from(format!("./{}_data/entries", subfolder))
         };
 
         let _ = fs::create_dir_all(&entries_dir);
