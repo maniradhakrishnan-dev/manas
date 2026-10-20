@@ -481,3 +481,24 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_base64_roundtrip() {
+        let sample_data = b"Hello, Manas Dual-Space Thinking Studio! \x00\x01\x02\xFF\xFE";
+        let encoded = base64_encode(sample_data);
+        let decoded = base64_decode(&encoded).expect("base64 decoding failed");
+        assert_eq!(decoded, sample_data);
+    }
+
+    #[test]
+    fn test_base64_empty() {
+        let encoded = base64_encode(b"");
+        assert_eq!(encoded, "");
+        let decoded = base64_decode("").expect("empty decode failed");
+        assert_eq!(decoded, Vec::<u8>::new());
+    }
+}
