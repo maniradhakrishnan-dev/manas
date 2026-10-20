@@ -23,6 +23,26 @@
           <img src="assets/logo.png" class="brand-compass-icon" alt="Manas Compass" width="26" height="26" onerror="this.onerror=null; this.src='logo.png';" />
           <span class="brand-name">MANAS</span>
         </div>
+
+        <!-- Mode Switcher Pill (Dual-Space Navigation) -->
+        <div class="mode-switcher-pill" id="mode-switcher" title="Toggle Space (Ctrl+1: Planner, Ctrl+2: Thinking Space)">
+          <button class="mode-switch-btn active" id="btn-mode-planner" title="Daily Planner Mode (Shortcut: Ctrl+1)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+            <span>Planner</span>
+          </button>
+          <button class="mode-switch-btn" id="btn-mode-thinking" title="Thinking Space Mode (Shortcut: Ctrl+2)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z"></path>
+              <line x1="9" y1="21" x2="15" y2="21"></line>
+            </svg>
+            <span>Thinking Space</span>
+          </button>
+        </div>
       </div>
 
       <!-- Center 365 Date Navigator -->
@@ -211,6 +231,106 @@
 
     </main>
 
+    <!-- Thinking Space Studio Workspace -->
+    <main class="thinking-workspace" id="thinking-workspace" style="display: none;">
+      <!-- Thinking Left Sidebar: Topics, Folders & Docs -->
+      <aside class="thinking-sidebar">
+        <div class="thinking-sidebar-header">
+          <div class="thinking-sidebar-title-row">
+            <span class="thinking-sidebar-heading">STUDIO DOCS</span>
+            <div class="thinking-sidebar-actions">
+              <button id="btn-thinking-new-doc" class="thinking-icon-btn" title="New Document (Ctrl+N)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 5v14M5 12h14"/>
+                </svg>
+              </button>
+              <button id="btn-thinking-new-folder" class="thinking-icon-btn" title="New Folder">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                  <line x1="12" y1="11" x2="12" y2="17"></line>
+                  <line x1="9" y1="14" x2="15" y2="14"></line>
+                </svg>
+              </button>
+              <button id="btn-thinking-open-folder" class="thinking-icon-btn" title="Open Docs Folder on Disk">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                  <polyline points="15 3 21 3 21 9"></polyline>
+                  <line x1="10" y1="14" x2="21" y2="3"></line>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="thinking-search-box">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="thinking-search-input" placeholder="Filter topics, research, notes..." />
+          </div>
+        </div>
+
+        <div class="thinking-tree-container" id="thinking-tree-container">
+          <!-- Populated dynamically by app.js -->
+        </div>
+
+        <div class="thinking-sidebar-footer">
+          <span class="thinking-docs-path" id="thinking-docs-path" title="Click to open docs folder">Storage: ~/.local/share/manas/docs</span>
+        </div>
+      </aside>
+
+      <!-- Thinking Main Studio Canvas -->
+      <section class="thinking-main-pane">
+        <!-- Document Toolbar / Header -->
+        <div class="thinking-doc-header">
+          <div class="thinking-doc-meta">
+            <span class="thinking-doc-breadcrumb" id="thinking-doc-breadcrumb">Select a topic</span>
+            <input type="text" id="thinking-doc-title-input" class="thinking-doc-title-input" value="Select or create a document" placeholder="Document Title" />
+          </div>
+
+          <div class="thinking-doc-actions">
+            <!-- The Magic Bridge: Push to Today's Daily Planner -->
+            <button id="btn-push-to-planner" class="thinking-action-pill btn-bridge" title="Push Actionable Tasks or Notes from this doc to Today's Daily Planner">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12h14"></path>
+                <path d="M12 5l7 7-7 7"></path>
+              </svg>
+              <span>Push to Today's Planner</span>
+            </button>
+
+            <!-- Mode Toggle: Edit / Split / Preview -->
+            <div class="thinking-view-toggle">
+              <button id="btn-thinking-view-edit" class="thinking-toggle-btn active" title="Edit Markdown">Edit</button>
+              <button id="btn-thinking-view-split" class="thinking-toggle-btn" title="Side-by-Side Split">Split</button>
+              <button id="btn-thinking-view-preview" class="thinking-toggle-btn" title="Rendered Preview">Preview</button>
+            </div>
+
+            <!-- Zen Focus Mode -->
+            <button id="btn-thinking-focus" class="thinking-tool-btn" title="Focus Zen Mode (F11)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+              </svg>
+            </button>
+
+            <!-- Save Indicator -->
+            <span class="thinking-save-indicator" id="thinking-save-indicator">Saved</span>
+          </div>
+        </div>
+
+        <!-- Document Content Split Area -->
+        <div class="thinking-editor-container" id="thinking-editor-container">
+          <!-- Raw Markdown Editor -->
+          <div class="thinking-editor-pane" id="thinking-editor-pane">
+            <textarea id="thinking-editor-textarea" class="thinking-editor-textarea" placeholder="Start writing your research, mathematical formulas ($$\tau = F \times r$$), code blocks, or checklists..."></textarea>
+          </div>
+
+          <!-- Live Rendered Preview -->
+          <div class="thinking-preview-pane" id="thinking-preview-pane" style="display: none;">
+            <div id="thinking-preview-content" class="thinking-preview-content"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
     <!-- Bottom Status Bar -->
     <footer class="app-footer">
       <div class="footer-left">
@@ -218,6 +338,8 @@
         <span class="shortcut-badge"><kbd>T</kbd> Today</span>
         <span class="shortcut-badge"><kbd>C</kbd> 365 Diary</span>
         <span class="shortcut-badge"><kbd>Esc</kbd> Blur</span>
+        <span class="shortcut-badge"><kbd>Ctrl+1</kbd> Planner</span>
+        <span class="shortcut-badge"><kbd>Ctrl+2</kbd> Thinking</span>
       </div>
       <div class="footer-right">
         <span class="storage-indicator" id="footer-storage-path" title="Click to open storage folder">Storage: ~/.local/share/manas/entries</span>
@@ -461,6 +583,75 @@
             spellcheck="false"></textarea>
         </div>
 
+      </div>
+    </div>
+
+    <!-- Push to Today's Planner Modal (Thinking Space -> Planner Bridge) -->
+    <div id="push-to-planner-modal" class="modal-backdrop">
+      <div class="modal-card bridge-modal-card">
+        <div class="modal-header">
+          <div class="modal-header-left">
+            <h2>🚀 Push to Today's Planner</h2>
+            <p class="modal-sub">Send action items or research goals from this document directly into today's rhythm.</p>
+          </div>
+          <button id="btn-close-push-planner-modal" class="modal-close-btn">&times;</button>
+        </div>
+        <div class="bridge-modal-body">
+          <div class="bridge-field-group">
+            <label class="bridge-label">Source Document:</label>
+            <div id="bridge-source-doc-name" class="bridge-source-badge">AI Research / Foundation Models & Latents.md</div>
+          </div>
+          <div class="bridge-field-group">
+            <label class="bridge-label" for="bridge-target-section">Destination Section in Today's Planner:</label>
+            <select id="bridge-target-section" class="bridge-select">
+              <!-- Dynamically populated with today's layout sections -->
+            </select>
+          </div>
+          <div class="bridge-field-group">
+            <label class="bridge-label">Select Items to Push or Type Action:</label>
+            <div id="bridge-doc-checklist-preview" class="bridge-checklist-box">
+              <!-- Checkboxes extracted from document or custom text -->
+            </div>
+            <textarea id="bridge-custom-task-input" class="bridge-task-textarea" placeholder="Or type a specific action item to push into today..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer bridge-modal-footer">
+          <button type="button" class="btn-ghost" id="btn-cancel-push-planner">Cancel</button>
+          <button type="button" class="btn-primary" id="btn-confirm-push-planner">↳ Push into Today</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Push to Thinking Space Modal (Planner -> Thinking Space Bridge) -->
+    <div id="push-to-thinking-modal" class="modal-backdrop">
+      <div class="modal-card bridge-modal-card">
+        <div class="modal-header">
+          <div class="modal-header-left">
+            <h2>💡 Push to Thinking Space</h2>
+            <p class="modal-sub">Append today's findings, notes, or learnings to an engineering document.</p>
+          </div>
+          <button id="btn-close-push-thinking-modal" class="modal-close-btn">&times;</button>
+        </div>
+        <div class="bridge-modal-body">
+          <div class="bridge-field-group">
+            <label class="bridge-label" for="bridge-target-doc">Select Target Document:</label>
+            <select id="bridge-target-doc" class="bridge-select">
+              <!-- Dynamically populated with all .md files in docs -->
+            </select>
+          </div>
+          <div class="bridge-field-group">
+            <label class="bridge-label">Or Create New Document:</label>
+            <input type="text" id="bridge-new-doc-name" class="bridge-input" placeholder="e.g. AI Research/Transformer Optimization.md" />
+          </div>
+          <div class="bridge-field-group">
+            <label class="bridge-label">Content to Append:</label>
+            <textarea id="bridge-content-to-append" class="bridge-task-textarea" rows="6" placeholder="Notes, findings, or code to append..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer bridge-modal-footer">
+          <button type="button" class="btn-ghost" id="btn-cancel-push-thinking">Cancel</button>
+          <button type="button" class="btn-primary" id="btn-confirm-push-thinking">↳ Append to Document</button>
+        </div>
       </div>
     </div>
 

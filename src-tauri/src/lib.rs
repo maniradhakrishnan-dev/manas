@@ -1,4 +1,5 @@
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
 use tauri::Manager;
 
@@ -27,6 +28,112 @@ fn get_storage_dir(app: &tauri::AppHandle) -> PathBuf {
     };
     let _ = fs::create_dir_all(&base);
     base
+}
+
+fn get_docs_dir(app: &tauri::AppHandle) -> PathBuf {
+    if let Ok(custom) = std::env::var("MANAS_DOCS_DIR") {
+        let p = PathBuf::from(custom);
+        let _ = fs::create_dir_all(&p);
+        return p;
+    }
+
+    let subfolder = if cfg!(debug_assertions) {
+        "mrt"
+    } else {
+        "manas"
+    };
+
+    let base = if let Some(d) = dirs::data_dir() {
+        d.join(subfolder).join("docs")
+    } else if let Ok(app_dir) = app.path().app_data_dir() {
+        app_dir.join(subfolder).join("docs")
+    } else {
+        PathBuf::from(format!("./{}_data/docs", subfolder))
+    };
+    let _ = fs::create_dir_all(&base);
+    base
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+pub struct DocItem {
+    pub name: String,
+    pub path: String,
+    pub is_dir: bool,
+    pub children: Vec<DocItem>,
+    pub updated_at: u64,
+}
+
+fn traverse_docs(dir: &std::path::Path, base: &std::path::Path) -> Vec<DocItem> {
+    let mut items = Vec::new();
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with('.') {
+                continue;
+            }
+            let is_dir = path.is_dir();
+            if !is_dir && !name.ends_with(".md") && !name.ends_with(".markdown") && !name.ends_with(".txt") {
+                continue;
+            }
+            let rel = path.strip_prefix(base).unwrap_or(&path).to_string_lossy().to_string();
+            let updated_at = entry.metadata()
+                .and_then(|m| m.modified())
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+
+            let children = if is_dir {
+                traverse_docs(&path, base)
+            } else {
+                Vec::new()
+            };
+
+            items.push(DocItem {
+                name,
+                path: rel,
+                is_dir,
+                children,
+                updated_at,
+            });
+        }
+    }
+    items.sort_by(|a, b| {
+        match (a.is_dir, b.is_dir) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+        }
+    });
+    items
+}
+
+fn seed_starter_docs(docs_dir: &std::path::Path) {
+    if let Ok(mut entries) = fs::read_dir(docs_dir) {
+        if entries.next().is_none() {
+            let ai_dir = docs_dir.join("AI Research");
+            let _ = fs::create_dir_all(&ai_dir);
+            let _ = fs::write(
+                ai_dir.join("Foundation Models & Latents.md"),
+                "# Foundation Models & Latent Spaces\n\n## 🎯 Core Research Question\nHow do compressed latent representations maintain semantic fidelity across modalities?\n\n## 📐 Mathematical Formulation\n$$\\mathcal{L}_{\\text{total}} = \\mathcal{L}_{\\text{recon}} + \\beta D_{\\text{KL}}(q_\\phi(z|x) \\parallel p(z))$$\n\n## 🔬 Actionable Experiments (Push to Daily Planner)\n- [ ] Profile token latency on RTX 4090 with FP16 vs INT4\n- [ ] Compare attention heatmaps on multi-turn context windows\n- [ ] Benchmark KV-cache memory pressure at 32k context\n\n## 📝 Reflection & Findings\n*Document experiment outputs and insights here.*\n"
+            );
+
+            let elec_dir = docs_dir.join("Electronics");
+            let _ = fs::create_dir_all(&elec_dir);
+            let _ = fs::write(
+                elec_dir.join("ESP32 & Power Architecture.md"),
+                "# ESP32 & System Power Architecture\n\n## ⚡ Power Budget & Voltage Regulators\n- Operating Voltage: 3.3V\n- Active RF Burst Current: ~240mA\n- Deep Sleep Current: ~10µA\n\n## 📐 Ohms Law & Thermal Dissipation\n$$P = I^2 R = V \\times I$$\n$$\\Delta T = P \\times R_{\\theta JA}$$\n\n## 🔌 Pinout & Bus Mapping\n| Pin | Function | Notes |\n| :--- | :--- | :--- |\n| GPIO 21 | I2C SDA | 4.7kΩ Pull-up required |\n| GPIO 22 | I2C SCL | 4.7kΩ Pull-up required |\n| GPIO 34 | ADC1_CH6 | Input only (Sensor feedback) |\n\n## 📋 Next Hardware Validation Tasks\n- [ ] Probe 3.3V rail ripple under WiFi transmission pulse\n- [ ] Verify buck converter efficiency at 50mA nominal load\n"
+            );
+
+            let mech_dir = docs_dir.join("Machine Design");
+            let _ = fs::create_dir_all(&mech_dir);
+            let _ = fs::write(
+                mech_dir.join("Torque & Gear Ratio Sizing.md"),
+                "# Torque & Gear Ratio Sizing\n\n## ⚙️ Dynamics & Load Torque\n$$\\tau_{\\text{motor}} = \\frac{\\tau_{\\text{load}}}{N \\cdot \\eta} + J_{\\text{reflected}} \\cdot \\alpha$$\n\nWhere:\n- $N$ = Gear ratio\n- $\\eta$ = Transmission efficiency (~85% for planetary gearbox)\n- $J_{\\text{reflected}} = \\frac{J_{\\text{load}}}{N^2}$\n\n## 🔩 Mechanical Design Checklist\n- [ ] Verify radial load ratings on output shaft bearings\n- [ ] Calculate lead screw pitch for 150mm/s linear velocity\n- [ ] CAD check motor mount clearance against chassis ribs\n"
+            );
+        }
+    }
 }
 
 #[tauri::command]
@@ -123,6 +230,127 @@ fn save_templates(app: tauri::AppHandle, templates: serde_json::Value) -> Result
     Ok(())
 }
 
+#[tauri::command]
+fn get_docs_path(app: tauri::AppHandle) -> String {
+    get_docs_dir(&app).to_string_lossy().to_string()
+}
+
+#[tauri::command]
+fn list_docs(app: tauri::AppHandle) -> Vec<DocItem> {
+    let dir = get_docs_dir(&app);
+    seed_starter_docs(&dir);
+    traverse_docs(&dir, &dir)
+}
+
+#[tauri::command]
+fn read_doc(app: tauri::AppHandle, path: String) -> Result<String, String> {
+    let dir = get_docs_dir(&app);
+    let target = dir.join(&path);
+    if !target.exists() {
+        return Err(format!("Document '{}' not found", path));
+    }
+    fs::read_to_string(&target).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn save_doc(app: tauri::AppHandle, path: String, content: String) -> Result<bool, String> {
+    let dir = get_docs_dir(&app);
+    let target = dir.join(&path);
+    if let Some(parent) = target.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    fs::write(&target, content).map_err(|e| e.to_string())?;
+    Ok(true)
+}
+
+#[tauri::command]
+fn create_doc(app: tauri::AppHandle, path: String, content: Option<String>) -> Result<bool, String> {
+    let dir = get_docs_dir(&app);
+    let mut target = dir.join(&path);
+    if target.extension().is_none() {
+        target.set_extension("md");
+    }
+    if let Some(parent) = target.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let body = content.unwrap_or_else(|| {
+        let stem = target.file_stem().and_then(|s| s.to_str()).unwrap_or("Untitled");
+        format!("# {}\n\nStart writing your thinking notes here...\n", stem)
+    });
+    fs::write(&target, body).map_err(|e| e.to_string())?;
+    Ok(true)
+}
+
+#[tauri::command]
+fn create_folder(app: tauri::AppHandle, path: String) -> Result<bool, String> {
+    let dir = get_docs_dir(&app);
+    let target = dir.join(&path);
+    fs::create_dir_all(&target).map_err(|e| e.to_string())?;
+    Ok(true)
+}
+
+#[tauri::command]
+fn delete_doc(app: tauri::AppHandle, path: String) -> Result<bool, String> {
+    let dir = get_docs_dir(&app);
+    let target = dir.join(&path);
+    if !target.exists() {
+        return Ok(true);
+    }
+    if target.is_dir() {
+        fs::remove_dir_all(&target).map_err(|e| e.to_string())?;
+    } else {
+        fs::remove_file(&target).map_err(|e| e.to_string())?;
+    }
+    Ok(true)
+}
+
+#[tauri::command]
+fn rename_doc(app: tauri::AppHandle, old_path: String, new_path: String) -> Result<bool, String> {
+    let dir = get_docs_dir(&app);
+    let src = dir.join(&old_path);
+    let dst = dir.join(&new_path);
+    if let Some(parent) = dst.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    fs::rename(&src, &dst).map_err(|e| e.to_string())?;
+    Ok(true)
+}
+
+#[tauri::command]
+fn append_to_doc(app: tauri::AppHandle, path: String, content: String) -> Result<bool, String> {
+    let dir = get_docs_dir(&app);
+    let target = dir.join(&path);
+    if let Some(parent) = target.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&target)
+        .map_err(|e| e.to_string())?;
+    file.write_all(content.as_bytes()).map_err(|e| e.to_string())?;
+    Ok(true)
+}
+
+#[tauri::command]
+fn open_docs_folder(app: tauri::AppHandle) -> Result<String, String> {
+    let dir = get_docs_dir(&app);
+    let path_str = dir.to_string_lossy().to_string();
+    #[cfg(target_os = "linux")]
+    {
+        let _ = std::process::Command::new("xdg-open").arg(&dir).spawn();
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("open").arg(&dir).spawn();
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let _ = std::process::Command::new("explorer").arg(&dir).spawn();
+    }
+    Ok(path_str)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -145,6 +373,16 @@ pub fn run() {
             open_data_folder,
             get_templates,
             save_templates,
+            get_docs_path,
+            list_docs,
+            read_doc,
+            save_doc,
+            create_doc,
+            create_folder,
+            delete_doc,
+            rename_doc,
+            append_to_doc,
+            open_docs_folder,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1444,6 +1444,7 @@ function renderCustomWorkspace(layout, workspaceEl) {
                           <span class="card-checklist-stat"></span>
                           <button class="btn-check-insert" title="Insert Checkbox">☐</button>
                           <button class="btn-bullet-insert" title="Insert Bullet">•</button>
+                          <button type="button" class="btn-push-to-doc-action" data-track-key="${t.key}" title="Push notes/tasks from this column to Thinking Space (e.g. AI Research)">💡</button>
                           <button type="button" class="btn-canvas-del-col" data-track-key="${t.key}" title="Delete this column from today">✕</button>
                         </div>
                       </div>
@@ -3425,6 +3426,26 @@ function bindCardEvents() {
         e.stopPropagation();
         setActiveColumnSelection(blockKey);
         insertBulletNote(card, blockKey);
+      });
+    }
+
+    // 9. Push to Thinking Space Button (💡)
+    const btnPushDoc = card.querySelector('.btn-push-to-doc-action');
+    if (btnPushDoc) {
+      btnPushDoc.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const block = currentDayData[blockKey];
+        let textToPush = '';
+        if (block) {
+          if (block.notes && block.notes.trim()) {
+            textToPush += block.notes.trim() + '\n\n';
+          }
+          if (Array.isArray(block.tasks) && block.tasks.length > 0) {
+            textToPush += block.tasks.map(t => `- [${t.done ? 'x' : ' '}] ${t.text}`).join('\n');
+          }
+        }
+        openPushToThinkingModal(textToPush);
       });
     }
   });
@@ -5750,7 +5771,825 @@ function init() {
       syncLevel1Bar(activeLayout);
     }
   });
+
+  // 7. Initialize Dual-Space & Thinking Studio
+  initDualSpaceAndThinkingStudio();
+}
+
+// ==========================================================================
+// DUAL-SPACE & THINKING SPACE STUDIO MODULE
+// ==========================================================================
+
+let currentAppMode = 'planner'; // 'planner' | 'thinking'
+let activeDocsList = [];
+let currentOpenDocPath = null;
+let currentOpenDocContent = '';
+let docAutoSaveTimer = null;
+let currentThinkingView = 'edit'; // 'edit' | 'split' | 'preview'
+let docsFolderPath = '';
+
+function switchAppMode(mode) {
+  if (mode === currentAppMode) return;
+  currentAppMode = mode;
+
+  const btnPlanner = document.getElementById('btn-mode-planner');
+  const btnThinking = document.getElementById('btn-mode-thinking');
+  const plannerWs = document.querySelector('.planner-workspace');
+  const thinkingWs = document.getElementById('thinking-workspace');
+  const phaseRibbon = document.getElementById('phase-ribbon');
+  const dateNavPill = document.querySelector('.date-navigator-pill');
+
+  if (mode === 'planner') {
+    btnPlanner?.classList.add('active');
+    btnThinking?.classList.remove('active');
+    if (plannerWs) plannerWs.style.display = 'flex';
+    if (thinkingWs) thinkingWs.style.display = 'none';
+    if (phaseRibbon) phaseRibbon.style.display = 'flex';
+    if (dateNavPill) dateNavPill.style.visibility = 'visible';
+
+    if (footerStoragePath) {
+      footerStoragePath.textContent = `Storage: ${activeStoragePath || '~/.local/share/manas/entries'}`;
+      footerStoragePath.title = "Click to open entries folder";
+    }
+  } else {
+    btnThinking?.classList.add('active');
+    btnPlanner?.classList.remove('active');
+    if (plannerWs) plannerWs.style.display = 'none';
+    if (thinkingWs) thinkingWs.style.display = 'flex';
+    if (phaseRibbon) phaseRibbon.style.display = 'none';
+
+    if (footerStoragePath) {
+      footerStoragePath.textContent = `Storage: ${docsFolderPath || '~/.local/share/manas/docs'}`;
+      footerStoragePath.title = "Click to open docs folder";
+    }
+
+    loadThinkingDocs();
+  }
+}
+
+async function loadThinkingDocs(autoOpenFirst = true) {
+  try {
+    const docs = await callTauri('list_docs');
+    if (Array.isArray(docs)) {
+      activeDocsList = docs;
+      renderDocsTree(docs);
+
+      if (autoOpenFirst && (!currentOpenDocPath || !findDocByPath(docs, currentOpenDocPath))) {
+        const firstDoc = getFirstDocItem(docs);
+        if (firstDoc) {
+          openThinkingDoc(firstDoc.path);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("Failed to load thinking docs:", err);
+  }
+}
+
+function getFirstDocItem(items) {
+  for (const item of items) {
+    if (!item.is_dir) return item;
+    if (item.children && item.children.length > 0) {
+      const found = getFirstDocItem(item.children);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function findDocByPath(items, path) {
+  for (const item of items) {
+    if (item.path === path) return item;
+    if (item.children && item.children.length > 0) {
+      const found = findDocByPath(item.children, path);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function renderDocsTree(items, filter = '') {
+  const container = document.getElementById('thinking-tree-container');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const filterLower = filter.trim().toLowerCase();
+
+  function buildTreeHTML(list, depth = 0) {
+    const frag = document.createDocumentFragment();
+
+    list.forEach(item => {
+      if (item.is_dir) {
+        const folderEl = document.createElement('div');
+        folderEl.className = 'thinking-folder-group';
+
+        const headerEl = document.createElement('div');
+        headerEl.className = 'thinking-folder-header';
+        headerEl.innerHTML = `
+          <span class="thinking-folder-toggle">▼</span>
+          <span class="thinking-folder-icon">📁</span>
+          <span class="thinking-folder-name">${escapeHTML(item.name)}</span>
+          <span class="thinking-folder-count">${item.children?.length || 0}</span>
+        `;
+
+        const childrenEl = document.createElement('div');
+        childrenEl.className = 'thinking-folder-children';
+
+        headerEl.addEventListener('click', () => {
+          const isCollapsed = childrenEl.style.display === 'none';
+          childrenEl.style.display = isCollapsed ? 'flex' : 'none';
+          const toggle = headerEl.querySelector('.thinking-folder-toggle');
+          if (toggle) toggle.textContent = isCollapsed ? '▼' : '▶';
+        });
+
+        if (item.children && item.children.length > 0) {
+          childrenEl.appendChild(buildTreeHTML(item.children, depth + 1));
+        }
+
+        folderEl.appendChild(headerEl);
+        folderEl.appendChild(childrenEl);
+        frag.appendChild(folderEl);
+      } else {
+        if (filterLower && !item.name.toLowerCase().includes(filterLower)) {
+          return;
+        }
+
+        const docEl = document.createElement('div');
+        docEl.className = `thinking-doc-item ${item.path === currentOpenDocPath ? 'active' : ''}`;
+        const cleanName = item.name.replace(/\.(md|markdown|txt)$/i, '');
+
+        docEl.innerHTML = `
+          <span class="thinking-doc-icon">📄</span>
+          <span class="thinking-doc-name" title="${escapeHTML(item.path)}">${escapeHTML(cleanName)}</span>
+          <div class="thinking-doc-item-actions">
+            <button class="thinking-doc-del-btn" title="Delete document">✕</button>
+          </div>
+        `;
+
+        docEl.addEventListener('click', (e) => {
+          if (e.target.closest('.thinking-doc-del-btn')) return;
+          openThinkingDoc(item.path);
+        });
+
+        const delBtn = docEl.querySelector('.thinking-doc-del-btn');
+        delBtn?.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          if (confirm(`Delete '${item.name}'?`)) {
+            await callTauri('delete_doc', { path: item.path });
+            if (currentOpenDocPath === item.path) {
+              currentOpenDocPath = null;
+            }
+            await loadThinkingDocs(true);
+            showToast(`Deleted ${item.name}`);
+          }
+        });
+
+        frag.appendChild(docEl);
+      }
+    });
+
+    return frag;
+  }
+
+  container.appendChild(buildTreeHTML(items));
+}
+
+async function openThinkingDoc(relPath) {
+  try {
+    currentOpenDocPath = relPath;
+    const content = await callTauri('read_doc', { path: relPath });
+    currentOpenDocContent = content !== null ? content : '';
+
+    const textarea = document.getElementById('thinking-editor-textarea');
+    if (textarea) {
+      textarea.value = currentOpenDocContent;
+    }
+
+    const titleInput = document.getElementById('thinking-doc-title-input');
+    const breadcrumb = document.getElementById('thinking-doc-breadcrumb');
+
+    const parts = relPath.split('/');
+    const fileName = parts.pop().replace(/\.(md|markdown|txt)$/i, '');
+    const folderName = parts.length > 0 ? parts.join(' / ') : 'Root';
+
+    if (titleInput) titleInput.value = fileName;
+    if (breadcrumb) breadcrumb.textContent = folderName;
+
+    // Highlight active in tree
+    document.querySelectorAll('.thinking-doc-item').forEach(el => {
+      const nameEl = el.querySelector('.thinking-doc-name');
+      if (nameEl && nameEl.getAttribute('title') === relPath) {
+        el.classList.add('active');
+      } else {
+        el.classList.remove('active');
+      }
+    });
+
+    renderThinkingPreview();
+  } catch (err) {
+    console.warn("Error opening document:", err);
+    showToast("Error opening document");
+  }
+}
+
+function queueAutoSaveDoc() {
+  const saveInd = document.getElementById('thinking-save-indicator');
+  if (saveInd) {
+    saveInd.textContent = "Saving...";
+    saveInd.style.color = "var(--text-dim)";
+  }
+
+  clearTimeout(docAutoSaveTimer);
+  docAutoSaveTimer = setTimeout(async () => {
+    if (!currentOpenDocPath) return;
+    const textarea = document.getElementById('thinking-editor-textarea');
+    if (!textarea) return;
+
+    currentOpenDocContent = textarea.value;
+    await callTauri('save_doc', {
+      path: currentOpenDocPath,
+      content: currentOpenDocContent
+    });
+
+    if (saveInd) {
+      saveInd.textContent = "Saved";
+      saveInd.style.color = "var(--accent-emerald)";
+    }
+    renderThinkingPreview();
+  }, 400);
+}
+
+function renderThinkingPreview() {
+  const previewContent = document.getElementById('thinking-preview-content');
+  if (!previewContent) return;
+
+  const text = currentOpenDocContent || '';
+  previewContent.innerHTML = parseMarkdownToHTML(text);
+
+  // Wire up interactive checklist items inside preview
+  previewContent.querySelectorAll('.preview-checkbox').forEach(cb => {
+    cb.addEventListener('change', (e) => {
+      const lineIdx = parseInt(e.target.dataset.lineIndex, 10);
+      toggleMarkdownChecklistLine(lineIdx, e.target.checked);
+    });
+  });
+}
+
+function toggleMarkdownChecklistLine(targetLineIdx, isChecked) {
+  const textarea = document.getElementById('thinking-editor-textarea');
+  if (!textarea) return;
+
+  const lines = textarea.value.split('\n');
+  let currentCheckboxIdx = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (/^\s*-\s*\[([ xX])\]\s+/.test(line)) {
+      if (currentCheckboxIdx === targetLineIdx) {
+        lines[i] = line.replace(/^(\s*-\s*\[)([ xX])(\]\s+)/, `$1${isChecked ? 'x' : ' '}$3`);
+        break;
+      }
+      currentCheckboxIdx++;
+    }
+  }
+
+  textarea.value = lines.join('\n');
+  currentOpenDocContent = textarea.value;
+  queueAutoSaveDoc();
+}
+
+function parseMarkdownToHTML(md) {
+  if (!md) return '<p class="text-dim">Empty document.</p>';
+
+  const lines = md.split('\n');
+  let html = '';
+  let inCodeBlock = false;
+  let codeLang = '';
+  let codeBuffer = [];
+  let inMathBlock = false;
+  let mathBuffer = [];
+  let inTable = false;
+  let tableRows = [];
+  let checkboxCount = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Math Block delimiter: $$
+    if (line.trim().startsWith('$$')) {
+      if (inMathBlock) {
+        inMathBlock = false;
+        html += `<div class="math-block">${escapeHTML(mathBuffer.join('\n'))}</div>`;
+        mathBuffer = [];
+        continue;
+      } else if (line.trim() === '$$') {
+        inMathBlock = true;
+        mathBuffer = [];
+        continue;
+      } else {
+        const mathContent = line.trim().replace(/^\$\$\s*/, '').replace(/\s*\$\$$/, '');
+        html += `<div class="math-block">${escapeHTML(mathContent)}</div>`;
+        continue;
+      }
+    }
+
+    if (inMathBlock) {
+      mathBuffer.push(line);
+      continue;
+    }
+
+    // Code Block delimiter: ```
+    if (line.trim().startsWith('```')) {
+      if (inCodeBlock) {
+        inCodeBlock = false;
+        const codeText = escapeHTML(codeBuffer.join('\n'));
+        html += `
+          <div class="code-block-box">
+            <div class="code-block-header">
+              <span>${codeLang || 'CODE'}</span>
+              <button class="code-copy-btn" onclick="navigator.clipboard.writeText(this.parentElement.nextElementSibling.innerText); showToast('Copied to clipboard');">Copy</button>
+            </div>
+            <pre class="code-block-body"><code>${codeText}</code></pre>
+          </div>
+        `;
+        codeBuffer = [];
+        codeLang = '';
+        continue;
+      } else {
+        inCodeBlock = true;
+        codeLang = line.trim().replace(/^```/, '').trim();
+        codeBuffer = [];
+        continue;
+      }
+    }
+
+    if (inCodeBlock) {
+      codeBuffer.push(line);
+      continue;
+    }
+
+    // Tables
+    if (line.trim().startsWith('|') && line.trim().endsWith('|')) {
+      inTable = true;
+      tableRows.push(line.trim());
+      continue;
+    } else if (inTable) {
+      inTable = false;
+      html += renderTableHTML(tableRows);
+      tableRows = [];
+    }
+
+    // Headers
+    if (line.startsWith('# ')) {
+      html += `<h1>${inlineFormat(line.slice(2))}</h1>`;
+      continue;
+    }
+    if (line.startsWith('## ')) {
+      html += `<h2>${inlineFormat(line.slice(3))}</h2>`;
+      continue;
+    }
+    if (line.startsWith('### ')) {
+      html += `<h3>${inlineFormat(line.slice(4))}</h3>`;
+      continue;
+    }
+    if (line.startsWith('#### ')) {
+      html += `<h4>${inlineFormat(line.slice(5))}</h4>`;
+      continue;
+    }
+
+    // Checklists: - [ ] or - [x]
+    const checkMatch = line.match(/^\s*-\s*\[([ xX])\]\s+(.*)$/);
+    if (checkMatch) {
+      const isChecked = checkMatch[1].toLowerCase() === 'x';
+      const text = checkMatch[2];
+      html += `
+        <div class="preview-checklist-item">
+          <input type="checkbox" class="preview-checkbox" ${isChecked ? 'checked' : ''} data-line-index="${checkboxCount}" />
+          <span class="preview-checklist-text ${isChecked ? 'checked' : ''}">${inlineFormat(text)}</span>
+        </div>
+      `;
+      checkboxCount++;
+      continue;
+    }
+
+    // Regular list: - or *
+    if (/^\s*[-*]\s+/.test(line)) {
+      html += `<ul><li>${inlineFormat(line.replace(/^\s*[-*]\s+/, ''))}</li></ul>`;
+      continue;
+    }
+
+    // Blockquotes: >
+    if (line.startsWith('>')) {
+      html += `<blockquote>${inlineFormat(line.slice(1).trim())}</blockquote>`;
+      continue;
+    }
+
+    // Empty line
+    if (!line.trim()) {
+      continue;
+    }
+
+    // Standard paragraph
+    html += `<p>${inlineFormat(line)}</p>`;
+  }
+
+  if (inTable && tableRows.length > 0) {
+    html += renderTableHTML(tableRows);
+  }
+
+  return html;
+}
+
+function renderTableHTML(rows) {
+  if (rows.length === 0) return '';
+  let out = '<table class="thinking-table">';
+  let isHeader = true;
+
+  rows.forEach((row, idx) => {
+    if (/^\|[\s:-|]+\|$/.test(row)) {
+      isHeader = false;
+      return;
+    }
+    const cols = row.split('|').slice(1, -1);
+    out += '<tr>';
+    cols.forEach(col => {
+      const tag = isHeader && idx === 0 ? 'th' : 'td';
+      out += `<${tag}>${inlineFormat(col.trim())}</${tag}>`;
+    });
+    out += '</tr>';
+  });
+
+  out += '</table>';
+  return out;
+}
+
+function inlineFormat(str) {
+  let s = escapeHTML(str);
+  s = s.replace(/\$([^\$\n]+)\$/g, '<span class="math-inline">$1</span>');
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  return s;
+}
+
+function setThinkingView(view) {
+  currentThinkingView = view;
+  const editorPane = document.getElementById('thinking-editor-pane');
+  const previewPane = document.getElementById('thinking-preview-pane');
+
+  document.querySelectorAll('.thinking-toggle-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`btn-thinking-view-${view}`)?.classList.add('active');
+
+  if (view === 'edit') {
+    if (editorPane) editorPane.style.display = 'flex';
+    if (previewPane) previewPane.style.display = 'none';
+  } else if (view === 'split') {
+    if (editorPane) editorPane.style.display = 'flex';
+    if (previewPane) previewPane.style.display = 'block';
+    renderThinkingPreview();
+  } else if (view === 'preview') {
+    if (editorPane) editorPane.style.display = 'none';
+    if (previewPane) previewPane.style.display = 'block';
+    renderThinkingPreview();
+  }
+}
+
+// Initializing All Thinking Studio Events & Bridge
+function initDualSpaceAndThinkingStudio() {
+  const btnModePlanner = document.getElementById('btn-mode-planner');
+  const btnModeThinking = document.getElementById('btn-mode-thinking');
+
+  btnModePlanner?.addEventListener('click', () => switchAppMode('planner'));
+  btnModeThinking?.addEventListener('click', () => switchAppMode('thinking'));
+
+  // Global Keyboard Shortcuts (Ctrl+1 / Ctrl+2)
+  window.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === '1') {
+      e.preventDefault();
+      switchAppMode('planner');
+    } else if ((e.ctrlKey || e.metaKey) && e.key === '2') {
+      e.preventDefault();
+      switchAppMode('thinking');
+    }
+  });
+
+  // Query docs folder path
+  callTauri('get_docs_path').then(p => {
+    if (p) {
+      docsFolderPath = p;
+      const el = document.getElementById('thinking-docs-path');
+      if (el) {
+        el.textContent = `Storage: ${p}`;
+        el.title = `Click to open ${p}`;
+      }
+    }
+  });
+
+  // Sidebar Buttons
+  const btnNewDoc = document.getElementById('btn-thinking-new-doc');
+  btnNewDoc?.addEventListener('click', async () => {
+    const docName = prompt("Enter new document name (e.g. Transformer Scaling or AI/Optimization):");
+    if (!docName || !docName.trim()) return;
+
+    let path = docName.trim();
+    if (!path.endsWith('.md')) path += '.md';
+
+    await callTauri('create_doc', { path });
+    await loadThinkingDocs(false);
+    openThinkingDoc(path);
+    showToast(`Created ${path}`);
+  });
+
+  const btnNewFolder = document.getElementById('btn-thinking-new-folder');
+  btnNewFolder?.addEventListener('click', async () => {
+    const folderName = prompt("Enter new folder name (e.g. Robotics or Deep Learning):");
+    if (!folderName || !folderName.trim()) return;
+
+    await callTauri('create_folder', { path: folderName.trim() });
+    await loadThinkingDocs(false);
+    showToast(`Created folder '${folderName}'`);
+  });
+
+  const btnOpenDocsFolder = document.getElementById('btn-thinking-open-folder');
+  btnOpenDocsFolder?.addEventListener('click', async () => {
+    const path = await callTauri('open_docs_folder');
+    showToast(`Opened: ${path || docsFolderPath || 'docs'}`);
+  });
+
+  const thinkingDocsPathEl = document.getElementById('thinking-docs-path');
+  thinkingDocsPathEl?.addEventListener('click', async () => {
+    const path = await callTauri('open_docs_folder');
+    showToast(`Opened: ${path || docsFolderPath || 'docs'}`);
+  });
+
+  // Search Filter in Sidebar
+  const searchInput = document.getElementById('thinking-search-input');
+  searchInput?.addEventListener('input', (e) => {
+    renderDocsTree(activeDocsList, e.target.value);
+  });
+
+  // Editor Textarea
+  const textarea = document.getElementById('thinking-editor-textarea');
+  textarea?.addEventListener('input', () => {
+    queueAutoSaveDoc();
+  });
+
+  // Rename Doc Title Input
+  const titleInput = document.getElementById('thinking-doc-title-input');
+  titleInput?.addEventListener('change', async () => {
+    if (!currentOpenDocPath) return;
+    const newTitle = titleInput.value.trim();
+    if (!newTitle) return;
+
+    const parts = currentOpenDocPath.split('/');
+    parts.pop();
+    const newPath = (parts.length > 0 ? parts.join('/') + '/' : '') + newTitle + '.md';
+
+    if (newPath !== currentOpenDocPath) {
+      await callTauri('rename_doc', { old_path: currentOpenDocPath, new_path: newPath });
+      currentOpenDocPath = newPath;
+      await loadThinkingDocs(false);
+      showToast(`Renamed to '${newTitle}'`);
+    }
+  });
+
+  // View Switchers
+  document.getElementById('btn-thinking-view-edit')?.addEventListener('click', () => setThinkingView('edit'));
+  document.getElementById('btn-thinking-view-split')?.addEventListener('click', () => setThinkingView('split'));
+  document.getElementById('btn-thinking-view-preview')?.addEventListener('click', () => setThinkingView('preview'));
+
+  // Zen Focus Mode Toggle
+  const btnFocus = document.getElementById('btn-thinking-focus');
+  btnFocus?.addEventListener('click', () => {
+    const ws = document.getElementById('thinking-workspace');
+    ws?.classList.toggle('zen-focus');
+  });
+
+  // ========================================================================
+  // THE BRIDGE: Push from Thinking Space -> Today's Daily Planner
+  // ========================================================================
+  const btnPushToPlanner = document.getElementById('btn-push-to-planner');
+  const pushModal = document.getElementById('push-to-planner-modal');
+  const btnClosePushModal = document.getElementById('btn-close-push-planner-modal');
+  const btnCancelPushModal = document.getElementById('btn-cancel-push-planner');
+  const btnConfirmPushModal = document.getElementById('btn-confirm-push-planner');
+
+  btnPushToPlanner?.addEventListener('click', () => {
+    if (!currentOpenDocPath) {
+      showToast("Please select a document first");
+      return;
+    }
+
+    const sourceBadge = document.getElementById('bridge-source-doc-name');
+    if (sourceBadge) sourceBadge.textContent = currentOpenDocPath;
+
+    // Populate destination sections from today's layout
+    const targetSectionSelect = document.getElementById('bridge-target-section');
+    if (targetSectionSelect) {
+      targetSectionSelect.innerHTML = '';
+      const activeLayout = getActiveLayout();
+      const pageRows = normalizeLayoutPageRows(activeLayout);
+
+      pageRows.forEach(row => {
+        (row.sections || []).forEach(sec => {
+          const subRows = getSectionSubRows(sec);
+          subRows.forEach(sub => {
+            (sub.tracks || []).forEach(tr => {
+              const opt = document.createElement('option');
+              opt.value = tr.key;
+              opt.textContent = `${sec.title} → ${tr.title}`;
+              targetSectionSelect.appendChild(opt);
+            });
+          });
+        });
+      });
+    }
+
+    // Extract checklists from current open doc
+    const checklistPreview = document.getElementById('bridge-doc-checklist-preview');
+    if (checklistPreview) {
+      checklistPreview.innerHTML = '';
+      const lines = (currentOpenDocContent || '').split('\n');
+      let foundAny = false;
+
+      lines.forEach(line => {
+        const m = line.match(/^\s*-\s*\[([ xX])\]\s+(.*)$/);
+        if (m) {
+          foundAny = true;
+          const itemText = m[2];
+          const isDone = m[1].toLowerCase() === 'x';
+          const row = document.createElement('label');
+          row.className = 'bridge-check-item';
+          row.innerHTML = `
+            <input type="checkbox" value="${escapeHTML(itemText)}" ${!isDone ? 'checked' : ''} />
+            <span>${escapeHTML(itemText)}</span>
+          `;
+          checklistPreview.appendChild(row);
+        }
+      });
+
+      if (!foundAny) {
+        checklistPreview.innerHTML = '<span class="text-dim" style="font-size: 12px;">No checklists found in doc. Type a custom action below:</span>';
+      }
+    }
+
+    const customInput = document.getElementById('bridge-custom-task-input');
+    if (customInput) customInput.value = '';
+
+    pushModal?.classList.add('show');
+  });
+
+  const closePushModal = () => pushModal?.classList.remove('show');
+  btnClosePushModal?.addEventListener('click', closePushModal);
+  btnCancelPushModal?.addEventListener('click', closePushModal);
+
+  btnConfirmPushModal?.addEventListener('click', async () => {
+    const targetSectionSelect = document.getElementById('bridge-target-section');
+    const targetKey = targetSectionSelect?.value;
+    if (!targetKey) {
+      showToast("No target section selected");
+      return;
+    }
+
+    // Collect tasks from checkboxes
+    const tasksToAdd = [];
+    document.querySelectorAll('#bridge-doc-checklist-preview input[type="checkbox"]:checked').forEach(cb => {
+      if (cb.value) tasksToAdd.push(cb.value.trim());
+    });
+
+    // Plus custom input text
+    const customText = document.getElementById('bridge-custom-task-input')?.value?.trim();
+    if (customText) {
+      tasksToAdd.push(customText);
+    }
+
+    if (tasksToAdd.length === 0) {
+      showToast("Select or type at least one task to push");
+      return;
+    }
+
+    // Ensure target block exists in currentDayData
+    if (!currentDayData[targetKey]) {
+      currentDayData[targetKey] = { title: targetKey, content: '', tasks: [] };
+    }
+    if (!Array.isArray(currentDayData[targetKey].tasks)) {
+      currentDayData[targetKey].tasks = [];
+    }
+
+    tasksToAdd.forEach(tText => {
+      currentDayData[targetKey].tasks.push({
+        id: 't_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        text: `[${currentOpenDocPath.split('/').pop().replace(/\.md$/i, '')}] ${tText}`,
+        completed: false
+      });
+    });
+
+    const dateKey = formatDateKey(currentDate);
+    activeDatesSet.add(dateKey);
+    await callTauri('save_day', { entry: currentDayData });
+
+    // Append pulse log to document
+    const todayStr = formatDateKey(currentDate);
+    const destTitle = targetSectionSelect.options[targetSectionSelect.selectedIndex]?.textContent || targetKey;
+    const logEntry = `\n> *🚀 Pushed ${tasksToAdd.length} task${tasksToAdd.length > 1 ? 's' : ''} to Daily Planner (${destTitle}) on ${todayStr}*\n`;
+
+    const textarea = document.getElementById('thinking-editor-textarea');
+    if (textarea) {
+      textarea.value += logEntry;
+      currentOpenDocContent = textarea.value;
+      queueAutoSaveDoc();
+    }
+
+    closePushModal();
+    renderCurrentDay();
+    showToast(`Pushed ${tasksToAdd.length} task(s) to Today's Planner!`);
+  });
+
+  // ========================================================================
+  // THE BRIDGE: Push from Daily Planner -> Thinking Space
+  // ========================================================================
+  const pushThinkingModal = document.getElementById('push-to-thinking-modal');
+  const btnClosePushThinkingModal = document.getElementById('btn-close-push-thinking-modal');
+  const btnCancelPushThinking = document.getElementById('btn-cancel-push-thinking');
+  const btnConfirmPushThinking = document.getElementById('btn-confirm-push-thinking');
+
+  const closePushThinkingModal = () => pushThinkingModal?.classList.remove('show');
+  btnClosePushThinkingModal?.addEventListener('click', closePushThinkingModal);
+  btnCancelPushThinking?.addEventListener('click', closePushThinkingModal);
+
+  btnConfirmPushThinking?.addEventListener('click', async () => {
+    const docSelect = document.getElementById('bridge-target-doc');
+    const newDocInput = document.getElementById('bridge-new-doc-name');
+    const contentArea = document.getElementById('bridge-content-to-append');
+
+    let targetDocPath = newDocInput?.value?.trim() || docSelect?.value;
+    if (!targetDocPath) {
+      showToast("Select or specify a document name");
+      return;
+    }
+    if (!targetDocPath.endsWith('.md')) targetDocPath += '.md';
+
+    const contentToAppend = contentArea?.value?.trim();
+    if (!contentToAppend) {
+      showToast("Please enter notes or findings to append");
+      return;
+    }
+
+    const todayDisplay = formatDateDisplay(currentDate);
+    const formattedAppend = `\n\n### 📅 Notes from ${todayDisplay}\n${contentToAppend}\n`;
+
+    await callTauri('append_to_doc', {
+      path: targetDocPath,
+      content: formattedAppend
+    });
+
+    closePushThinkingModal();
+    await loadThinkingDocs(false);
+    showToast(`Appended to '${targetDocPath}'!`);
+  });
+}
+
+// Global helper to open the Push-To-Thinking modal from anywhere in the planner
+function openPushToThinkingModal(presetText = '') {
+  const modal = document.getElementById('push-to-thinking-modal');
+  const docSelect = document.getElementById('bridge-target-doc');
+  const contentArea = document.getElementById('bridge-content-to-append');
+  const newDocInput = document.getElementById('bridge-new-doc-name');
+
+  if (docSelect) {
+    docSelect.innerHTML = '';
+    function collectDocPaths(items) {
+      let paths = [];
+      items.forEach(it => {
+        if (!it.is_dir) paths.push(it.path);
+        if (it.children) paths = paths.concat(collectDocPaths(it.children));
+      });
+      return paths;
+    }
+
+    const allPaths = collectDocPaths(activeDocsList);
+    if (allPaths.length === 0) {
+      const opt = document.createElement('option');
+      opt.value = "AI Research/Research Notes.md";
+      opt.textContent = "AI Research/Research Notes.md (New)";
+      docSelect.appendChild(opt);
+    } else {
+      allPaths.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = p;
+        docSelect.appendChild(opt);
+      });
+    }
+  }
+
+  if (newDocInput) newDocInput.value = '';
+  if (contentArea) contentArea.value = presetText;
+
+  modal?.classList.add('show');
 }
 
 // Start application immediately
 init();
+
