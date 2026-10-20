@@ -12,14 +12,28 @@ pub struct Storage {
 
 impl Storage {
     pub fn new() -> Self {
-        // Try user data directory first: ~/.local/share/mrt on Linux, then fallback to ./mrt_data
-        let base_dir = if let Some(proj_dirs) = dirs::data_dir() {
-            proj_dirs.join("mrt")
+        let entries_dir = if let Some(proj_dirs) = dirs::data_dir() {
+            let manas_dir = proj_dirs.join("manas").join("entries");
+            let legacy_mrt_dir = proj_dirs.join("mrt").join("entries");
+            if legacy_mrt_dir.exists() {
+                let _ = fs::create_dir_all(&manas_dir);
+                if let Ok(entries) = fs::read_dir(&legacy_mrt_dir) {
+                    for entry in entries.flatten() {
+                        let p = entry.path();
+                        if let Some(fname) = p.file_name() {
+                            let dest = manas_dir.join(fname);
+                            if !dest.exists() {
+                                let _ = fs::copy(&p, dest);
+                            }
+                        }
+                    }
+                }
+            }
+            manas_dir
         } else {
-            PathBuf::from("./mrt_data")
+            PathBuf::from("./manas_data/entries")
         };
 
-        let entries_dir = base_dir.join("entries");
         let _ = fs::create_dir_all(&entries_dir);
 
         Self { data_dir: entries_dir }

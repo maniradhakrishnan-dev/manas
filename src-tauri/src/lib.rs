@@ -6,13 +6,16 @@ fn get_storage_dir(app: &tauri::AppHandle) -> PathBuf {
     let base = if let Some(d) = dirs::data_dir() {
         let manas_dir = d.join("manas").join("entries");
         let legacy_mrt_dir = d.join("mrt").join("entries");
-        if !manas_dir.exists() && legacy_mrt_dir.exists() {
+        if legacy_mrt_dir.exists() {
             let _ = fs::create_dir_all(&manas_dir);
             if let Ok(entries) = fs::read_dir(&legacy_mrt_dir) {
                 for entry in entries.flatten() {
                     let p = entry.path();
                     if let Some(fname) = p.file_name() {
-                        let _ = fs::copy(&p, manas_dir.join(fname));
+                        let dest = manas_dir.join(fname);
+                        if !dest.exists() {
+                            let _ = fs::copy(&p, dest);
+                        }
                     }
                 }
             }
