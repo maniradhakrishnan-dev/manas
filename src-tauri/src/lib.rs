@@ -97,6 +97,31 @@ fn open_data_folder(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn get_templates(app: tauri::AppHandle) -> Option<serde_json::Value> {
+    let dir = get_storage_dir(&app);
+    let parent = dir.parent().unwrap_or(&dir);
+    let file = parent.join("templates.json");
+    if file.exists() {
+        if let Ok(content) = fs::read_to_string(&file) {
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                return Some(val);
+            }
+        }
+    }
+    None
+}
+
+#[tauri::command]
+fn save_templates(app: tauri::AppHandle, templates: serde_json::Value) -> Result<(), String> {
+    let dir = get_storage_dir(&app);
+    let parent = dir.parent().unwrap_or(&dir);
+    let file = parent.join("templates.json");
+    let json_str = serde_json::to_string_pretty(&templates).map_err(|e| e.to_string())?;
+    fs::write(file, json_str).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -117,6 +142,8 @@ pub fn run() {
             get_active_dates,
             get_data_folder_path,
             open_data_folder,
+            get_templates,
+            save_templates,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

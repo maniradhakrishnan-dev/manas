@@ -79,46 +79,113 @@ const PRESETS = {
   }
 };
 
+let inMemoryUserTemplates = null;
+
+async function loadTemplatesFromDisk() {
+  const diskTemplates = await callTauri('get_templates');
+  if (Array.isArray(diskTemplates)) {
+    inMemoryUserTemplates = diskTemplates;
+    safeStorage.setItem('mrt_user_templates', JSON.stringify(diskTemplates));
+    return diskTemplates;
+  }
+  return getUserTemplates();
+}
+
 function getUserTemplates() {
+  if (Array.isArray(inMemoryUserTemplates)) {
+    return inMemoryUserTemplates;
+  }
   try {
     const raw = safeStorage.getItem('mrt_user_templates');
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      inMemoryUserTemplates = JSON.parse(raw);
+      return inMemoryUserTemplates;
+    }
   } catch (e) { }
+  inMemoryUserTemplates = [];
   return [];
 }
 
-function saveUserTemplate(name, layout) {
+function saveUserTemplate(name, layout, existingId = null) {
   if (!name || !name.trim()) return null;
   const templates = getUserTemplates();
-  const tplId = `template_${Date.now()}`;
   const pageRows = normalizeLayoutPageRows(layout);
+  const cleanName = name.trim();
+
+  // 1. If explicit existingId provided, update in-place
+  if (existingId) {
+    const idx = templates.findIndex(t => t.id === existingId);
+    if (idx !== -1) {
+      templates[idx].name = cleanName;
+      templates[idx].description = `Custom layout with ${pageRows.length} page row(s)`;
+      templates[idx].pageRows = JSON.parse(JSON.stringify(pageRows));
+      templates[idx].phases = JSON.parse(JSON.stringify(layout.phases || []));
+      inMemoryUserTemplates = templates;
+      safeStorage.setItem('mrt_user_templates', JSON.stringify(templates));
+      callTauri('save_templates', { templates });
+      return templates[idx];
+    }
+  }
+
+  // 2. If a template with the exact same name exists, update in-place
+  const matchByName = templates.find(t => t.name.toLowerCase() === cleanName.toLowerCase());
+  if (matchByName) {
+    matchByName.description = `Custom layout with ${pageRows.length} page row(s)`;
+    matchByName.pageRows = JSON.parse(JSON.stringify(pageRows));
+    matchByName.phases = JSON.parse(JSON.stringify(layout.phases || []));
+    inMemoryUserTemplates = templates;
+    safeStorage.setItem('mrt_user_templates', JSON.stringify(templates));
+    callTauri('save_templates', { templates });
+    return matchByName;
+  }
+
+  // 3. Otherwise create new template
+  const tplId = `template_${Date.now()}`;
   const newTpl = {
     id: tplId,
-    name: name.trim(),
+    name: cleanName,
     description: `Custom layout with ${pageRows.length} page row(s)`,
     pageRows: JSON.parse(JSON.stringify(pageRows)),
     phases: JSON.parse(JSON.stringify(layout.phases || []))
   };
   templates.push(newTpl);
+  inMemoryUserTemplates = templates;
   safeStorage.setItem('mrt_user_templates', JSON.stringify(templates));
+  callTauri('save_templates', { templates });
   return newTpl;
 }
 
 function deleteUserTemplate(tplId) {
   let templates = getUserTemplates();
   templates = templates.filter(t => t.id !== tplId);
+  inMemoryUserTemplates = templates;
   safeStorage.setItem('mrt_user_templates', JSON.stringify(templates));
+  callTauri('save_templates', { templates });
+}
+
+function markLayoutModified(activeLayout) {
+  if (!activeLayout) return;
+  const baseId = activeLayout.baseTemplateId || (activeLayout.id !== 'blank_canvas' && activeLayout.id !== 'custom' ? activeLayout.id : null);
+  if (baseId) {
+    activeLayout.baseTemplateId = baseId;
+    const allTpls = getUserTemplates();
+    const t = allTpls.find(item => item.id === baseId);
+    if (t) activeLayout.baseTemplateName = t.name;
+  }
+  activeLayout.isModified = true;
+  activeLayout.id = 'custom';
 }
 
 function renderLevel1TopBarHTML(activeLayout) {
   const currentId = activeLayout ? activeLayout.id : 'blank_canvas';
   const userTemplates = getUserTemplates();
+  const baseId = activeLayout ? (activeLayout.baseTemplateId || (userTemplates.some(t => t.id === currentId) ? currentId : null)) : null;
+  const matchedUserTpl = userTemplates.find(t => t.id === baseId);
+  const isModified = activeLayout ? (activeLayout.isModified && !!matchedUserTpl) : false;
 
   const standardOptions = [
     { id: 'blank_canvas', label: "📄 Blank Canvas" }
   ];
-
-  let isKnown = standardOptions.some(o => o.id === currentId) || userTemplates.some(t => t.id === currentId);
 
   let optionsHTML = standardOptions.map(o => `
     <option value="${o.id}" ${currentId === o.id ? 'selected' : ''}>${escapeHtml(o.label)}</option>
@@ -127,15 +194,36 @@ function renderLevel1TopBarHTML(activeLayout) {
   if (userTemplates.length > 0) {
     optionsHTML += `
       <optgroup label="My Custom Templates">
-        ${userTemplates.map(t => `
-          <option value="${t.id}" ${currentId === t.id ? 'selected' : ''}>📌 ${escapeHtml(t.name)}</option>
-        `).join('')}
+        ${userTemplates.map(t => {
+          const isSelected = (baseId === t.id);
+          const label = (isSelected && isModified) ? `📌 ${t.name} (Modified)` : `📌 ${t.name}`;
+          return `<option value="${t.id}" ${isSelected ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+        }).join('')}
       </optgroup>
     `;
   }
 
-  if (!isKnown) {
+  if (!matchedUserTpl && currentId === 'custom') {
     optionsHTML += `<option value="custom" selected>✦ Custom (${escapeHtml(formatDateDisplay(currentDate))})</option>`;
+  }
+
+  let actionButtonsHTML = '';
+  if (matchedUserTpl) {
+    if (isModified) {
+      actionButtonsHTML = `
+        <button type="button" class="btn-level1-pill btn-update-template" id="btn-top-update-template" title="Update the saved template '${escapeHtml(matchedUserTpl.name)}' with your current layout changes">🔄 Update "${escapeHtml(matchedUserTpl.name)}"</button>
+        <button type="button" class="btn-level1-pill btn-save-new-template" id="btn-top-save-new-template" title="Save these changes as a brand new template">💾 Save as New...</button>
+      `;
+    } else {
+      actionButtonsHTML = `
+        <button type="button" class="btn-level1-pill btn-save-new-template" id="btn-top-save-new-template" title="Save a copy of this template with a new name">💾 Duplicate...</button>
+        <button type="button" class="btn-level1-pill btn-del-template" id="btn-top-del-template" data-tpl-id="${matchedUserTpl.id}" title="Delete template '${escapeHtml(matchedUserTpl.name)}'">🗑️ Delete</button>
+      `;
+    }
+  } else {
+    actionButtonsHTML = `
+      <button type="button" class="btn-level1-pill btn-save-template" id="btn-top-save-template" title="Save today's layout as a reusable template">💾 Save Template</button>
+    `;
   }
 
   return `
@@ -155,7 +243,7 @@ function renderLevel1TopBarHTML(activeLayout) {
         <select id="level1-template-select" class="level1-template-select" title="Switch layout template for today">
           ${optionsHTML}
         </select>
-        <button type="button" class="btn-level1-pill btn-save-template" id="btn-top-save-template" title="Save today's layout as a reusable template for different purposes">💾 Save Template</button>
+        ${actionButtonsHTML}
       </div>
     </div>
   `;
@@ -551,7 +639,7 @@ function updateSectionInLayout(secId, updates) {
   }
 
   if (found) {
-    activeLayout.id = 'custom';
+    markLayoutModified(activeLayout);
     activeLayout.pageRows = pageRows;
     delete activeLayout.phases;
     if (!currentDayData) currentDayData = getDefaultDayData(dateKey);
@@ -587,7 +675,7 @@ function updateTrackTitleInLayout(blockKey, newTitle) {
   }
 
   if (found) {
-    activeLayout.id = 'custom';
+    markLayoutModified(activeLayout);
     activeLayout.pageRows = pageRows;
     delete activeLayout.phases;
     if (!currentDayData) currentDayData = getDefaultDayData(dateKey);
@@ -679,7 +767,7 @@ function handleCanvasAddPageRow() {
       }
     ]
   });
-  activeLayout.id = 'custom';
+  markLayoutModified(activeLayout);
   activeLayout.pageRows = pageRows;
   delete activeLayout.phases;
   saveAndApplyLayoutForToday(activeLayout);
@@ -693,7 +781,7 @@ function handleCanvasDeletePageRow(rowId) {
   const idx = pageRows.findIndex(r => r.id === rowId);
   if (idx !== -1) {
     pageRows.splice(idx, 1);
-    activeLayout.id = 'custom';
+    markLayoutModified(activeLayout);
     activeLayout.pageRows = pageRows;
     delete activeLayout.phases;
     saveAndApplyLayoutForToday(activeLayout);
@@ -725,7 +813,7 @@ function handleCanvasAddSectionToRow(rowId) {
     colorClass: nextColor,
     rows: []
   });
-  activeLayout.id = 'custom';
+  markLayoutModified(activeLayout);
   activeLayout.pageRows = pageRows;
   delete activeLayout.phases;
   saveAndApplyLayoutForToday(activeLayout);
@@ -750,7 +838,7 @@ function handleCanvasDeleteSection(sectionId) {
     }
   }
   if (found) {
-    activeLayout.id = 'custom';
+    markLayoutModified(activeLayout);
     activeLayout.pageRows = pageRows;
     delete activeLayout.phases;
     saveAndApplyLayoutForToday(activeLayout);
@@ -823,7 +911,7 @@ function handleCanvasAddColumn(sectionId, targetSubRowId, banner) {
       placeholder: "Tasks, milestones, notes..."
     });
 
-    activeLayout.id = 'custom';
+    markLayoutModified(activeLayout);
     activeLayout.pageRows = pageRows;
     delete activeLayout.phases;
     saveAndApplyLayoutForToday(activeLayout);
@@ -885,7 +973,7 @@ function handleCanvasAddRow(sectionId, banner) {
         }
       ]
     });
-    activeLayout.id = 'custom';
+    markLayoutModified(activeLayout);
     activeLayout.pageRows = pageRows;
     delete activeLayout.phases;
     saveAndApplyLayoutForToday(activeLayout);
@@ -912,7 +1000,7 @@ function handleCanvasDeleteRow(sectionId, subRowId) {
           rows.splice(idx, 1);
           sec.rows = rows;
           delete sec.tracks;
-          activeLayout.id = 'custom';
+          markLayoutModified(activeLayout);
           activeLayout.pageRows = pageRows;
           delete activeLayout.phases;
           saveAndApplyLayoutForToday(activeLayout);
@@ -956,7 +1044,7 @@ function handleCanvasDeleteColumn(blockKey) {
   }
 
   if (removed) {
-    activeLayout.id = 'custom';
+    markLayoutModified(activeLayout);
     activeLayout.pageRows = pageRows;
     delete activeLayout.phases;
     saveAndApplyLayoutForToday(activeLayout);
@@ -964,18 +1052,52 @@ function handleCanvasDeleteColumn(blockKey) {
   }
 }
 
-function promptSaveCurrentLayoutAsTemplate() {
+function promptSaveCurrentLayoutAsTemplate(forceNew = false) {
   const activeLayout = getActiveLayout();
-  const defName = (activeLayout.name && activeLayout.id !== 'blank_canvas' && activeLayout.id !== 'custom')
-    ? activeLayout.name
-    : "My Custom Routine";
-  const name = prompt("Enter a name for this custom template (e.g. 'Deep Work Sprint', 'Weekend Flow', 'Study Planner'):", defName);
+  const userTemplates = getUserTemplates();
+  const baseId = activeLayout.baseTemplateId || (activeLayout.id !== 'blank_canvas' && activeLayout.id !== 'custom' ? activeLayout.id : null);
+  const matchedUserTpl = userTemplates.find(t => t.id === baseId);
+
+  let defName = "My Custom Routine";
+  if (matchedUserTpl) {
+    defName = forceNew ? `${matchedUserTpl.name} (Copy)` : matchedUserTpl.name;
+  }
+
+  const name = prompt(forceNew ? "Enter name for the new template:" : "Enter template name:", defName);
   if (!name || !name.trim()) return;
-  const saved = saveUserTemplate(name.trim(), activeLayout);
+
+  const targetId = (!forceNew && matchedUserTpl && matchedUserTpl.name.toLowerCase() === name.trim().toLowerCase()) ? matchedUserTpl.id : null;
+  const saved = saveUserTemplate(name.trim(), activeLayout, targetId);
   if (saved) {
+    activeLayout.id = saved.id;
+    activeLayout.baseTemplateId = saved.id;
+    activeLayout.name = saved.name;
+    activeLayout.baseTemplateName = saved.name;
+    activeLayout.isModified = false;
+    saveAndApplyLayoutForToday(activeLayout);
     showToast(`Saved template "${saved.name}"!`);
-    const dateKey = formatDateKey(currentDate);
-    syncWorkspaceLayoutForDate(dateKey, currentDayData);
+  }
+}
+
+function handleUpdateCurrentTemplate() {
+  const activeLayout = getActiveLayout();
+  const userTemplates = getUserTemplates();
+  const baseId = activeLayout.baseTemplateId || (activeLayout.id !== 'blank_canvas' && activeLayout.id !== 'custom' ? activeLayout.id : null);
+  const matchedUserTpl = userTemplates.find(t => t.id === baseId);
+  if (!matchedUserTpl) {
+    promptSaveCurrentLayoutAsTemplate(false);
+    return;
+  }
+
+  const updated = saveUserTemplate(matchedUserTpl.name, activeLayout, matchedUserTpl.id);
+  if (updated) {
+    activeLayout.id = updated.id;
+    activeLayout.baseTemplateId = updated.id;
+    activeLayout.name = updated.name;
+    activeLayout.baseTemplateName = updated.name;
+    activeLayout.isModified = false;
+    saveAndApplyLayoutForToday(activeLayout);
+    showToast(`Template "${updated.name}" updated with latest layout!`);
   }
 }
 
@@ -985,7 +1107,9 @@ document.addEventListener('change', (e) => {
     const tplId = e.target.value;
     if (tplId === 'custom') return;
     if (PRESETS[tplId]) {
-      saveAndApplyLayoutForToday(PRESETS[tplId]);
+      const preset = JSON.parse(JSON.stringify(PRESETS[tplId]));
+      preset.isModified = false;
+      saveAndApplyLayoutForToday(preset);
       showToast(`Switched today to "${PRESETS[tplId].name}"`);
     } else {
       const userTpls = getUserTemplates();
@@ -993,8 +1117,11 @@ document.addEventListener('change', (e) => {
       if (match) {
         const tplLayout = {
           id: match.id,
+          baseTemplateId: match.id,
           name: match.name,
+          baseTemplateName: match.name,
           description: match.description,
+          isModified: false,
           pageRows: JSON.parse(JSON.stringify(match.pageRows || normalizeLayoutPageRows(match))),
           phases: JSON.parse(JSON.stringify(match.phases || []))
         };
@@ -1097,12 +1224,49 @@ document.addEventListener('click', (e) => {
     return;
   }
 
-  // 9. Save as template button (Level 1 Top bar)
-  const saveTplBtn = e.target.closest('#btn-top-save-template');
+  // 9. Template action buttons (Level 1 Top bar)
+  const updateTplBtn = e.target.closest('#btn-top-update-template, .btn-update-template');
+  if (updateTplBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    handleUpdateCurrentTemplate();
+    return;
+  }
+
+  const saveNewTplBtn = e.target.closest('#btn-top-save-new-template, .btn-save-new-template');
+  if (saveNewTplBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    promptSaveCurrentLayoutAsTemplate(true);
+    return;
+  }
+
+  const delTplBtn = e.target.closest('#btn-top-del-template, .btn-del-template');
+  if (delTplBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    const tplId = delTplBtn.getAttribute('data-tpl-id');
+    const userTemplates = getUserTemplates();
+    const match = userTemplates.find(t => t.id === tplId);
+    if (!match) return;
+    if (confirm(`Delete the template "${match.name}"?`)) {
+      deleteUserTemplate(match.id);
+      const activeLayout = getActiveLayout();
+      activeLayout.id = 'custom';
+      delete activeLayout.baseTemplateId;
+      delete activeLayout.baseTemplateName;
+      activeLayout.isModified = false;
+      saveAndApplyLayoutForToday(activeLayout);
+      showToast(`Deleted template "${match.name}"`);
+    }
+    return;
+  }
+
+  const saveTplBtn = e.target.closest('#btn-top-save-template, .btn-save-template');
   if (saveTplBtn) {
     e.preventDefault();
     e.stopPropagation();
-    promptSaveCurrentLayoutAsTemplate();
+    promptSaveCurrentLayoutAsTemplate(false);
     return;
   }
 
@@ -5556,6 +5720,14 @@ function init() {
       if (cached) {
         try { activeDatesSet = new Set(JSON.parse(cached)); } catch (e) { }
       }
+    }
+  });
+
+  // 6. Load saved templates from disk in background
+  loadTemplatesFromDisk().then(templates => {
+    if (Array.isArray(templates)) {
+      const activeLayout = getActiveLayout();
+      syncLevel1Bar(activeLayout);
     }
   });
 }
