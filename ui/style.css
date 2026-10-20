@@ -6399,6 +6399,22 @@ body[data-section-focus] .planner-col.phase-col-custom.section-focused {
   display: flex;
 }
 
+.thinking-doc-push-btn {
+  background: transparent;
+  border: none;
+  color: var(--accent-cyan);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 11px;
+  transition: all 0.15s ease;
+}
+
+.thinking-doc-push-btn:hover {
+  background: rgba(56, 189, 248, 0.15);
+  transform: scale(1.15);
+}
+
 .thinking-doc-del-btn {
   background: transparent;
   border: none;

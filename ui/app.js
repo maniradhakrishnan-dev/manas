@@ -6005,13 +6005,21 @@ function renderDocsTree(items, filter = '') {
           <span class="thinking-doc-icon">📄</span>
           <span class="thinking-doc-name" title="${escapeHTML(item.path)}">${escapeHTML(cleanName)}</span>
           <div class="thinking-doc-item-actions">
-            <button class="thinking-doc-del-btn" title="Delete document">✕</button>
+            <button type="button" class="thinking-doc-push-btn" title="Push to Today's Planner">🚀</button>
+            <button type="button" class="thinking-doc-del-btn" title="Delete document">✕</button>
           </div>
         `;
 
         docEl.addEventListener('click', (e) => {
-          if (e.target.closest('.thinking-doc-del-btn')) return;
+          if (e.target.closest('.thinking-doc-del-btn') || e.target.closest('.thinking-doc-push-btn')) return;
           openThinkingDoc(item.path);
+        });
+
+        const pushBtn = docEl.querySelector('.thinking-doc-push-btn');
+        pushBtn?.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          await openThinkingDoc(item.path);
+          document.getElementById('btn-push-to-planner')?.click();
         });
 
         const delBtn = docEl.querySelector('.thinking-doc-del-btn');
