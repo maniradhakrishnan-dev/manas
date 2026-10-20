@@ -69,7 +69,7 @@ fn traverse_docs(dir: &std::path::Path, base: &std::path::Path) -> Vec<DocItem> 
         for entry in entries.flatten() {
             let path = entry.path();
             let name = entry.file_name().to_string_lossy().to_string();
-            if name.starts_with('.') {
+            if name.starts_with('.') || name == "assets" {
                 continue;
             }
             let is_dir = path.is_dir();
@@ -500,5 +500,14 @@ mod tests {
         assert_eq!(encoded, "");
         let decoded = base64_decode("").expect("empty decode failed");
         assert_eq!(decoded, Vec::<u8>::new());
+    }
+
+    #[test]
+    fn test_traverse_docs_structure() {
+        let path = std::path::PathBuf::from("/home/mani_radhakrishnan/.local/share/mrt/docs");
+        if path.exists() {
+            let items = traverse_docs(&path, &path);
+            assert!(!items.is_empty(), "Items should not be empty");
+        }
     }
 }

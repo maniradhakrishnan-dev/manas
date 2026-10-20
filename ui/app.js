@@ -2326,14 +2326,15 @@ function hasContent(data) {
 }
 
 function escapeHtml(str) {
-  if (!str) return '';
-  return str
+  if (str === null || str === undefined) return '';
+  return String(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
+const escapeHTML = escapeHtml;
 
 // Switch between independent Tasks panel and Notes panel inside a card
 function setCardActiveTab(card, tabName) {
@@ -5869,12 +5870,56 @@ function findDocByPath(items, path) {
   return null;
 }
 
+function filterDocItems(list, q) {
+  if (!q) return list;
+  const res = [];
+  list.forEach(item => {
+    if (item.is_dir) {
+      const matchingChildren = filterDocItems(item.children || [], q);
+      if (matchingChildren.length > 0 || item.name.toLowerCase().includes(q)) {
+        res.push({
+          ...item,
+          children: matchingChildren
+        });
+      }
+    } else {
+      if (item.name.toLowerCase().includes(q)) {
+        res.push(item);
+      }
+    }
+  });
+  return res;
+}
+
 function renderDocsTree(items, filter = '') {
   const container = document.getElementById('thinking-tree-container');
   if (!container) return;
   container.innerHTML = '';
 
+  if (!items || items.length === 0) {
+    container.innerHTML = `
+      <div class="thinking-tree-empty">
+        <p>No documents yet.</p>
+        <button type="button" class="btn-ghost" id="btn-tree-create-first">+ Create First Document</button>
+      </div>
+    `;
+    container.querySelector('#btn-tree-create-first')?.addEventListener('click', () => {
+      document.getElementById('btn-thinking-new-doc')?.click();
+    });
+    return;
+  }
+
   const filterLower = filter.trim().toLowerCase();
+  const displayItems = filterDocItems(items, filterLower);
+
+  if (displayItems.length === 0) {
+    container.innerHTML = `
+      <div class="thinking-tree-empty">
+        <p>No matching notes found.</p>
+      </div>
+    `;
+    return;
+  }
 
   function buildTreeHTML(list, depth = 0) {
     const frag = document.createDocumentFragment();
@@ -5887,34 +5932,66 @@ function renderDocsTree(items, filter = '') {
         const headerEl = document.createElement('div');
         headerEl.className = 'thinking-folder-header';
         headerEl.innerHTML = `
-          <span class="thinking-folder-toggle">▼</span>
+          <span class="thinking-folder-toggle">${filterLower ? '▼' : '▼'}</span>
           <span class="thinking-folder-icon">📁</span>
-          <span class="thinking-folder-name">${escapeHTML(item.name)}</span>
+          <span class="thinking-folder-name" title="${escapeHTML(item.name)}">${escapeHTML(item.name)}</span>
           <span class="thinking-folder-count">${item.children?.length || 0}</span>
+          <div class="thinking-folder-actions">
+            <button type="button" class="thinking-folder-add-btn" title="Add note into '${escapeHTML(item.name)}'">+</button>
+            <button type="button" class="thinking-folder-del-btn" title="Delete folder '${escapeHTML(item.name)}'">✕</button>
+          </div>
         `;
 
         const childrenEl = document.createElement('div');
         childrenEl.className = 'thinking-folder-children';
 
-        headerEl.addEventListener('click', () => {
+        headerEl.addEventListener('click', (e) => {
+          if (e.target.closest('.thinking-folder-add-btn') || e.target.closest('.thinking-folder-del-btn')) {
+            return;
+          }
           const isCollapsed = childrenEl.style.display === 'none';
           childrenEl.style.display = isCollapsed ? 'flex' : 'none';
           const toggle = headerEl.querySelector('.thinking-folder-toggle');
           if (toggle) toggle.textContent = isCollapsed ? '▼' : '▶';
         });
 
+        const addBtn = headerEl.querySelector('.thinking-folder-add-btn');
+        addBtn?.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const docName = prompt(`Create new document inside '${item.name}':`);
+          if (!docName || !docName.trim()) return;
+          let filename = docName.trim();
+          if (!filename.endsWith('.md')) filename += '.md';
+          const fullPath = `${item.path}/${filename}`;
+          await callTauri('create_doc', { path: fullPath });
+          await loadThinkingDocs(false);
+          openThinkingDoc(fullPath);
+          showToast(`Created ${fullPath}`);
+        });
+
+        const delFolderBtn = headerEl.querySelector('.thinking-folder-del-btn');
+        delFolderBtn?.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          if (confirm(`Delete folder '${item.name}' and all its documents?`)) {
+            await callTauri('delete_doc', { path: item.path });
+            await loadThinkingDocs(true);
+            showToast(`Deleted folder '${item.name}'`);
+          }
+        });
+
         if (item.children && item.children.length > 0) {
           childrenEl.appendChild(buildTreeHTML(item.children, depth + 1));
+        } else {
+          const emptyHint = document.createElement('div');
+          emptyHint.className = 'thinking-empty-folder-hint';
+          emptyHint.textContent = 'Empty folder (click + to add note)';
+          childrenEl.appendChild(emptyHint);
         }
 
         folderEl.appendChild(headerEl);
         folderEl.appendChild(childrenEl);
         frag.appendChild(folderEl);
       } else {
-        if (filterLower && !item.name.toLowerCase().includes(filterLower)) {
-          return;
-        }
-
         const docEl = document.createElement('div');
         docEl.className = `thinking-doc-item ${item.path === currentOpenDocPath ? 'active' : ''}`;
         const cleanName = item.name.replace(/\.(md|markdown|txt)$/i, '');
@@ -5952,7 +6029,7 @@ function renderDocsTree(items, filter = '') {
     return frag;
   }
 
-  container.appendChild(buildTreeHTML(items));
+  container.appendChild(buildTreeHTML(displayItems));
 }
 
 async function openThinkingDoc(relPath) {
