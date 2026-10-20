@@ -622,8 +622,8 @@
       <div class="modal-card bridge-modal-card">
         <div class="modal-header">
           <div class="modal-header-left">
-            <h2>🚀 Push to Today's Planner</h2>
-            <p class="modal-sub">Send action items or research goals from this document directly into today's rhythm.</p>
+            <h2>🚀 Push Action Items to Planner</h2>
+            <p class="modal-sub">Route actionable tasks or research items from this document into the exact section and column box in Today's Planner.</p>
           </div>
           <button id="btn-close-push-planner-modal" class="modal-close-btn">&times;</button>
         </div>
@@ -632,23 +632,43 @@
             <label class="bridge-label">Source Document:</label>
             <div id="bridge-source-doc-name" class="bridge-source-badge">AI Research / Foundation Models & Latents.md</div>
           </div>
-          <div class="bridge-field-group">
-            <label class="bridge-label" for="bridge-target-section">Destination Section in Today's Planner:</label>
-            <select id="bridge-target-section" class="bridge-select">
-              <!-- Dynamically populated with today's layout sections -->
-            </select>
+
+          <!-- Section & Column Precision Routing -->
+          <div class="bridge-grid-row">
+            <div class="bridge-field-group flex-1">
+              <label class="bridge-label" for="bridge-target-section">1. Choose Section / Phase:</label>
+              <select id="bridge-target-section" class="bridge-select">
+                <!-- Dynamically populated with today's layout sections -->
+              </select>
+            </div>
+            <div class="bridge-field-group flex-1">
+              <label class="bridge-label" for="bridge-target-column">2. Choose Column Box:</label>
+              <select id="bridge-target-column" class="bridge-select">
+                <!-- Dynamically populated with columns belonging to selected section -->
+              </select>
+            </div>
           </div>
+
+          <!-- Live Visual Destination Indicator -->
+          <div class="bridge-landing-badge" id="bridge-landing-badge">
+            <span class="bridge-landing-icon">🎯</span>
+            <span id="bridge-landing-text">Landing in: Morning Focus → Deep Work Target</span>
+          </div>
+
           <div class="bridge-field-group">
-            <label class="bridge-label">Select Items to Push or Type Action:</label>
+            <div class="bridge-check-header">
+              <label class="bridge-label">Select Action Items to Push:</label>
+              <button type="button" id="btn-bridge-select-all" class="bridge-text-btn">Select All</button>
+            </div>
             <div id="bridge-doc-checklist-preview" class="bridge-checklist-box">
               <!-- Checkboxes extracted from document or custom text -->
             </div>
-            <textarea id="bridge-custom-task-input" class="bridge-task-textarea" placeholder="Or type a specific action item to push into today..."></textarea>
+            <textarea id="bridge-custom-task-input" class="bridge-task-textarea" placeholder="Or type a custom action item to land in this box..."></textarea>
           </div>
         </div>
         <div class="modal-footer bridge-modal-footer">
           <button type="button" class="btn-ghost" id="btn-cancel-push-planner">Cancel</button>
-          <button type="button" class="btn-primary" id="btn-confirm-push-planner">↳ Push into Today</button>
+          <button type="button" class="btn-primary" id="btn-confirm-push-planner">↳ Push into Today's Box</button>
         </div>
       </div>
     </div>

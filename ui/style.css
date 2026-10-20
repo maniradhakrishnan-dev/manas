@@ -6114,6 +6114,8 @@ body[data-section-focus] .planner-col.phase-col-custom.section-focused {
   width: 290px;
   min-width: 250px;
   max-width: 380px;
+  height: 100%;
+  max-height: 100%;
   background: var(--surface-card);
   border-right: 1px solid var(--border-glass);
   display: flex;
@@ -6128,6 +6130,7 @@ body[data-section-focus] .planner-col.phase-col-custom.section-focused {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .thinking-sidebar-title-row {
@@ -6205,12 +6208,31 @@ body[data-section-focus] .planner-col.phase-col-custom.section-focused {
 
 /* Document Tree Container */
 .thinking-tree-container {
-  flex: 1;
+  flex: 1 1 0;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 10px 8px;
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.thinking-tree-container::-webkit-scrollbar {
+  width: 5px;
+}
+
+.thinking-tree-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.thinking-tree-container::-webkit-scrollbar-thumb {
+  background: var(--border-glass);
+  border-radius: 4px;
+}
+
+.thinking-tree-container::-webkit-scrollbar-thumb:hover {
+  background: var(--text-dim);
 }
 
 .thinking-folder-group {
@@ -6951,6 +6973,54 @@ body[data-section-focus] .planner-col.phase-col-custom.section-focused {
   flex-direction: column;
   gap: 16px;
   margin-top: 14px;
+}
+
+.bridge-grid-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.bridge-grid-row .flex-1 {
+  flex: 1;
+}
+
+.bridge-landing-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: var(--accent-emerald);
+  font-weight: 500;
+}
+
+.bridge-landing-icon {
+  font-size: 14px;
+}
+
+.bridge-check-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.bridge-text-btn {
+  background: transparent;
+  border: none;
+  color: var(--accent-cyan);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.bridge-text-btn:hover {
+  text-decoration: underline;
 }
 
 .bridge-field-group {

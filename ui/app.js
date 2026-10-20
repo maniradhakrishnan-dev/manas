@@ -5809,6 +5809,11 @@ function switchAppMode(mode) {
     if (phaseRibbon) phaseRibbon.style.display = 'flex';
     if (dateNavPill) dateNavPill.style.visibility = 'visible';
 
+    // Refresh planner layout and cards so newly pushed tasks appear immediately
+    const dateKey = formatDateKey(currentDate);
+    syncWorkspaceLayoutForDate(dateKey, currentDayData);
+    renderCurrentDay();
+
     if (footerStoragePath) {
       footerStoragePath.textContent = `Storage: ${activeStoragePath || '~/.local/share/manas/entries'}`;
       footerStoragePath.title = "Click to open entries folder";
@@ -6733,26 +6738,79 @@ function initDualSpaceAndThinkingStudio() {
     const sourceBadge = document.getElementById('bridge-source-doc-name');
     if (sourceBadge) sourceBadge.textContent = currentOpenDocPath;
 
-    // Populate destination sections from today's layout
+    // Build structured section and column list from current active layout
     const targetSectionSelect = document.getElementById('bridge-target-section');
-    if (targetSectionSelect) {
-      targetSectionSelect.innerHTML = '';
-      const activeLayout = getActiveLayout();
-      const pageRows = normalizeLayoutPageRows(activeLayout);
+    const targetColumnSelect = document.getElementById('bridge-target-column');
+    const landingText = document.getElementById('bridge-landing-text');
 
-      pageRows.forEach(row => {
-        (row.sections || []).forEach(sec => {
-          const subRows = getSectionSubRows(sec);
-          subRows.forEach(sub => {
-            (sub.tracks || []).forEach(tr => {
-              const opt = document.createElement('option');
-              opt.value = tr.key;
-              opt.textContent = `${sec.title} → ${tr.title}`;
-              targetSectionSelect.appendChild(opt);
+    const activeLayout = getActiveLayout();
+    const pageRows = normalizeLayoutPageRows(activeLayout);
+
+    const sectionList = [];
+    pageRows.forEach(row => {
+      (row.sections || []).forEach(sec => {
+        const subRows = getSectionSubRows(sec);
+        const columns = [];
+        subRows.forEach(sub => {
+          (sub.tracks || []).forEach(tr => {
+            columns.push({
+              key: tr.key,
+              title: tr.title || getDefaultTitle(tr.key),
+              placeholder: tr.placeholder || ''
             });
           });
         });
+        if (columns.length > 0) {
+          sectionList.push({
+            id: sec.id,
+            title: sec.title || 'Section',
+            timeRange: sec.timeRange || '',
+            columns
+          });
+        }
       });
+    });
+
+    function updateColumnDropdown(selectedSecIdx) {
+      if (!targetColumnSelect) return;
+      targetColumnSelect.innerHTML = '';
+      const sec = sectionList[selectedSecIdx] || sectionList[0];
+      if (!sec) return;
+
+      sec.columns.forEach(col => {
+        const opt = document.createElement('option');
+        opt.value = col.key;
+        opt.textContent = col.title;
+        targetColumnSelect.appendChild(opt);
+      });
+      updateLandingBadge();
+    }
+
+    function updateLandingBadge() {
+      if (!landingText) return;
+      const secOpt = targetSectionSelect?.options[targetSectionSelect.selectedIndex];
+      const colOpt = targetColumnSelect?.options[targetColumnSelect.selectedIndex];
+      landingText.textContent = `Landing in: ${secOpt?.textContent || 'Section'} → ${colOpt?.textContent || 'Column'}`;
+    }
+
+    if (targetSectionSelect && targetColumnSelect) {
+      targetSectionSelect.innerHTML = '';
+      sectionList.forEach((sec, idx) => {
+        const opt = document.createElement('option');
+        opt.value = idx;
+        opt.textContent = sec.timeRange ? `${sec.title} (${sec.timeRange})` : sec.title;
+        targetSectionSelect.appendChild(opt);
+      });
+
+      targetSectionSelect.onchange = () => {
+        updateColumnDropdown(parseInt(targetSectionSelect.value, 10));
+      };
+
+      targetColumnSelect.onchange = () => {
+        updateLandingBadge();
+      };
+
+      updateColumnDropdown(0);
     }
 
     // Extract checklists from current open doc
@@ -6783,6 +6841,20 @@ function initDualSpaceAndThinkingStudio() {
       }
     }
 
+    // Select All / Deselect All toggle
+    const btnSelectAll = document.getElementById('btn-bridge-select-all');
+    if (btnSelectAll) {
+      let isAllSelected = true;
+      btnSelectAll.textContent = 'Deselect All';
+      btnSelectAll.onclick = () => {
+        isAllSelected = !isAllSelected;
+        document.querySelectorAll('#bridge-doc-checklist-preview input[type="checkbox"]').forEach(cb => {
+          cb.checked = isAllSelected;
+        });
+        btnSelectAll.textContent = isAllSelected ? 'Deselect All' : 'Select All';
+      };
+    }
+
     const customInput = document.getElementById('bridge-custom-task-input');
     if (customInput) customInput.value = '';
 
@@ -6794,17 +6866,18 @@ function initDualSpaceAndThinkingStudio() {
   btnCancelPushModal?.addEventListener('click', closePushModal);
 
   btnConfirmPushModal?.addEventListener('click', async () => {
+    const targetColumnSelect = document.getElementById('bridge-target-column');
     const targetSectionSelect = document.getElementById('bridge-target-section');
-    const targetKey = targetSectionSelect?.value;
+    const targetKey = targetColumnSelect?.value;
     if (!targetKey) {
-      showToast("No target section selected");
+      showToast("No target column selected");
       return;
     }
 
     // Collect tasks from checkboxes
     const tasksToAdd = [];
     document.querySelectorAll('#bridge-doc-checklist-preview input[type="checkbox"]:checked').forEach(cb => {
-      if (cb.value) tasksToAdd.push(cb.value.trim());
+      if (cb.value && cb.value.trim()) tasksToAdd.push(cb.value.trim());
     });
 
     // Plus custom input text
@@ -6818,30 +6891,45 @@ function initDualSpaceAndThinkingStudio() {
       return;
     }
 
+    const dateKeyToUse = formatDateKey(currentDate);
+
     // Ensure target block exists in currentDayData
     if (!currentDayData[targetKey]) {
-      currentDayData[targetKey] = { title: targetKey, content: '', tasks: [] };
+      const colTitle = targetColumnSelect?.options[targetColumnSelect.selectedIndex]?.textContent || getDefaultTitle(targetKey);
+      currentDayData[targetKey] = getDefaultBlockData(colTitle);
     }
     if (!Array.isArray(currentDayData[targetKey].tasks)) {
       currentDayData[targetKey].tasks = [];
     }
 
+    const docTag = currentOpenDocPath.split('/').pop().replace(/\.md$/i, '');
     tasksToAdd.forEach(tText => {
       currentDayData[targetKey].tasks.push({
-        id: 't_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-        text: `[${currentOpenDocPath.split('/').pop().replace(/\.md$/i, '')}] ${tText}`,
-        completed: false
+        text: `[${docTag}] ${tText}`,
+        done: false,
+        notes: `Source doc: ${currentOpenDocPath}`,
+        subtasks: []
       });
     });
 
-    const dateKey = formatDateKey(currentDate);
-    activeDatesSet.add(dateKey);
-    await callTauri('save_day', { entry: currentDayData });
+    // Synchronize block content and persist to disk + local cache
+    syncBlockContent(targetKey);
+    isDirty = true;
+    saveDay(dateKeyToUse, currentDayData);
+    activeDatesSet.add(dateKeyToUse);
+
+    if (typeof window.__TAURI__ !== 'undefined') {
+      try {
+        await callTauri('save_day', { entry: currentDayData });
+      } catch (e) {
+        console.warn("Direct save_day call failed:", e);
+      }
+    }
 
     // Append pulse log to document
-    const todayStr = formatDateKey(currentDate);
-    const destTitle = targetSectionSelect.options[targetSectionSelect.selectedIndex]?.textContent || targetKey;
-    const logEntry = `\n> *🚀 Pushed ${tasksToAdd.length} task${tasksToAdd.length > 1 ? 's' : ''} to Daily Planner (${destTitle}) on ${todayStr}*\n`;
+    const secTitle = targetSectionSelect?.options[targetSectionSelect.selectedIndex]?.textContent || 'Section';
+    const colTitle = targetColumnSelect?.options[targetColumnSelect.selectedIndex]?.textContent || targetKey;
+    const logEntry = `\n> *🚀 Pushed ${tasksToAdd.length} task${tasksToAdd.length > 1 ? 's' : ''} to Daily Planner [${secTitle} → ${colTitle}] on ${dateKeyToUse}*\n`;
 
     const textarea = document.getElementById('thinking-editor-textarea');
     if (textarea) {
@@ -6851,8 +6939,12 @@ function initDualSpaceAndThinkingStudio() {
     }
 
     closePushModal();
+
+    // Re-render planner workspace immediately
+    syncWorkspaceLayoutForDate(dateKeyToUse, currentDayData);
     renderCurrentDay();
-    showToast(`Pushed ${tasksToAdd.length} task(s) to Today's Planner!`);
+
+    showToast(`Pushed ${tasksToAdd.length} task(s) into [${secTitle} → ${colTitle}]!`);
   });
 
   // ========================================================================
