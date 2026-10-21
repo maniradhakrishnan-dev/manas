@@ -2283,8 +2283,10 @@ function saveDay(targetDateKey = null, targetData = null) {
   if (statusDot) statusDot.classList.add('pulsing');
   if (statusLabel) statusLabel.textContent = "Saving...";
 
-  if (typeof window.__TAURI__ === 'undefined') {
-    safeStorage.setItem(`mrt_${dateKey}`, JSON.stringify(dataToSave));
+  // Always mirror to safeStorage as instant synchronous local cache
+  safeStorage.setItem(`mrt_${dateKey}`, JSON.stringify(dataToSave));
+  if (dataToSave.customLayout) {
+    safeStorage.setItem(`mrt_layout_${dateKey}`, JSON.stringify(dataToSave.customLayout));
   }
   callTauri('save_day', { entry: dataToSave });
 
@@ -3436,6 +3438,17 @@ function triggerAutoSave() {
   clearTimeout(autoSaveTimer);
   autoSaveTimer = setTimeout(saveDay, 700);
 }
+
+// Flush dirty edits immediately on window exit, hide, or beforeunload
+window.addEventListener('beforeunload', () => {
+  if (isDirty) saveDay();
+});
+window.addEventListener('pagehide', () => {
+  if (isDirty) saveDay();
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && isDirty) saveDay();
+});
 
 // Instant Non-Blocking Date Navigation
 function changeDate(newDate) {
@@ -5663,29 +5676,16 @@ function init() {
     else btnToday.classList.remove('active-today');
   }
 
-  // In desktop app, purge any legacy localStorage day keys so disk is the sole source of truth
-  const isDesktop = typeof window.__TAURI__ !== 'undefined';
-  if (isDesktop) {
+  // 1. Immediately read from safeStorage (localStorage) for instant zero-flicker render
+  const localCached = safeStorage.getItem(`mrt_${dateKey}`);
+  if (localCached) {
     try {
-      for (let i = localStorage.length - 1; i >= 0; i--) {
-        const k = localStorage.key(i);
-        if (k && (k.startsWith('mrt_20') || k.startsWith('mrt_active_dates'))) {
-          localStorage.removeItem(k);
-        }
-      }
-    } catch (e) { }
-    currentDayData = getDefaultDayData(dateKey);
-  } else {
-    const localCached = safeStorage.getItem(`mrt_${dateKey}`);
-    if (localCached) {
-      try {
-        currentDayData = normalizeDayData(JSON.parse(localCached), dateKey);
-      } catch (e) {
-        currentDayData = getDefaultDayData(dateKey);
-      }
-    } else {
+      currentDayData = normalizeDayData(JSON.parse(localCached), dateKey);
+    } catch (e) {
       currentDayData = getDefaultDayData(dateKey);
     }
+  } else {
+    currentDayData = getDefaultDayData(dateKey);
   }
   syncWorkspaceLayoutForDate(dateKey, currentDayData);
   renderCurrentDay();
@@ -5696,20 +5696,19 @@ function init() {
   // Check pending carryover for today
   checkPendingCarryover(dateKey);
 
-  // 4. Background non-blocking sync with native disk
+  // 4. In Tauri desktop app, load disk data as the authoritative persistent source of truth
   callTauri('get_day', { date: dateKey }).then(diskData => {
     if (formatDateKey(currentDate) === dateKey) {
       if (diskData && typeof diskData === 'object') {
-        const diskTime = new Date(diskData.updatedAt || 0).getTime();
-        const curTime = new Date(currentDayData.updatedAt || 0).getTime();
-        if (diskTime > curTime) {
-          currentDayData = normalizeDayData(diskData, dateKey);
-          syncWorkspaceLayoutForDate(dateKey, currentDayData);
-          renderCurrentDay();
-          checkPendingCarryover(dateKey);
+        currentDayData = normalizeDayData(diskData, dateKey);
+        safeStorage.setItem(`mrt_${dateKey}`, JSON.stringify(currentDayData));
+        if (currentDayData.customLayout) {
+          safeStorage.setItem(`mrt_layout_${dateKey}`, JSON.stringify(currentDayData.customLayout));
         }
-      } else if (typeof window.__TAURI__ !== 'undefined' && !diskData) {
-        safeStorage.removeItem(`mrt_${dateKey}`);
+        syncWorkspaceLayoutForDate(dateKey, currentDayData);
+        renderCurrentDay();
+        checkPendingCarryover(dateKey);
+      } else if (typeof window.__TAURI__ !== 'undefined' && !diskData && !localCached) {
         activeDatesSet.delete(dateKey);
         currentDayData = getDefaultDayData(dateKey);
         syncWorkspaceLayoutForDate(dateKey, currentDayData);

@@ -10,21 +10,29 @@ fn get_storage_dir(app: &tauri::AppHandle) -> PathBuf {
         return p;
     }
 
-    // Isolate Development / Testing from Real Production User Space:
-    // Debug builds / Dev tests strictly use ~/.local/share/mrt/entries
-    // Release builds / Installed app strictly use ~/.local/share/manas/entries
-    let subfolder = if cfg!(debug_assertions) {
-        "mrt"
-    } else {
-        "manas"
-    };
-
     let base = if let Some(d) = dirs::data_dir() {
-        d.join(subfolder).join("entries")
+        let manas_dir = d.join("manas").join("entries");
+        let legacy_mrt_dir = d.join("mrt").join("entries");
+        let _ = fs::create_dir_all(&manas_dir);
+        // Automatically migrate any legacy or dev files from mrt
+        if legacy_mrt_dir.exists() {
+            if let Ok(entries) = fs::read_dir(&legacy_mrt_dir) {
+                for entry in entries.flatten() {
+                    let p = entry.path();
+                    if let Some(fname) = p.file_name() {
+                        let dest = manas_dir.join(fname);
+                        if !dest.exists() {
+                            let _ = fs::copy(&p, dest);
+                        }
+                    }
+                }
+            }
+        }
+        manas_dir
     } else if let Ok(app_dir) = app.path().app_data_dir() {
-        app_dir.join(subfolder).join("entries")
+        app_dir.join("manas").join("entries")
     } else {
-        PathBuf::from(format!("./{}_data/entries", subfolder))
+        PathBuf::from("./manas_data/entries")
     };
     let _ = fs::create_dir_all(&base);
     base
@@ -37,18 +45,28 @@ fn get_docs_dir(app: &tauri::AppHandle) -> PathBuf {
         return p;
     }
 
-    let subfolder = if cfg!(debug_assertions) {
-        "mrt"
-    } else {
-        "manas"
-    };
-
     let base = if let Some(d) = dirs::data_dir() {
-        d.join(subfolder).join("docs")
+        let manas_docs = d.join("manas").join("docs");
+        let legacy_mrt_docs = d.join("mrt").join("docs");
+        let _ = fs::create_dir_all(&manas_docs);
+        if legacy_mrt_docs.exists() {
+            if let Ok(entries) = fs::read_dir(&legacy_mrt_docs) {
+                for entry in entries.flatten() {
+                    let p = entry.path();
+                    if let Some(fname) = p.file_name() {
+                        let dest = manas_docs.join(fname);
+                        if !dest.exists() {
+                            let _ = fs::copy(&p, dest);
+                        }
+                    }
+                }
+            }
+        }
+        manas_docs
     } else if let Ok(app_dir) = app.path().app_data_dir() {
-        app_dir.join(subfolder).join("docs")
+        app_dir.join("manas").join("docs")
     } else {
-        PathBuf::from(format!("./{}_data/docs", subfolder))
+        PathBuf::from("./manas_data/docs")
     };
     let _ = fs::create_dir_all(&base);
     base
@@ -147,6 +165,18 @@ fn get_day(app: tauri::AppHandle, date: String) -> Option<serde_json::Value> {
             }
         }
     }
+    // Fallback: check legacy mrt directory if present
+    if let Some(d) = dirs::data_dir() {
+        let legacy_file = d.join("mrt").join("entries").join(format!("{}.json", date));
+        if legacy_file.exists() && legacy_file != file {
+            if let Ok(content) = fs::read_to_string(&legacy_file) {
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                    let _ = fs::write(&file, &content);
+                    return Some(val);
+                }
+            }
+        }
+    }
     None
 }
 
@@ -159,8 +189,24 @@ fn save_day(app: tauri::AppHandle, entry: serde_json::Value) -> Result<(), Strin
 
     let dir = get_storage_dir(&app);
     let file = dir.join(format!("{}.json", date));
+
+    // Create automatic safety backup if file already exists
+    if file.exists() {
+        let bak = dir.join(format!("{}.json.bak", date));
+        let _ = fs::copy(&file, bak);
+    }
+
     let json_str = serde_json::to_string_pretty(&entry).map_err(|e| e.to_string())?;
-    fs::write(file, json_str).map_err(|e| e.to_string())?;
+    fs::write(&file, &json_str).map_err(|e| e.to_string())?;
+
+    // Also mirror to legacy mrt directory if present
+    if let Some(d) = dirs::data_dir() {
+        let legacy_file = d.join("mrt").join("entries").join(format!("{}.json", date));
+        if legacy_file != file && legacy_file.parent().map(|p| p.exists()).unwrap_or(false) {
+            let _ = fs::write(legacy_file, &json_str);
+        }
+    }
+
     Ok(())
 }
 
@@ -168,7 +214,7 @@ fn save_day(app: tauri::AppHandle, entry: serde_json::Value) -> Result<(), Strin
 fn get_active_dates(app: tauri::AppHandle) -> Vec<String> {
     let mut dates = Vec::new();
     let dir = get_storage_dir(&app);
-    if let Ok(entries) = fs::read_dir(dir) {
+    if let Ok(entries) = fs::read_dir(&dir) {
         for entry in entries.flatten() {
             let path = entry.path();
             if path.extension().and_then(|s| s.to_str()) == Some("json") {
@@ -210,12 +256,44 @@ fn get_templates(app: tauri::AppHandle) -> Option<serde_json::Value> {
     let dir = get_storage_dir(&app);
     let parent = dir.parent().unwrap_or(&dir);
     let file = parent.join("templates.json");
+    let mut primary_templates: Vec<serde_json::Value> = Vec::new();
+
     if file.exists() {
         if let Ok(content) = fs::read_to_string(&file) {
-            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
-                return Some(val);
+            if let Ok(val) = serde_json::from_str::<Vec<serde_json::Value>>(&content) {
+                primary_templates = val;
             }
         }
+    }
+
+    // Merge any unique templates from legacy mrt directory
+    if let Some(d) = dirs::data_dir() {
+        let legacy_file = d.join("mrt").join("templates.json");
+        if legacy_file.exists() && legacy_file != file {
+            if let Ok(content) = fs::read_to_string(&legacy_file) {
+                if let Ok(legacy_list) = serde_json::from_str::<Vec<serde_json::Value>>(&content) {
+                    let mut updated = false;
+                    for item in legacy_list {
+                        let id = item.get("id").and_then(|v| v.as_str());
+                        if let Some(id_str) = id {
+                            if !primary_templates.iter().any(|p| p.get("id").and_then(|v| v.as_str()) == Some(id_str)) {
+                                primary_templates.push(item);
+                                updated = true;
+                            }
+                        }
+                    }
+                    if updated {
+                        if let Ok(merged_str) = serde_json::to_string_pretty(&primary_templates) {
+                            let _ = fs::write(&file, merged_str);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if !primary_templates.is_empty() {
+        return serde_json::to_value(&primary_templates).ok();
     }
     None
 }
@@ -226,7 +304,16 @@ fn save_templates(app: tauri::AppHandle, templates: serde_json::Value) -> Result
     let parent = dir.parent().unwrap_or(&dir);
     let file = parent.join("templates.json");
     let json_str = serde_json::to_string_pretty(&templates).map_err(|e| e.to_string())?;
-    fs::write(file, json_str).map_err(|e| e.to_string())?;
+    fs::write(&file, &json_str).map_err(|e| e.to_string())?;
+
+    // Mirror to legacy mrt templates.json if present
+    if let Some(d) = dirs::data_dir() {
+        let legacy_file = d.join("mrt").join("templates.json");
+        if legacy_file != file && legacy_file.parent().map(|p| p.exists()).unwrap_or(false) {
+            let _ = fs::write(legacy_file, &json_str);
+        }
+    }
+
     Ok(())
 }
 
