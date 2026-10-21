@@ -15,8 +15,8 @@ fn get_storage_dir(app: &tauri::AppHandle) -> PathBuf {
         let legacy_mrt_dir = d.join("mrt").join("entries");
         let _ = fs::create_dir_all(&manas_dir);
         // Automatically migrate any legacy or dev files from mrt
-        if legacy_mrt_dir.exists() {
-            if let Ok(entries) = fs::read_dir(&legacy_mrt_dir) {
+        if legacy_mrt_dir.exists()
+            && let Ok(entries) = fs::read_dir(&legacy_mrt_dir) {
                 for entry in entries.flatten() {
                     let p = entry.path();
                     if let Some(fname) = p.file_name() {
@@ -27,7 +27,6 @@ fn get_storage_dir(app: &tauri::AppHandle) -> PathBuf {
                     }
                 }
             }
-        }
         manas_dir
     } else if let Ok(app_dir) = app.path().app_data_dir() {
         app_dir.join("manas").join("entries")
@@ -49,8 +48,8 @@ fn get_docs_dir(app: &tauri::AppHandle) -> PathBuf {
         let manas_docs = d.join("manas").join("docs");
         let legacy_mrt_docs = d.join("mrt").join("docs");
         let _ = fs::create_dir_all(&manas_docs);
-        if legacy_mrt_docs.exists() {
-            if let Ok(entries) = fs::read_dir(&legacy_mrt_docs) {
+        if legacy_mrt_docs.exists()
+            && let Ok(entries) = fs::read_dir(&legacy_mrt_docs) {
                 for entry in entries.flatten() {
                     let p = entry.path();
                     if let Some(fname) = p.file_name() {
@@ -61,7 +60,6 @@ fn get_docs_dir(app: &tauri::AppHandle) -> PathBuf {
                     }
                 }
             }
-        }
         manas_docs
     } else if let Ok(app_dir) = app.path().app_data_dir() {
         app_dir.join("manas").join("docs")
@@ -128,8 +126,8 @@ fn traverse_docs(dir: &std::path::Path, base: &std::path::Path) -> Vec<DocItem> 
 }
 
 fn seed_starter_docs(docs_dir: &std::path::Path) {
-    if let Ok(mut entries) = fs::read_dir(docs_dir) {
-        if entries.next().is_none() {
+    if let Ok(mut entries) = fs::read_dir(docs_dir)
+        && entries.next().is_none() {
             let ai_dir = docs_dir.join("AI Research");
             let _ = fs::create_dir_all(&ai_dir);
             let _ = fs::write(
@@ -151,31 +149,26 @@ fn seed_starter_docs(docs_dir: &std::path::Path) {
                 "# Torque & Gear Ratio Sizing\n\n## ⚙️ Dynamics & Load Torque\n$$\\tau_{\\text{motor}} = \\frac{\\tau_{\\text{load}}}{N \\cdot \\eta} + J_{\\text{reflected}} \\cdot \\alpha$$\n\nWhere:\n- $N$ = Gear ratio\n- $\\eta$ = Transmission efficiency (~85% for planetary gearbox)\n- $J_{\\text{reflected}} = \\frac{J_{\\text{load}}}{N^2}$\n\n## 🔩 Mechanical Design Checklist\n- [ ] Verify radial load ratings on output shaft bearings\n- [ ] Calculate lead screw pitch for 150mm/s linear velocity\n- [ ] CAD check motor mount clearance against chassis ribs\n"
             );
         }
-    }
 }
 
 #[tauri::command]
 fn get_day(app: tauri::AppHandle, date: String) -> Option<serde_json::Value> {
     let dir = get_storage_dir(&app);
     let file = dir.join(format!("{}.json", date));
-    if file.exists() {
-        if let Ok(content) = fs::read_to_string(&file) {
-            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+    if file.exists()
+        && let Ok(content) = fs::read_to_string(&file)
+            && let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
                 return Some(val);
             }
-        }
-    }
     // Fallback: check legacy mrt directory if present
     if let Some(d) = dirs::data_dir() {
         let legacy_file = d.join("mrt").join("entries").join(format!("{}.json", date));
-        if legacy_file.exists() && legacy_file != file {
-            if let Ok(content) = fs::read_to_string(&legacy_file) {
-                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+        if legacy_file.exists() && legacy_file != file
+            && let Ok(content) = fs::read_to_string(&legacy_file)
+                && let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
                     let _ = fs::write(&file, &content);
                     return Some(val);
                 }
-            }
-        }
     }
     None
 }
@@ -217,11 +210,10 @@ fn get_active_dates(app: tauri::AppHandle) -> Vec<String> {
     if let Ok(entries) = fs::read_dir(&dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) == Some("json") {
-                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+            if path.extension().and_then(|s| s.to_str()) == Some("json")
+                && let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                     dates.push(stem.to_string());
                 }
-            }
         }
     }
     dates
@@ -258,38 +250,32 @@ fn get_templates(app: tauri::AppHandle) -> Option<serde_json::Value> {
     let file = parent.join("templates.json");
     let mut primary_templates: Vec<serde_json::Value> = Vec::new();
 
-    if file.exists() {
-        if let Ok(content) = fs::read_to_string(&file) {
-            if let Ok(val) = serde_json::from_str::<Vec<serde_json::Value>>(&content) {
+    if file.exists()
+        && let Ok(content) = fs::read_to_string(&file)
+            && let Ok(val) = serde_json::from_str::<Vec<serde_json::Value>>(&content) {
                 primary_templates = val;
             }
-        }
-    }
 
     // Merge any unique templates from legacy mrt directory
     if let Some(d) = dirs::data_dir() {
         let legacy_file = d.join("mrt").join("templates.json");
-        if legacy_file.exists() && legacy_file != file {
-            if let Ok(content) = fs::read_to_string(&legacy_file) {
-                if let Ok(legacy_list) = serde_json::from_str::<Vec<serde_json::Value>>(&content) {
+        if legacy_file.exists() && legacy_file != file
+            && let Ok(content) = fs::read_to_string(&legacy_file)
+                && let Ok(legacy_list) = serde_json::from_str::<Vec<serde_json::Value>>(&content) {
                     let mut updated = false;
                     for item in legacy_list {
                         let id = item.get("id").and_then(|v| v.as_str());
-                        if let Some(id_str) = id {
-                            if !primary_templates.iter().any(|p| p.get("id").and_then(|v| v.as_str()) == Some(id_str)) {
+                        if let Some(id_str) = id
+                            && !primary_templates.iter().any(|p| p.get("id").and_then(|v| v.as_str()) == Some(id_str)) {
                                 primary_templates.push(item);
                                 updated = true;
                             }
-                        }
                     }
-                    if updated {
-                        if let Ok(merged_str) = serde_json::to_string_pretty(&primary_templates) {
+                    if updated
+                        && let Ok(merged_str) = serde_json::to_string_pretty(&primary_templates) {
                             let _ = fs::write(&file, merged_str);
                         }
-                    }
                 }
-            }
-        }
     }
 
     if !primary_templates.is_empty() {
@@ -475,7 +461,7 @@ fn base64_encode(data: &[u8]) -> String {
     if valb > -6 {
         out.push(TABLE[((val << 8) >> (valb + 8)) as usize & 0x3F] as char);
     }
-    while out.len() % 4 != 0 {
+    while !out.len().is_multiple_of(4) {
         out.push('=');
     }
     out
@@ -591,10 +577,26 @@ mod tests {
 
     #[test]
     fn test_traverse_docs_structure() {
-        let path = std::path::PathBuf::from("/home/mani_radhakrishnan/.local/share/mrt/docs");
-        if path.exists() {
-            let items = traverse_docs(&path, &path);
-            assert!(!items.is_empty(), "Items should not be empty");
-        }
+        let temp_dir = std::env::temp_dir().join(format!(
+            "manas_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(temp_dir.join("subfolder")).expect("failed to create test dir");
+        fs::write(temp_dir.join("test_note.md"), "# Hello").expect("failed to create test doc");
+        fs::write(temp_dir.join("subfolder").join("child.md"), "# Child").expect("failed to create child doc");
+
+        let items = traverse_docs(&temp_dir, &temp_dir);
+        assert_eq!(items.len(), 2, "Expected 1 subfolder and 1 md file");
+        assert_eq!(items[0].name, "subfolder");
+        assert!(items[0].is_dir);
+        assert_eq!(items[0].children.len(), 1);
+        assert_eq!(items[0].children[0].name, "child.md");
+        assert_eq!(items[1].name, "test_note.md");
+        assert!(!items[1].is_dir);
+
+        let _ = fs::remove_dir_all(&temp_dir);
     }
 }
